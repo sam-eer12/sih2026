@@ -160,7 +160,14 @@ or steep off-road terrain where a 2.5D height-field assumption breaks (§13, A-4
               │  FrameMessage (WebSocket, binary)
               ▼
   ┌───────────────────────────┐
-  │ 5. DASHBOARD (Three.js)   │   4 views · ring overlay · live HUD
+  │ 5. WEB APP (Next.js)      │   Firebase Auth gate · app shell · routing
+  │    ├─ Three.js viewer     │   4 views · ring overlay · A/B wipe · live HUD
+  │    └─ route handlers      │   Firebase Admin token verify → MongoDB
+  └───────────┬───────────────┘
+              │  runs · decision audit log · scene registry
+              ▼
+  ┌───────────────────────────┐
+  │ 5b. MongoDB Atlas         │   run history · reroute audit · scene ground truth
   └───────────────────────────┘
 
   ┌───────────────────────────┐
@@ -332,6 +339,37 @@ make the refinement pass unbounded.
 | **FR-34** | The harness shall report object recall by range bin and by object class. | PS-9 | T-B4 |
 | **FR-35** | All benchmark output shall be written to a machine-readable `results.json` plus a rendered Markdown table, regenerable by one command, so no number reaches a slide by hand-copy. | — | T-B5 |
 
+### 7.8 Web platform
+
+The dashboard is delivered as a Next.js application with Firebase authentication and MongoDB
+persistence. The realtime path is deliberately *not* routed through Next.js (FR-41) — Next.js
+owns the shell, the auth gate and durable storage; the frame stream stays a direct browser to
+FastAPI WebSocket connection.
+
+| ID | Requirement | PS | Test |
+|---|---|---|---|
+| **FR-36** | The application shall be a Next.js (App Router, TypeScript) app. Unauthenticated users shall not reach the dashboard route; authentication is Firebase Auth with email/password and Google providers. | — | T-W1 |
+| **FR-37** | Every route handler that writes to MongoDB shall first verify the caller's Firebase ID token server-side with the Firebase Admin SDK. No write path shall trust a client-supplied user id. | — | T-W2 |
+| **FR-38** | Completed pipeline and benchmark runs shall be persisted to MongoDB as a `runs` document containing the full `config.yaml` snapshot, the `results.json` payload, git commit, host platform and timestamps — so any number in the deck can be traced back to the run that produced it. | FR-35 | T-W3 |
+| **FR-39** | Decision records shall be persisted to a `decisions` collection **on change plus a heartbeat**, not per frame: a write occurs when the selected route, risk level or reason string changes, and otherwise at most once every 60 frames. | — | T-W4 |
+| **FR-40** | Synthetic scenes shall be registered in a `scenes` collection carrying their exact ground-truth values, so the hazard-preservation comparison reads truth from the same store the dashboard reads. | FR-16 | T-W5 |
+| **FR-41** | The browser shall connect directly to the FastAPI WebSocket for the frame stream. Next.js shall not proxy, buffer or re-serialise frame data. | NFR-1 | T-W6 |
+| **FR-42** | Three.js rendering shall run imperatively against a canvas ref, outside React's reconciliation. Per-frame cell data shall never become React state. | NFR-1 | T-W7 |
+
+**On FR-41 and FR-42.** Both exist because the obvious implementation is a performance trap.
+Proxying a 30 Hz binary stream through a Next.js route handler adds a serialisation hop and a
+process boundary to the one path that has a 33 ms budget. And putting 50,000 cells into React
+state re-runs reconciliation 30 times a second over data that only a WebGL buffer ever reads.
+The viewer is a `useRef` canvas driven by a plain `requestAnimationFrame` loop; React renders
+the chrome around it and nothing inside it. This is the single most likely way for the new
+stack to lose the frame-rate claim, so it is written down as a requirement rather than left
+as folklore.
+
+**On FR-39.** At 30 FPS an unbatched decision log would be 30 Atlas writes per second, which
+is both slower than the frame budget and pointless — the decision is unchanged in the vast
+majority of frames. Writing on change plus a heartbeat keeps the audit trail complete while
+reducing write volume by two or three orders of magnitude.
+
 ---
 
 ## 8. Non-functional requirements
@@ -346,6 +384,8 @@ make the refinement pass unbounded.
 | **NFR-6** | Cold start to first rendered frame ≤ 15 s, so a live demo does not stall in front of judges. | |
 | **NFR-7** | Every configurable threshold (`τ_pothole`, `τ_step`, `H_vehicle`, cost weights, refinement bounds) lives in one `config.yaml` with documented defaults and units. No magic numbers in code. | Judges ask "where did 0.15 come from?" |
 | **NFR-8** | The dashboard shall run against `fixtures.py` with the backend entirely absent. | Unblocks two frontend developers from Day 1. |
+| **NFR-9** | The demo shall be served from `http://localhost:3000`, not from the deployed origin. | A page served over HTTPS cannot open a `ws://localhost` connection — browsers block the mixed content. The Vercel deployment exists for the submission link; the live demo runs locally against the local FastAPI server. Discovering this on Day 12 would be expensive. |
+| **NFR-10** | MongoDB writes shall be bounded and off the frame-rate critical path: batched, asynchronous, and never awaited inside the render or pipeline loop. | A cloud round-trip inside a 33 ms budget would dominate it. |
 
 ---
 
@@ -374,9 +414,9 @@ is the core justification for 2.5D over 2D (PS-10), a qualitative claim is not e
 
 ### 9.3 Synthetic scenes with exact ground truth
 
-Generated in base-language MATLAB (§ `WORK_DISTRIBUTION.md`, Khanak). A scripted spherical
-ray-caster intersects 64 beams × 1800 azimuths against analytic primitives — planes, boxes,
-cylinders — and writes KITTI-format `.bin` (float32 x, y, z, intensity) and `.label` files.
+Generated in-repo by `avr25d/synth/` (§ `WORK_DISTRIBUTION.md`, Anuj). A spherical ray-caster
+intersects 64 beams × 1800 azimuths against analytic primitives — planes, boxes, cylinders —
+and writes KITTI-format `.bin` (float32 x, y, z, intensity) and `.label` files.
 
 Because the scene is analytic, ground truth is **exact and free**: we know the pothole is
 0.22 m deep and 1.4 m across, and the gantry clearance is 3.10 m, to machine precision. That
@@ -390,12 +430,17 @@ converts hazard preservation from a demo into a measurement with an error in met
 | `S4_curb` | 0.15 m kerb along the road edge | Step detection rate; height error |
 | `S5_crossing_truck` | 40-frame sequence, truck crossing at 8 m/s | Tracking, velocity error, reroute trigger |
 
-**Toolchain.** All `.m` files are written in base MATLAB language only — no Automated Driving
-Toolbox, no Lidar Toolbox, no toolbox functions at all. This means the identical files run
-unmodified in **GNU Octave**, which is free and installs in minutes. MATLAB Online's free
-tier is the primary environment; Octave is the zero-cost fallback and the CI environment.
-This choice is deliberate: it removes licensing from the critical path entirely while keeping
-the MATLAB-based validation story that a DRDO evaluator will recognise.
+**Toolchain.** NumPy only, inside the main repository — no MATLAB, no external tool, no
+licence. Scene specifications remain one primitive per row in a CSV, so authoring a new hazard
+scene is still editing a table rather than writing code.
+
+**Why this moved.** An earlier revision of this plan generated these scenes in MATLAB. The
+MATLAB workstream has since been redirected to the drone sensing payload (§16), which is a
+separate deliverable. Since hazard preservation is the core argument for 2.5D over 2D and
+§11.4 depends entirely on having exact ground truth, the ray-caster had to keep a home rather
+than follow MATLAB out of the pipeline. It is roughly 150 lines and shares its spherical
+projection maths with `perception/range_proj.py`, so co-locating it with that module costs
+very little.
 
 ---
 
@@ -551,6 +596,9 @@ extended deadline makes room for four items that a six-day schedule had pushed o
 - Benchmark harness: memory, latency, distance-binned accuracy, hazard preservation (FR-31…FR-35)
 - Synthetic scenes S1–S5, all five (S4 curb is no longer at risk of being dropped)
 - 5-slide SIH-format deck, 3-minute video, README, demo run-book
+- Next.js web application with Firebase Auth and MongoDB Atlas persistence (FR-36…FR-42)
+- Drone LiDAR sensing payload: design report and MATLAB/Simulink model (§16) — a **companion
+  workstream**, presented on its own slide and not woven into the software narrative
 - **[pulled forward]** Uncertainty-driven refinement — resolution as a function of confidence,
   not only of motion and roughness. Completes the `R = f(distance, complexity, semantics,
   uncertainty)` claim rather than leaving it half-supported.
@@ -580,6 +628,9 @@ deadline shifted (§12.1).
 - Jetson / embedded-GPU latency measurement if hardware becomes available
 - Route ETA calibration against measured vehicle dynamics
 - Full technical report
+- Web app: saved-run comparison view, shareable read-only run links, richer history charts
+- Payload: extend the Simulink receiver model with a full noise budget and a Monte-Carlo
+  range-accuracy study
 
 ### 12.3 Explicitly cut
 
@@ -608,7 +659,10 @@ deadline shifted (§12.1).
 | **R-7** | Live demo fails in front of judges | Med | High | `--replay` mode from a saved frame log; pre-recorded video as backup; demo run-book with a rehearsed recovery path; NFR-6 cold-start bound | Sameer |
 | **R-8** | MATLAB licence unavailable to the non-tech pair | Med | Med | All `.m` files are base-language only and run unmodified in free GNU Octave (§9.3) | Khanak |
 | **R-9** | The team over-commits and misses the deadline | Med | High | §12.1 cut line is explicit and dated; features are cut, never quality; Day 11 (Mon 7 Sep) is a hard feature freeze with three clear days after it | Sameer |
-| **R-10** | Unmeasured numbers leak into the deck | Med | High | Results tables ship empty; only `results.json` may populate them (FR-35); Veda cross-checks every slide number against the file before submission | Veda |
+| **R-10** | Unmeasured numbers leak into the deck | Med | High | Results tables ship empty; only `results.json` may populate them (FR-35); Khanak cross-checks every slide number against the file before submission | Veda |
+| **R-11** | Firebase Auth or MongoDB Atlas unreachable during the live demo | Med | High | **Accepted risk — cloud-only was chosen deliberately.** Mitigations that do not change that decision: authenticate *before* the demo begins and keep the session warm (Firebase ID tokens refresh for an hour); carry a phone hotspot as a second network; the realtime pipeline itself is entirely local, so a network failure blocks login and persistence but not perception, mapping or rendering; recorded video and `--replay` remain the final fallbacks | Navya |
+| **R-12** | Simulink unavailable to the non-tech pair (basic MATLAB licence only) | Med | Med | Every analysis script is base-language `.m` and runs in free GNU Octave. The Simulink receiver-chain model has a documented pure-MATLAB fallback: a discrete-time convolution of the laser pulse with the detector impulse response plus noise, which produces the same waveform and range-error figures without Simulink (§16.4) | Khanak |
+| **R-13** | Next.js/React reconciliation destroys the frame rate | Med | High | FR-41 and FR-42 make the mitigation a requirement: direct browser→FastAPI WebSocket, and imperative Three.js on a `useRef` canvas with frame data never entering React state. Verified by T-W6, T-W7 and T-V6 | Shubham |
 
 ---
 
@@ -660,7 +714,95 @@ Every PS clause is covered by at least one requirement.
 
 ---
 
-## 16. Glossary
+## 16. Companion workstream — proprietary drone LiDAR sensing payload
+
+A parallel hardware-design deliverable, produced alongside the software and **presented
+separately**. It is not part of the PS coverage in §15, it introduces no runtime dependency,
+and no software requirement depends on it. Its purpose is to demonstrate sensor and analogue
+front-end design capability: a proprietary time-of-flight LiDAR module light enough to fly on
+a drone, specified and simulated end to end.
+
+Owned jointly by Khanak and Veda (§ `WORK_DISTRIBUTION.md` §6).
+
+### 16.1 What is being designed
+
+A pulsed direct-time-of-flight LiDAR sensing module:
+
+```
+  Trigger ─→ [ Laser driver ]──→ [ TX optics ]───→ ╲
+             GaN FET + gate       collimator        ╲  scene
+             driver, storage                         ╲
+             capacitor                                ▼
+                                                  target (reflectivity ρ)
+  Timing reference                                    │
+        │                                             ▼
+        │        [ RX optics ]  ←── aperture + 905 nm bandpass filter
+        │              │
+        │              ▼
+        │        [ APD / SiPM ]  ──→ [ TIA ]  ──→ [ CFD comparator ]  ──→ [ TDC ]
+        │         detector           ~200 MHz      constant-fraction        ~50 ps
+        │                                           discriminator            LSB
+        └──────────────────────────────────────────────────────────────────→ Δt
+                                                                              │
+                                        range = c·Δt / 2  ────────────────────┘
+                                                     │
+                                    [ MEMS scanner ] │  → (r, θ, φ) point stream
+                                                     ▼
+                                        [ MCU / FPGA aggregator ]
+                                                     ▼
+                                     UDP point stream, KITTI-compatible `.bin`
+```
+
+### 16.2 Requirements
+
+Numbered `HW-` to keep them clearly distinct from the software requirements in §7.
+
+| ID | Requirement |
+|---|---|
+| **HW-1** | Produce an optical link budget: received power against range for target reflectivity 0.1–0.9, including atmospheric transmission and receiver aperture, and derive maximum range at a stated SNR threshold. |
+| **HW-2** | Specify the emitter — 905 nm pulsed laser diode, peak power, pulse width, repetition rate — and demonstrate **Class 1 eye safety at the exit aperture**, showing the calculation. A LiDAR design that does not address eye safety is not a credible design. |
+| **HW-3** | Specify the receive chain: detector (APD or SiPM) with responsivity and multiplication factor, TIA bandwidth sized for the pulse width, and a constant-fraction discriminator to bound amplitude-dependent walk error. |
+| **HW-4** | Derive range resolution and accuracy from TDC LSB and timing jitter, showing the `σ_range = c·σ_t / 2` relation and the resulting error budget. |
+| **HW-5** | Specify the scan mechanism (MEMS mirror) and derive the angular sampling and point density against range from the scan pattern and pulse repetition rate. |
+| **HW-6** | Produce a power and mass budget per component, with totals against a stated drone payload limit. |
+| **HW-7** | Define the output interface: point aggregation and a UDP stream written in the same KITTI-format `.bin` layout the software pipeline already reads, so the payload is a drop-in source. |
+| **HW-8** | Deliver a design report with every figure reproducible from the MATLAB scripts that generated it. |
+
+### 16.3 Deliverables
+
+| Deliverable | Form |
+|---|---|
+| Design report | `hardware/docs/DESIGN_REPORT.md` — architecture, component selection with justification, every derived figure |
+| Link budget | `hardware/matlab/link_budget.m` → received power and SNR against range |
+| Range accuracy study | `hardware/matlab/range_accuracy.m` → jitter and walk error into a range error budget |
+| Parameter sweeps | `hardware/matlab/snr_sweep.m` → reflectivity, aperture, sunlight background |
+| Scan coverage | `hardware/matlab/scan_coverage.m` → angular sampling and point density against range |
+| Power / mass budget | `hardware/matlab/power_budget.m` + `hardware/docs/BOM.md` |
+| Receiver chain model | `hardware/simulink/tof_receiver_chain.slx` — pulse → APD → TIA → CFD → TDC, with noise, showing measured against true range |
+| Eye safety calculation | Section of the design report, with the IEC 60825-1 Class 1 limit worked through |
+
+### 16.4 Toolchain and fallback
+
+Primary is MATLAB with Simulink. Every `.m` analysis script is written in **base language
+only**, so all of them run unmodified in free GNU Octave.
+
+The one Simulink-dependent item is the receiver-chain model, and it has a documented
+equivalent: a discrete-time simulation in plain MATLAB that convolves the laser pulse with the
+detector impulse response, adds shot and thermal noise, and applies the CFD and TDC models
+numerically. It produces the same waveform plots and the same range-error figures without
+Simulink. Take that path immediately if a Simulink licence is not available — do not spend
+days trying to obtain one (risk R-12).
+
+### 16.5 How this is presented
+
+One slide in the deck and one section of the technical report, framed as *"we also designed
+the sensor"* rather than as part of the mapping pipeline. The software submission stands
+entirely on its own; §15's PS coverage does not reference this section, and nothing in §7
+depends on it.
+
+---
+
+## 17. Glossary
 
 | Term | Meaning |
 |---|---|
@@ -673,3 +815,8 @@ Every PS clause is covered by at least one requirement.
 | **Conservation test** | The per-frame assertion that the number of points assigned to cells equals the number of input points in the envelope. The formal statement of "no data loss" (PS-4). |
 | **Range image** | Spherical (azimuth × elevation) projection of a point cloud into a dense 2D image, letting a standard 2D CNN process LiDAR. |
 | **mIoU** | Mean intersection-over-union across classes; the standard semantic segmentation metric. |
+| **APD / SiPM** | Avalanche photodiode / silicon photomultiplier — photodetectors with internal gain, used to sense weak returned laser pulses. |
+| **TIA** | Transimpedance amplifier: converts the detector's output current into a voltage, with bandwidth sized to the pulse width. |
+| **CFD** | Constant-fraction discriminator: triggers at a fixed fraction of pulse amplitude rather than a fixed threshold, which removes the amplitude-dependent timing error known as walk. |
+| **TDC** | Time-to-digital converter: measures the interval between emission and return. Its least-significant bit sets the range quantisation, `Δr = c·LSB / 2`. |
+| **Link budget** | The accounting of optical power from emitter to detector — transmitted power, target reflectivity, range falloff, aperture, optical efficiency, atmospheric loss — which determines maximum usable range. |

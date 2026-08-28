@@ -17,13 +17,22 @@
 |---|---|---|---|
 | **Sameer** | Backend / DL | Grid engine + integration lead | `avr25d/core/`, `avr25d/server/`, `avr25d/decision/{costmap,planner,explain}.py` |
 | **Anuj** | Backend / DL | Perception + benchmarking | `avr25d/perception/`, `avr25d/bench/`, `avr25d/io/`, `avr25d/decision/{traversability,tracker}.py` |
-| **Shubham** | Frontend / web | Dashboard — 3D scene and views | `web/scene.js`, `web/views.js`, `web/palette.js` |
-| **Navya** | Frontend / web | Dashboard — HUD, transport, decision panel | `web/main.js`, `web/hud.js`, `web/index.html` |
-| **Khanak** | Non-tech | Scenario generation and ground truth | `matlab/`, `data/synthetic/` |
-| **Veda** | Non-tech | Evidence, communication, submission | `docs/`, deck, video, run-book, submission |
+| **Shubham** | Frontend / web | Three.js viewer — all rendering | `webapp/components/viewer/`, `lib/palette.ts` |
+| **Navya** | Frontend / web | Next.js platform — auth, persistence, HUD | `webapp/app/`, `lib/`, `components/hud/`, `components/decision/` |
+| **Khanak** | Non-tech | Drone LiDAR payload — design and model | `hardware/matlab/`, `hardware/simulink/` |
+| **Veda** | Non-tech | Payload documentation + evidence and submission | `hardware/docs/`, deck, script, Q&A, submission |
 
 Six people, six non-overlapping directories. Two people never edit the same file on the same
 day, which is what makes daily merges to `main` cheap.
+
+**Two changes from the previous revision.** The MATLAB workstream was redirected from
+synthetic scene generation to the drone LiDAR sensing payload (`PRD.md` §16) — a companion
+hardware-design deliverable presented on its own slide, not woven into the software narrative.
+The synthetic scenes did not go with it: they are the only source of exact hazard ground truth
+and `PRD.md` §11.4 depends on them, so the ray-caster moved into Python as `avr25d/synth/`
+under Anuj. Separately, the dashboard is now a Next.js application with Firebase Auth and
+MongoDB Atlas, which splits the frontend along a cleaner boundary — Shubham owns everything
+inside the canvas, Navya owns everything around it.
 
 ---
 
@@ -48,10 +57,13 @@ owner is ill, stuck, or pulled onto something urgent — decided now, calmly, ra
 | `decision/traversability.py`, `tracker.py` | Anuj | Sameer | No |
 | `decision/costmap.py`, `planner.py`, `explain.py` | Sameer | Anuj | No |
 | `bench/*` | Anuj | Sameer | Yes — Day 12 depends on it |
-| `web/scene.js`, `views.js` | Shubham | Navya | **Yes** |
-| `web/main.js`, `hud.js` | Navya | Shubham | **Yes** |
-| `matlab/*` | Khanak | Sameer (seed) | No — KITTI is an independent path |
-| Deck, video, submission | Veda | Khanak | **Yes — it is the deliverable** |
+| `avr25d/synth/*` | Anuj | Sameer | **Yes — §11.4 depends on it** |
+| `webapp/components/viewer/*` | Shubham | Navya | **Yes** |
+| `webapp/app/*`, `lib/*`, `components/hud/*` | Navya | Shubham | **Yes** |
+| Firebase project, Atlas cluster | Navya | Sameer | **Yes — external lead time** |
+| `hardware/matlab/*`, `simulink/*` | Khanak | Veda | No — companion workstream |
+| `hardware/docs/*` | Veda | Khanak | No — companion workstream |
+| Deck, video, submission | Veda | Navya (video edit) | **Yes — it is the deliverable** |
 
 **The decision layer is deliberately not one person's.** Sameer and Anuj converge on it on
 Day 7, after `core/` and `perception/` have both landed. Neither of them opens a second front
@@ -67,13 +79,20 @@ while the hard core is still moving.
         ┌─────────────────────┴─────────────────────┐
         ▼                                           ▼
    Shubham + Navya build the ENTIRE dashboard   Sameer builds core/
-   against fixtures — zero backend dependency   Anuj builds perception/
+   against fixtures — zero backend dependency   Anuj builds perception/ + synth/
         │                                           │
         └─────────────────────┬─────────────────────┘
                               ▼
                  Day 11–12 ─ integration is a FLAG CHANGE
                             (--fixtures  →  --infer cached)
+
+  Khanak + Veda ── hardware/ payload ──→ own slide + report
+                   (no dependency in either direction)
 ```
+
+The payload workstream is fully decoupled. Nothing in `avr25d/` or `webapp/` imports it, and
+it needs nothing from them. If it slips, the software submission is unaffected; if the
+software slips, the payload still lands.
 
 **The one hard blocker in the project** is `protocol.py` + `fixtures.py` on Day 1 afternoon.
 Two people cannot start until it lands, so it is the highest-priority item on the board and
@@ -126,8 +145,12 @@ are almost entirely integration. Do not take on a second module before Day 7.
 
 ### 4.2 Anuj — Perception and benchmarking
 
-**Owns:** everything that turns points into labels, and everything that turns runs into
-numbers.
+**Owns:** everything that turns points into labels, everything that turns runs into numbers,
+and — new in this revision — `avr25d/synth/`, the synthetic scenes that carry exact hazard
+ground truth. That last one arrived when MATLAB was redirected to the payload workstream. It
+is roughly 150 lines and shares its spherical-projection maths with `range_proj.py`, which you
+are writing anyway, so it is cheaper than it looks. It is still on the critical path for
+`PRD.md` §11.4.
 
 **First action of the entire sprint:** start the SemanticKITTI download. It is bandwidth-bound
 rather than effort-bound, so it runs unattended in the background all day while you write
@@ -137,20 +160,21 @@ code. Starting it on Day 2 instead of Day 1 is the easiest way to lose the proje
 |---|---|---|
 | **1 · Fri 28 Aug** | **08:00 — start the KITTI subset download** (seq 04, then 00, then 05; ~1000 scans, ~12 GB). Then begin `perception/geometric_seg.py`. | Seq 04 downloading. RANSAC ground fit working on a synthetic plane. |
 | **2 · Sat 29 Aug** | Finish `geometric_seg.py`: RANSAC ground plane, Euclidean clustering, bbox classification. `io/kitti.py` readers. | 5-class labels on a real KITTI scan. |
-| **3 · Sun 30 Aug** | `labelmap.py` (19→5 merge including the `moving-*` IDs). First labelled KITTI scan into the grid. | End-to-end: KITTI scan → labels → grid → browser. |
+| **3 · Sun 30 Aug** | `labelmap.py` (19→5 merge including the `moving-*` IDs). **`avr25d/synth/` ray-caster plus scenes `S1`, `S2`, `S3`** — Sameer needs them on Day 4. | End-to-end: KITTI scan → labels → grid → browser. `S1`–`S3` load in the pipeline. |
 | **4 · Mon 31 Aug** | Acquire an ONNX SemanticKITTI checkpoint (Q-4). Export and int8-quantise. Begin `range_proj.py`. | Checkpoint obtained and its licence confirmed usable. |
-| **5 · Tue 1 Sep** | `onnx_infer.py`. k-NN range-aware reprojection in `range_proj.py`. | T-P4 passes — 100% of points labelled, including those occluded in the range image. |
+| **5 · Tue 1 Sep** | `onnx_infer.py`. k-NN range-aware reprojection in `range_proj.py`. Scenes `S4_curb` and `S5_crossing_truck`. | T-P4 passes — 100% of points labelled. All five scenes exist. |
 | **6 · Wed 2 Sep** | Network labels on real scans with measured CPU latency. **Kick off the label-cache build overnight.** | Network labels visibly better than geometric on the same scan; both modes selectable. |
 | **7 · Thu 3 Sep** | `decision/traversability.py` and `decision/tracker.py`. Verify the overnight label cache. | Stable track ID across all 40 `S5` frames; speed within 0.5 m/s of 8.0 m/s. |
 | **8 · Fri 4 Sep** | `bench/distance_bins.py` and `bench/hazard.py`. | Binned mIoU computed; hazard scoring runs against `GROUND_TRUTH.md`. |
-| **9 · Sat 5 Sep** | Assemble the 5-class fine-tuning split. **Resolve Q-1 definitively** — is the Windows GPU usable? | Q-1 answered and shared with the team. Fine-tuning split assembled. |
-| **10 · Sun 6 Sep** | Perception improvement *[pulled forward]*: GPU fine-tune if Q-1 allows, otherwise CPU decoder-head-only fine-tune plus confidence calibration. Run overnight. | A measured before/after mIoU comparison exists, whichever branch was taken. |
+| **9 · Sat 5 Sep** | Assemble the 5-class fine-tuning split. **Resolve Q-1 definitively** — is the Windows GPU usable? Adversarial scene: occluded pothole. | Q-1 answered and shared. Split assembled. Scene loads. |
+| **10 · Sun 6 Sep** | Perception improvement *[pulled forward]*: GPU fine-tune if Q-1 allows, otherwise CPU decoder-head-only fine-tune plus confidence calibration. Run overnight. Adversarial scene: low-clearance tunnel with a curb. | A measured before/after mIoU comparison exists, whichever branch was taken. |
 | **11 · Mon 7 Sep** | `bench/report.py`. **First full `make bench`.** Multi-sequence evaluation *[pulled forward]* with per-sequence variance. | Complete `results.json` with every section populated. |
-| **12 · Tue 8 Sep** | Authoritative benchmark runs: ≥200 scans for latency, full subset for accuracy, all scenes for hazards. Hand `results.json` to Veda. | Final `results.json` handed over. **No changes after handover.** |
+| **12 · Tue 8 Sep** | Authoritative benchmark runs: ≥200 scans for latency, full subset for accuracy, all scenes for hazards. Persist as a `runs` document and hand `results.json` to Veda. | Final `results.json` handed over and stored in MongoDB. **No changes after handover.** |
 | **13 · Wed 9 Sep** | Bug fixes only. Standby for rehearsal support. | — |
 | **14 · Thu 10 Sep** | Demo support. | — |
 
 **Depends on:** Sameer for `protocol.py` (Day 1), `CellGrid` (Day 3).
+**Unblocks:** Sameer's Day 4 hazard work — `S1`–`S3` must exist by the end of Day 3.
 **Unblocks:** Sameer on Day 3 (readers and labels), Veda on Day 12 (all numbers).
 
 **If the ONNX checkpoint does not materialise by Day 6 evening:** stop looking. The geometric
@@ -162,29 +186,45 @@ position than a broken model dependency in the final week.
 
 ## 5. Frontend track
 
-Both frontend developers work entirely against `fixtures.py` from Day 1 afternoon. Neither
-imports backend code, and neither waits for a backend feature. On Day 11–12, integration is
-changing `--fixtures` to `--infer cached`.
+The dashboard is a **Next.js 14 application** (App Router, TypeScript) with **Firebase Auth**
+and **MongoDB Atlas**. Both cloud services are used directly — see risk R-11, where cloud-only
+was chosen deliberately and the mitigations are listed.
 
-**Shared rule:** `web/palette.js` is the single source of class colours. Nobody hard-codes a
-hex value anywhere else, or the two views will disagree in front of a judge.
+The split follows a real boundary: **Shubham owns everything inside the canvas, Navya owns
+everything around it.** That keeps the highest-risk performance work in one pair of hands and
+the platform, auth and persistence work in the other, with almost no shared files.
 
-### 5.1 Shubham — 3D scene and views
+Both work entirely against `fixtures.py` from Day 1 afternoon. Neither imports backend code.
 
-**Owns:** everything the judge actually looks at.
+**Two rules that are not style preferences.**
+
+1. **The frame stream bypasses Next.js entirely** (FR-41). The browser opens a WebSocket
+   straight to the FastAPI server. Proxying a 30 Hz binary stream through a route handler adds
+   a serialisation hop and a process boundary to the one path with a 33 ms budget.
+2. **Per-frame data never becomes React state** (FR-42). The viewer is a `useRef` canvas with
+   a plain `requestAnimationFrame` loop; React renders the chrome around it and nothing inside
+   it. `react-three-fiber` is deliberately not used. T-W7 enforces this with a render counter.
+
+**Shared:** `lib/palette.ts` is the single source of class colours, and `lib/protocol.ts`
+mirrors `avr25d/server/protocol.py`. Nobody hard-codes a hex value or a field offset anywhere
+else, or the two halves will disagree in front of a judge.
+
+### 5.1 Shubham — the Three.js viewer
+
+**Owns:** `webapp/components/viewer/`, `lib/palette.ts`. Everything the judge actually looks at.
 
 | Day | Tasks | Acceptance criterion |
 |---|---|---|
-| **1 · Fri 28 Aug** | Three.js scene, vendored `three.module.js` (no CDN), orbit camera, ground reference, `palette.js`. From 14:00: render fixture cells as one `InstancedMesh`. | ~50,000 fixture cells render at interactive frame rate. |
+| **1 · Fri 28 Aug** | Three.js scene inside a `useRef` canvas — renderer, orbit camera, ground reference, `lib/palette.ts`. From 14:00: render fixture cells as one `InstancedMesh`. | ~50,000 fixture cells render at interactive frame rate. |
 | **2 · Sat 29 Aug** | Class colouring, elevation-shading toggle, correct per-instance sizing from `cell_extents`. | Cells correctly sized at every range — no slivers, no gaps. |
 | **3 · Sun 30 Aug** | View 1 (raw cloud) and View 3 (adaptive grid) on real streamed frames. | Views 1 and 3 render real streamed frames, class-coloured. |
 | **4 · Mon 31 Aug** | View 2 — the uniform 5 cm grid, needed for the comparison. | Uniform view renders the same scan as View 3. |
-| **5 · Tue 1 Sep** | **The A/B wipe** (FR-29) and the ring overlay (FR-27). The highest-value visual in the submission. | Draggable divider shows **16,000,000 vs 705,771** live on the same scan. |
+| **5 · Tue 1 Sep** | **The A/B wipe** (FR-29) and the ring overlay (FR-27). Two scissor-rect renders of one scene graph, not two canvases. | Divider shows **16,000,000 vs 705,771** live on the same scan. |
 | **6 · Wed 2 Sep** | Wipe polish. Performance pass on instance count. | No frame drops while dragging the divider. |
 | **7 · Thu 3 Sep** | View 4 scaffold: track markers and predicted trajectories. | Tracks visible and individually identifiable. |
 | **8 · Fri 4 Sep** | View 4 complete: routes, risk shading. | Reroute legible from three metres away. |
-| **9 · Sat 5 Sep** | LOD tuning. Verify ≥30 FPS at 100k instances (FR-30). | T-V6 passes on the demo machine. |
-| **10 · Sun 6 Sep** | Visual polish. Verify on the actual demo machine at projector resolution. | Renders correctly at projector resolution. |
+| **9 · Sat 5 Sep** | LOD tuning. Verify ≥30 FPS at 100k instances (FR-30) **and the React render count** (T-W7). | T-V6 passes; T-W7 passes — under 10 React renders across 300 frames. |
+| **10 · Sun 6 Sep** | Visual polish. Verify at projector resolution. Help Navya with the Vercel deploy. | Renders correctly at projector resolution. |
 | **11 · Mon 7 Sep** | Final polish. Demo keystroke sequence verified end to end. | Every run-book keystroke works. |
 | **12 · Tue 8 Sep** | Bug fixes only. | Zero console errors across all four views. |
 | **13 · Wed 9 Sep** | Rehearsal support. | — |
@@ -194,175 +234,166 @@ hex value anywhere else, or the two views will disagree in front of a judge.
 camera, a divider you drag, live cell counts on both sides. It converts "22.67× reduction"
 from a claim into something the judge watches happen. Build it on Day 5, not in the final week.
 
-**Design notes.** Judged on a projector, possibly in a bright room. High contrast, thick
-lines, large HUD type. Verify the class palette is distinguishable in greyscale — if it
-survives greyscale it survives a bad projector and it survives colour-blind judges.
+**Design notes.** Judged on a projector, possibly in a bright room. High contrast, thick lines,
+large HUD type. Verify the class palette is distinguishable in greyscale — if it survives
+greyscale it survives a bad projector and it survives colour-blind judges.
 
-### 5.2 Navya — HUD, transport, decision panel
+**Performance fallback** (risk R-4): if instancing underperforms, render cell centroids as a
+`THREE.Points` cloud with per-point size. Near-identical at demo zoom, far cheaper.
 
-**Owns:** the numbers on screen and the plumbing that gets them there.
+### 5.2 Navya — Next.js platform, auth, persistence, HUD
+
+**Owns:** `webapp/app/`, `lib/` (except palette), `components/hud/`, `components/decision/`,
+plus the Firebase project and the Atlas cluster.
 
 | Day | Tasks | Acceptance criterion |
 |---|---|---|
-| **1 · Fri 28 Aug** | `index.html` shell, layout, WebSocket client, binary `FrameMessage` decode into typed arrays, HUD skeleton with live fixture numbers. | HUD updates continuously from fixture frames. |
-| **2 · Sat 29 Aug** | View switching, frame stepping, pause. | All controls work against fixtures. |
-| **3 · Sun 30 Aug** | HUD wired to real `stats` rather than fixtures. | Real numbers displayed; no `NaN`, no `undefined`. |
-| **4 · Mon 31 Aug** | Memory comparison panel, reduction factor, per-stage latency bars. | Memory panel shows both sides and the live ratio. |
-| **5 · Tue 1 Sep** | **Perception-mode badge** (FR-6). Track list panel scaffold. | Badge always shows whether perception is `live`, `cached` or `geometric`. |
-| **6 · Wed 2 Sep** | Full HUD per FR-28 — every field populated from real frames. | Every FR-28 field populated from real frames. |
-| **7 · Thu 3 Sep** | Decision panel scaffold: route, risk, ETA, reason string. | Panel renders from both fixtures and real frames. |
-| **8 · Fri 4 Sep** | Decision panel complete and readable at projector resolution. | Reason string readable at projector resolution. |
-| **9 · Sat 5 Sep** | Refinement visualisation — sub-cells visibly distinct from their parents. | Refined cells visually distinguishable from unrefined ones. |
-| **10 · Sun 6 Sep** | Polish. Responsive layout at the demo machine's real resolution. | Layout correct at the demo machine's resolution. |
-| **11 · Mon 7 Sep** | Keyboard shortcuts for the entire demo sequence (`1`–`4`, `R`, `W`, `H`, `L`). | Every run-book keystroke works. |
+| **1 · Fri 28 Aug** | **Create the Firebase project and the Atlas M0 cluster** — external accounts first, they have lead time. Then `create-next-app` + TypeScript + Tailwind, `.env.local.example`, `lib/protocol.ts` decoding fixture frames. | Firebase project and Atlas cluster exist. `pnpm dev` serves a page. |
+| **2 · Sat 29 Aug** | Firebase Auth: login page, email/password and Google providers, middleware gating `/dashboard` (FR-36). `lib/ws.ts` with exponential-backoff reconnect. | T-W1 passes — unauthenticated users cannot reach `/dashboard`. |
+| **3 · Sun 30 Aug** | HUD wired to real `stats`. View switching, frame stepping, pause. | Real numbers displayed; no `NaN`, no `undefined`. |
+| **4 · Mon 31 Aug** | `lib/mongo.ts` (module-scoped cached client) and `app/api/runs/route.ts` with `requireUser` token verification (FR-37). | T-W2 passes on the `runs` route — unverified tokens rejected before any Mongo call. |
+| **5 · Tue 1 Sep** | Mongo collections and indexes created. `app/api/scenes/route.ts`; scene ground truth registered (FR-40). | T-W5 passes — every scene's ground truth matches its CSV exactly. |
+| **6 · Wed 2 Sep** | Full HUD per FR-28, including the **perception-mode badge** (FR-6). | Every FR-28 field populated from real frames. |
+| **7 · Thu 3 Sep** | `app/api/decisions/route.ts` with **batched writes** (FR-39). **Verify the localhost-vs-Vercel mixed-content path today** (NFR-9). | NFR-9 confirmed: the demo path is `http://localhost:3000`. T-W6 passes. |
+| **8 · Fri 4 Sep** | Decision panel: route, risk, ETA, reason string. `/runs` history page. | T-W4 passes — reroutes plus heartbeats, not one write per frame. |
+| **9 · Sat 5 Sep** | `/runs/[id]` detail page: config, results, decision log. | A completed run renders its config, results and decision log. |
+| **10 · Sun 6 Sep** | Deploy to Vercel for the submission link, keeping localhost as the demo path. | Vercel deployment live; localhost still the demo path. |
+| **11 · Mon 7 Sep** | Final polish. Responsive layout at the demo machine's resolution. | Layout correct at the demo machine's resolution. |
 | **12 · Tue 8 Sep** | Bug fixes only. | T-V4 passes — no undefined fields. |
-| **13 · Wed 9 Sep** | Rehearse the keystroke sequence with Sameer. | Three clean rehearsals. |
+| **13 · Wed 9 Sep** | **Edit the 3-minute video** — picked up from Veda, whose load peaks here. | Video rendered and stored **locally** on the presenting laptop. |
 | **14 · Thu 10 Sep** | Demo support. | — |
 
-**The perception-mode badge is a requirement, not decoration** (FR-6, PRD §7.1). It always
-shows whether segmentation is `live`, `cached` or `geometric`. Showing it is what makes the
-demo honest, and an evaluator who sees you display it will trust the rest of your numbers
-more, not less.
+**Create the Firebase project and the Atlas cluster on Day 1 morning.** They are external
+dependencies with account-verification lead time, and everything else you own is blocked
+behind them. This is the same reasoning that puts Anuj's KITTI download first.
+
+**Three things that will cost you a day each if missed:**
+
+- **Mixed content** (NFR-9). An HTTPS page on Vercel cannot open `ws://localhost:8000`. The
+  demo runs from `http://localhost:3000`; Vercel exists for the submission link. Verify this
+  on **Day 7**, not Day 13.
+- **Mongo client per request.** Next.js route handlers run per-request; creating a
+  `MongoClient` in each one exhausts the Atlas connection pool within minutes. Cache it at
+  module scope.
+- **Decision write volume** (FR-39). At 30 FPS, one write per frame is 30 Atlas round-trips a
+  second storing near-identical documents. Write on change plus a heartbeat, batch with
+  `insertMany`, flush on a timer, and never await it inside the frame loop.
 
 **Never compute a displayed number in the browser.** Everything comes from `stats` in the
-`FrameMessage`. One source of truth means the HUD and `results.json` can never disagree.
+`FrameMessage`. One source of truth means the HUD and `results.json` cannot disagree.
 
 ---
 
-## 6. Non-technical track
+## 6. Non-technical track — drone LiDAR sensing payload
 
-Two workstreams that are genuinely load-bearing. Khanak produces the only data in the project
-with exact ground truth — without it, hazard preservation is a demo rather than a measurement,
-and hazard preservation is the core argument for 2.5D over 2D. Veda owns the artefacts that
-are literally what gets submitted.
+Khanak and Veda jointly own a **companion hardware-design deliverable**: a proprietary
+time-of-flight LiDAR sensing module, light enough to fly on a drone, specified and simulated
+end to end in MATLAB and Simulink. Full specification in `PRD.md` §16.
 
-### 6.1 Khanak — Scenario generation and ground truth
+**It is presented separately** — one slide in the deck, one section of the report — and framed
+as *"we also designed the sensor"*. It is not woven into the software narrative, nothing in
+`avr25d/` or `webapp/` depends on it, and the PS coverage in `PRD.md` §15 does not reference
+it. That decoupling is deliberate: if the payload slips, the software submission is unaffected.
 
-**Owns:** `matlab/` and `data/synthetic/`.
+**What this actually is.** A LiDAR measures distance by firing a very short laser pulse and
+timing how long the reflection takes to come back — at the speed of light, 1 cm of range is
+67 picoseconds of delay. Designing one means answering, with numbers: how much laser power is
+needed to see a dark target at 100 m; whether that power is still safe for the human eye; how
+fast the detector and amplifier must be to resolve a 5 ns pulse; how precisely the timing
+circuit must measure that delay to get centimetre accuracy; and whether the whole thing fits
+inside a drone's weight and power budget. Each of those is a calculation, and each calculation
+is a MATLAB script that produces a figure for the report.
 
-**What this actually is.** A LiDAR sensor works by firing laser beams in known directions and
-timing the reflection. You are going to simulate that in software: for each of 64 × 1800
-directions, compute where that beam would hit a simple shape (a flat plane, a box, a cylinder),
-and record the hit point. The result is a synthetic point cloud that looks like real LiDAR
-data — and because you built the scene, **you know exactly where every object is, to the
-millimetre.** Real datasets never give you that. It is why your scenes are the only way to
-measure whether the system correctly reports a pothole as 0.22 m deep rather than merely
-"noticing something".
+**Division of labour.** Khanak drives the models and the numbers; Veda drives the report, the
+component justification and the BOM. Veda's half is documentation-shaped work, which is the
+same skill as the deck — that is why the split falls there.
 
-**Toolchain — no licence problem.** Everything is written in the base MATLAB language, using
-no toolboxes. That means the identical files run in **GNU Octave**, which is free and
-open-source. Use whichever you can get:
+**Toolchain, and the licence escape hatch.** Every `.m` analysis script is written in base
+MATLAB language only, so all of them run unmodified in free **GNU Octave**. The one
+Simulink-dependent item is the receiver-chain model, and it has a documented pure-MATLAB
+equivalent: discrete-time convolution of the laser pulse with the detector impulse response,
+plus shot and thermal noise, with the discriminator and timing circuit applied numerically.
+Same waveforms, same range-error figures, no Simulink. **Establish on Day 1 whether Simulink
+is available and say so at standup.** If it is not, take the fallback immediately — do not
+spend days chasing a licence (risk R-12).
 
-1. **GNU Octave** (recommended, free) — download from `octave.org`, install, done. All scripts
-   run unmodified.
-2. **MATLAB Online** free tier — `matlab.mathworks.com`, sign in with a student account.
+### 6.1 Khanak — payload models and analysis
 
-You do not need Automated Driving Toolbox or Lidar Toolbox. If anyone suggests adding a
-toolbox function to these scripts, say no — it breaks Octave compatibility and puts licensing
-back on the critical path.
-
-**Day 1 onboarding, in order:**
-
-1. Install Octave (or open MATLAB Online). Confirm `disp('hello')` runs.
-2. Sameer gives you `lidar_raycast.m` — the ray-casting engine, already written. You do not
-   need to write it or fully understand its internals. You need to run it and read its inputs.
-3. Run `run_all_scenes.m`. It should produce `S1_flat_road`.
-4. Open `scenes/S1_flat_road.csv`. This is the scene description — **one shape per row**:
-
-   ```csv
-   type,   x,     y,     z,     sx,   sy,   sz,   class, note
-   plane,  0,     0,     0,     200,  200,  0,    1,     road surface
-   box,    12.0, -0.5,  -0.22,  1.4,  1.0,  0.22, 0,     pothole (negative)
-   box,    25.0,  0.0,   3.10,  6.0,  0.4,  0.5,  3,     gantry beam, 3.10 m clearance
-   cyl,    25.0, -3.0,   1.55,  0.3,  0.3,  3.10, 3,     gantry support post
-   ```
-
-   `x, y, z` is the centre in metres (`x` forward, `y` left, `z` up, sensor at the origin
-   1.7 m above the road). `sx, sy, sz` are the dimensions. `class` is the semantic label from
-   `PRD.md` §6.1 — `1` drivable, `2` non-drivable terrain, `3` static obstacle, `4` dynamic
-   object, `0` void.
-
-5. **Building a scene means editing this spreadsheet.** Change a number, re-run, look at the
-   output. That is the whole workflow.
-
-**Your five scenes and their exact specifications:**
-
-| Scene | Content | Exact ground truth to record |
-|---|---|---|
-| `S1_flat_road` | Flat 200 × 200 m road plane, no hazards | Nothing. This is the control — the system must find **zero** hazards here. |
-| `S2_pothole` | Road plus a depression 12 m ahead, 1.4 m across, **0.22 m deep** | depth = 0.220 m, centre = (12.0, −0.5), extent = 1.4 × 1.0 m |
-| `S3_overhang` | Road plus a gantry beam with **3.10 m clearance**, plus two support posts | clearance = 3.100 m, beam at x = 25.0 m, road beneath must stay drivable |
-| `S4_curb` | Road plus a **0.15 m** kerb along the right edge | height = 0.150 m, edge at y = −4.0 m |
-| `S5_crossing_truck` | 40 frames; a 7 × 2.5 × 3 m box crossing left to right at **8.0 m/s** | speed = 8.00 m/s, crossing x = 18.0 m, entry at t = 0.5 s |
-
-The bolded numbers are the answer key. The system's job is to recover them from the point
-cloud, and the error between its answer and yours is the hazard-preservation metric in
-`PRD.md` §11.4. Record them in `matlab/GROUND_TRUTH.md` and hand that file to Anuj on Day 8.
+**Owns:** `hardware/matlab/`, `hardware/simulink/`.
 
 | Day | Tasks | Acceptance criterion |
 |---|---|---|
-| **1 · Fri 28 Aug** | Install Octave or MATLAB Online. Get `lidar_raycast.m` running. Produce `S1_flat_road`. | `S1` `.bin` and `.label` files exist and Anuj's reader opens them. |
-| **2 · Sat 29 Aug** | `S2_pothole`. Verify the depression is visible in the point cloud, not just in the CSV. | `S2` loads; the pothole is visible in the dashboard. |
-| **3 · Sun 30 Aug** | `S3_overhang` with 3.10 m clearance. | `S3` loads; the gantry is at exactly 3.10 m. |
-| **4 · Mon 31 Aug** | `S4_curb` at 0.15 m. | Kerb visible in the point cloud; height exactly 0.15 m. |
-| **5 · Tue 1 Sep** | Begin `S5_crossing_truck` (40 frames, moving box). | The truck moves between frames. |
-| **6 · Wed 2 Sep** | Finish `S5_crossing_truck`. | The 40-frame sequence plays end to end. |
-| **7 · Thu 3 Sep** | Regenerate S1–S5 with final parameters. Begin `GROUND_TRUTH.md`. | All five scenes present in `data/synthetic/`. |
-| **8 · Fri 4 Sep** | Deliver `GROUND_TRUTH.md` to Anuj. | Ground-truth table delivered and accepted by Anuj. |
-| **9 · Sat 5 Sep** | Adversarial scene: pothole partially occluded by a parked vehicle. | Scene generates and loads in the pipeline. |
-| **10 · Sun 6 Sep** | Adversarial scene: low-clearance tunnel with a curb inside it. | Scene generates and loads in the pipeline. |
-| **11 · Mon 7 Sep** | Cross-check `GROUND_TRUTH.md` against the hazard benchmark output. | Every hazard number reconciled between the two sources. |
-| **12 · Tue 8 Sep** | **Cross-check every number in Veda's deck against `results.json`.** | Zero unverified numbers in the deck. |
+| **1 · Fri 28 Aug** | Install MATLAB or Octave. **Determine on day one whether Simulink is available** and tell the team either way (risk R-12). Read `PRD.md` §16. Draft the payload architecture block diagram. | Toolchain working; Simulink question answered; block diagram drafted. |
+| **2 · Sat 29 Aug** | `link_budget.m` — received optical power against range, reflectivity 0.1–0.9. | Max range at the stated SNR threshold, plotted. |
+| **3 · Sun 30 Aug** | `range_accuracy.m` — timing jitter and walk error into a range error budget. | `σ_range = c·σ_t / 2` error budget with numbers. |
+| **4 · Mon 31 Aug** | `snr_sweep.m` — sweep aperture, reflectivity and sunlight background. | Sweep plots produced; design margins identified. |
+| **5 · Tue 1 Sep** | `scan_coverage.m` — MEMS scan pattern → angular sampling → point density against range. | Point density against range, tabulated. |
+| **6 · Wed 2 Sep** | `power_budget.m`. Begin the component selection table with part numbers. | Total power and mass against the drone payload limit. |
+| **7 · Thu 3 Sep** | Simulink receiver chain — or the pure-MATLAB fallback if Day 1 found no licence. Do not spend days chasing a licence. | Model runs end to end, or the fallback script does. |
+| **8 · Fri 4 Sep** | Finish the receiver-chain model; produce measured-against-true range plots. | Measured range tracks true range within the derived error budget. |
+| **9 · Sat 5 Sep** | **Eye-safety calculation** (HW-2) worked through against IEC 60825-1 Class 1 at 905 nm. | Class 1 limit computed; the design is shown to comply, or the aperture is changed until it does. |
+| **10 · Sun 6 Sep** | Regenerate every payload figure from its script and confirm reproducibility (HW-8). | Every figure regenerable from its script — no hand-drawn plots. |
+| **11 · Mon 7 Sep** | Payload design report complete, with Veda. | Report complete: architecture, components with justification, all derived figures. |
+| **12 · Tue 8 Sep** | **Cross-check every number destined for the deck against `results.json`** — software and payload both. | Zero unverified numbers in the deck. |
 | **13 · Wed 9 Sep** | Finalise the demo run-book with Sameer. | Run-book complete, including both failure paths. |
 | **14 · Thu 10 Sep** | Demo support. | — |
 
-**If Octave will not install:** tell Sameer at standup, not later. There is a Python fallback
-ray-caster that produces identical outputs; it costs Sameer two hours and it is a fine
-outcome. What is not fine is losing two days to a silent install problem. Your scenes are on
-the critical path for §11.4 of the PRD.
+**Eye safety is not optional** (HW-2). The IEC 60825-1 Class 1 accessible-emission limit at
+905 nm has to be worked through explicitly. If the design exceeds it, change the design —
+widen the aperture, lower the peak power, reduce the repetition rate — and show the working.
+A LiDAR design that does not address eye safety is not a credible design, and it is exactly
+the question a DRDO evaluator will ask.
 
-**Why S1 matters as much as the others.** It is easy to build a detector that flags hazards
-everywhere. `S1` is the scene where the correct answer is "nothing here". If the system raises
-a single hazard flag on flat road, a threshold is wrong, and it is far better to find that on
-Day 4 than in front of a judge.
+**Every figure must be regenerable from its script** (HW-8). No hand-drawn plots, no numbers
+typed into the report that the code does not produce. This is the same rule the software side
+follows with `results.json`, and for the same reason.
 
-### 6.2 Veda — Evidence, communication, and submission
+**If you get stuck for more than two hours**, say so at standup. Anuj and Sameer can both seed
+a script skeleton in under an hour; grinding silently is what costs days.
 
-**Owns:** everything that is actually submitted. The code is the means; the deck, the video
-and the submission are the deliverable.
+### 6.2 Veda — payload documentation, evidence, and submission
 
-**The rule that matters most:** *no number reaches a slide except from `results.json`.* Anuj
-generates it, you consume it, Khanak cross-checks it. If a number is not in that file, it does
-not go in the deck, the video narration, or anything said out loud to a judge. Placeholders
-stay as `_measured_` until Day 12. A single unverifiable number is the fastest way to lose a
+**Owns:** `hardware/docs/`, the deck, the video script, the Q&A bank, and the submission.
+
+**The rule that matters most:** *no number reaches a slide except from `results.json`, or from
+a payload script that produced it.* Anuj generates the software numbers, Khanak generates the
+payload numbers, you consume both, and Khanak cross-checks the deck on Day 12. Placeholders
+stay as `_measured_` until then. A single unverifiable number is the fastest way to lose a
 technically strong submission.
 
 | Day | Tasks | Acceptance criterion |
 |---|---|---|
-| **1 · Fri 28 Aug** | Resolve Q-2 (deck template, slide count) and Q-3 (demo hardware) from `PRD.md` §14.2 — the team's plans depend on the answers. Deck outline. Begin prior-art search. | Q-2 and Q-3 answered and shared with the team. |
-| **2 · Sat 29 Aug** | Prior-art and novelty write-up (§6.2.2). Draft slides 1–2. | Novelty statement written: what exists, what we do differently. |
-| **3 · Sun 30 Aug** | Slides 3–4. Begin the judge Q&A bank. | Slides 3–4 drafted. |
+| **1 · Fri 28 Aug** | Resolve Q-2 (deck template, slide count) and Q-3 (demo hardware). Deck outline. Begin prior-art search. | Q-2 and Q-3 answered and shared with the team. |
+| **2 · Sat 29 Aug** | Prior-art and novelty write-up. Draft slides 1–2. | Novelty statement written: what exists, what we do differently. |
+| **3 · Sun 30 Aug** | Slides 3–4. Begin the judge Q&A bank. Start the payload design report skeleton with Khanak. | Slides 3–4 drafted; report skeleton agreed with Khanak. |
 | **4 · Mon 31 Aug** | Slide 5. Full deck draft with `_measured_` placeholders intact. | Complete deck; every number still a placeholder. |
-| **5 · Tue 1 Sep** | Video script, timed to 3:00, beats matched to the run-book. | Script timed to 3:00 with 10 seconds spare. |
-| **6 · Wed 2 Sep** | Q&A bank to 12 questions. Rehearse narration against the draft deck. | 12 questions, each with the location of its answer. |
-| **7 · Thu 3 Sep** | Deck to near-final. Q&A bank to 20 questions. | 20 questions. Deck near-final. |
-| **8 · Fri 4 Sep** | Assemble the demo run-book with Sameer. | Run-book drafted with Sameer. |
-| **9 · Sat 5 Sep** | **Record a rough-cut video against the current build** — find problems while they are still fixable. | Rough cut exists; problem list produced and circulated. |
+| **5 · Tue 1 Sep** | Video script timed to 3:00, beats matched to the run-book. | Script timed to 3:00 with 10 seconds spare. |
+| **6 · Wed 2 Sep** | Q&A bank to 12 questions. Payload report: architecture and component-justification sections. | 12 questions, each with the location of its answer. |
+| **7 · Thu 3 Sep** | Deck to near-final. Q&A bank to 20 questions, including payload questions. | 20 questions. Deck near-final. |
+| **8 · Fri 4 Sep** | Assemble the demo run-book with Sameer. Payload BOM table with costs. | Run-book drafted. BOM costed. |
+| **9 · Sat 5 Sep** | Payload design report first full draft. **Record a rough-cut video** against the current build. | Rough cut exists; problem list produced and circulated. |
 | **10 · Sun 6 Sep** | Fix everything the rough cut exposed. | Problem list closed. |
-| **11 · Mon 7 Sep** | Deck final except for `_measured_` placeholders. | Deck final; placeholders intact and clearly marked. |
+| **11 · Mon 7 Sep** | Deck final except for `_measured_` placeholders — now including the payload slide. Rehearse the Q&A bank with the team. | Deck final; placeholders intact and clearly marked. |
 | **12 · Tue 8 Sep** | **Fill every placeholder from `results.json` only.** | Zero placeholders remain; every number traces to `results.json`. |
-| **13 · Wed 9 Sep** | Record and edit the final 3-minute video. Finalise the deck. | Video rendered and stored **locally** on the presenting laptop. |
+| **13 · Wed 9 Sep** | Finalise the deck. Record the narration; hand the edit to Navya. | Narration recorded; deck locked. |
 | **14 · Thu 10 Sep** | **Submit.** Deck, video, documentation. | Submission confirmed. |
 
-#### 6.2.1 Deck structure — five slides, SIH format
+**Load note.** You are carrying the payload report *and* the deck *and* the submission. Two
+items have been moved off you to keep Days 11–13 survivable: the **video edit** goes to Navya
+on Day 13, and the **deck number cross-check** goes to Khanak on Day 12. If it still looks
+overloaded at the Day 10 standup, hand the Q&A rehearsal to Sameer — it is the most
+transferable item you own.
+
+#### 6.2.1 Deck structure — SIH format, plus one payload slide
 
 | Slide | Content | Where it comes from |
 |---|---|---|
 | **1 · Idea / Solution** | The foveation analogy in one line. The 2D-vs-3D dilemma. What we built. The system diagram. | `PRD.md` §1, §5 |
-| **2 · Technical Approach** | Pipeline. The ring-sector grid: 662 rings, 5 cm → 50 cm, isotropic cells, closed-form O(1) index. **Constant 0.286° far-field bins matched to sensor sampling.** Tech stack. | `IMPLEMENTATION_PLAN.md` §3 |
+| **2 · Technical Approach** | Pipeline. The ring-sector grid: 662 rings, 5 cm → 50 cm, isotropic cells, closed-form O(1) index. **Constant 0.286° far-field bins matched to sensor sampling.** Tech stack including Next.js, Firebase, MongoDB. | `IMPLEMENTATION_PLAN.md` §3 |
 | **3 · Feasibility & Viability** | Working prototype, measured numbers, cross-platform CPU-only operation. Risks and how they were handled — a judge trusts a team that names its risks. | `PRD.md` §13, `results.json` |
-| **4 · Impact & Benefits** | 22.67× cell reduction → memory and downstream compute. Hazards a 2D grid destroys, preserved and measured. Explainable routing for logistics. Defence and IDEX relevance. | `PRD.md` §10, §11 |
-| **5 · Research & References** | SemanticKITTI, RangeNet++/SalsaNext, elevation-mapping and traversability literature, the PS itself. | §6.2.2 |
+| **4 · Impact & Benefits** | 22.67× cell reduction → memory and downstream compute. Hazards a 2D grid destroys, preserved and measured. Explainable routing with a persisted audit trail. Defence and IDEX relevance. | `PRD.md` §10, §11 |
+| **5 · Sensing Hardware** | The drone LiDAR payload: architecture, link budget, range accuracy, power and mass, eye safety. Framed as *"we also designed the sensor"*. | `hardware/docs/DESIGN_REPORT.md` |
+| **6 · Research & References** | SemanticKITTI, RangeNet++/SalsaNext, elevation-mapping and traversability literature, IEC 60825-1, the PS itself. | §6.2.2 |
 
 **Slide 2 is where the submission is won.** Every team will show a point cloud and a
 dashboard. The specific, defensible claims are: the closed-form index that makes alignment
@@ -396,13 +427,15 @@ everything else.
 |---|---|
 | 0:00–0:20 | Problem. Millions of points per second; 2D grids destroy height. |
 | 0:20–0:40 | The foveation idea, with the human-vision analogy. |
-| 0:40–1:30 | Live screen capture following the run-book (`IMPLEMENTATION_PLAN.md` §10). |
-| 1:30–2:10 | Hazards: overhang and pothole, with measured numbers on screen. |
-| 2:10–2:40 | Dynamic object, reroute, the explanation string. |
+| 0:40–1:25 | Live screen capture following the run-book (`IMPLEMENTATION_PLAN.md` §10). |
+| 1:25–2:00 | Hazards: overhang and pothole, with measured numbers on screen. |
+| 2:00–2:25 | Dynamic object, reroute, the explanation string. |
+| 2:25–2:40 | The drone payload, briefly — architecture diagram and headline figures. |
 | 2:40–3:00 | Results summary. Every number from `results.json`. |
 
 Record screen capture at the demo machine's native resolution. Narrate over it afterwards
 rather than live — retakes are cheap, and a clean audio track is worth more than spontaneity.
+Veda records the narration on Day 13; Navya cuts it.
 
 #### 6.2.4 Judge Q&A bank — build to 20 questions
 
@@ -418,6 +451,8 @@ The ones that will certainly be asked, with the answer's location:
 | "What happens on a flyover or multi-level structure?" | `PRD.md` A-3 — a known limit of any 2.5D height field; `z_ground` plus clearance still captures what the planner needs. |
 | "Why 5 cm and 50 cm?" | They are given by PS-6. The `s(r) ∝ r` interpolation between them is our choice, and §3.2 shows it is the one that makes both endpoints exact. |
 | "Could this run on vehicle hardware?" | It runs CPU-only today at the measured rate; the design has fixed pre-allocated memory and no GC pressure in the hot path. |
+| **"Did you build the sensor?"** | No — we designed and simulated it. Link budget, receiver chain, timing error budget, scan coverage, power and mass, and eye safety are all worked through in `hardware/docs/DESIGN_REPORT.md`. Say plainly that it is a design study, not a built prototype. Overclaiming here is the easiest way to lose the room. |
+| **"Is the laser eye-safe?"** | HW-2 — IEC 60825-1 Class 1 computed at the exit aperture. Have the number ready. |
 
 Rehearse these with the team on Day 11. The best answer to a hard question is a slide number.
 
@@ -456,36 +491,46 @@ Rehearse these with the team on Day 11. The best answer to a hard question is a 
 | Person | Days 1–3 · Foundations | Days 4–8 · Perception + decisions | Days 9–11 · Depth | Days 12–14 · Evidence |
 |---|---|---|---|---|
 | Sameer | **Heavy** — protocol, fixtures, grid, cells | Heavy — analysis, costmap, planner | **Heavy** — refinement, integration, freeze | Medium — demo only |
-| Anuj | Heavy — download, segmenter, readers | **Heavy** — ONNX, tracker, benchmarks | Heavy — fine-tune, multi-sequence eval | **Heavy** — authoritative runs |
-| Shubham | Medium — scene, instancing | **Heavy** — uniform view, wipe, View 4 | Medium — LOD, polish | Light — bug fixes |
-| Navya | Medium — client, HUD | Medium — panels, badge, decision panel | Medium — refinement view, shortcuts | Light — rehearsal |
-| Khanak | Medium — setup, S1, S2 | Medium — S3, S4, S5 | Medium — adversarial scenes, cross-check | **Heavy** — deck verification, run-book |
-| Veda | Light — questions, outline | Medium — deck, script, Q&A bank | Medium — rough cut, fixes | **Heavy** — numbers, video, submission |
+| Anuj | **Heavy** — download, segmenter, readers, synth | **Heavy** — ONNX, tracker, scenes, benchmarks | Heavy — fine-tune, multi-sequence eval | **Heavy** — authoritative runs |
+| Shubham | Medium — canvas, instancing | **Heavy** — uniform view, wipe, View 4 | Medium — LOD, render-count verification | Light — bug fixes |
+| Navya | **Heavy** — accounts, Next.js, auth | **Heavy** — Mongo, API routes, HUD, decision panel | Medium — run pages, Vercel deploy | Medium — video edit |
+| Khanak | Medium — toolchain, link budget | Medium — sweeps, receiver chain | Medium — eye safety, reproducibility | **Heavy** — deck cross-check, run-book |
+| Veda | Light — questions, outline | Medium — deck, script, Q&A, payload report | **Heavy** — report, rough cut | **Heavy** — numbers, narration, submission |
 
-**Known concentration risk.** Sameer owns the protocol, the grid, the cells, the planner, the
-integration and the demo. That is a lot on one person, and it is a deliberate trade — those
-pieces are tightly coupled and splitting them would cost more in coordination than it saves in
-load. The mitigation is that Anuj is the named backup on every one of them and reviews each as
-it merges, so the bus factor is two and not one.
+**Known concentration risks — two, both accepted deliberately.**
 
-**If Navya finishes the HUD early on Day 5**, the highest-value place to help is Shubham on the
-A/B wipe. It is the most persuasive artefact in the submission and the one most worth two
+*Sameer* owns the protocol, the grid, the cells, the planner, the integration and the demo.
+Those pieces are tightly coupled and splitting them would cost more in coordination than it
+saves in load. Anuj is the named backup on every one and reviews each as it merges, so the bus
+factor is two, not one.
+
+*Anuj* is the only Heavy in all four columns. He picked up `avr25d/synth/` when MATLAB moved
+to the payload workstream, on top of perception and the entire benchmark harness. The
+mitigations are that `synth/` is small and shares maths with `range_proj.py` which he is
+writing regardless, and that the scenes are front-loaded to Days 3 and 5 while the fine-tuning
+work on Days 9–10 is explicitly droppable if it does not pay off. **If Anuj is behind at the
+Day 5 standup, the first thing to hand to Sameer is `bench/baselines.py` and
+`bench/memory.py`** — they are self-contained and Sameer has already written the baseline
+arithmetic into `PRD.md` §10.1.
+
+**If either frontend developer finds slack**, the highest-value place to help is the A/B wipe
+on Day 5. It is the most persuasive artefact in the submission and the one most worth two
 people.
 
 ---
 
-## 9. Phase 2 — 4 to 20 September 2026
+## 9. Phase 2 — 11 to 20 September 2026
 
 Ten days, calmer pace, same ownership.
 
 | Person | Phase 2 focus |
 |---|---|
-| **Sameer** | Uncertainty-driven refinement; temporal accumulation with ego-motion compensation; ablation studies |
-| **Anuj** | Fine-tune the network on the 5-class taxonomy; expand evaluation across sequences; per-sequence variance |
+| **Sameer** | Temporal accumulation with ego-motion compensation; ablation studies |
+| **Anuj** | Complete the perception fine-tune; expand evaluation across sequences; per-sequence variance |
 | **Shubham** | Timeline scrubber; side-by-side scene comparison; exportable evidence screenshots |
-| **Navya** | Metrics history plots; recorded-run comparison view; UI for the expanded evaluation |
-| **Khanak** | Adversarial scenes: multiple simultaneous hazards, occluded pothole, low-clearance tunnel, sparse-return conditions |
-| **Veda** | Full technical report; final SIH deck; portal submission on 20 Sep |
+| **Navya** | Saved-run comparison view; shareable read-only run links; history charts from MongoDB |
+| **Khanak** | Extend the receiver model with a full noise budget and a Monte-Carlo range-accuracy study |
+| **Veda** | Full technical report including the payload section; final SIH deck; portal submission on 20 Sep |
 
 ---
 
@@ -494,10 +539,10 @@ Ten days, calmer pace, same ownership.
 Print this. Tick it tonight.
 
 - [ ] **Anuj** — KITTI download started (do this first, before anything else)
+- [ ] **Navya** — Firebase project created and Atlas M0 cluster provisioned (external lead time)
 - [ ] **Sameer** — `protocol.py` frozen and `fixtures.py` pushed **by 14:00**
-- [ ] **Sameer** — `lidar_raycast.m` seed handed to Khanak
-- [ ] **Shubham + Navya** — dashboard rendering fixture cells by end of day
-- [ ] **Khanak** — Octave or MATLAB Online installed and running
+- [ ] **Shubham + Navya** — `pnpm dev` serving a page that renders fixture cells
+- [ ] **Khanak** — MATLAB or Octave installed; **Simulink availability answered** (risk R-12)
 - [ ] **Veda** — Q-2 (deck template) and Q-3 (demo hardware) answered
 - [ ] **Everyone** — repo cloned, `pytest -q` green on your own machine
 - [ ] **Sameer** — cross-platform smoke test passed on both Mac and Windows

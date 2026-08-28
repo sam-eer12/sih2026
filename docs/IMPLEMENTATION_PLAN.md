@@ -52,8 +52,24 @@ psutil        == 5.9.8         # RSS measurement for the memory benchmark
 numba         == 0.59.1        # OPTIONAL, behind a flag (NFR-3)
 ```
 
-Frontend uses Three.js `r165` vendored into `web/vendor/` — **not** loaded from a CDN. A
-live demo must not depend on conference wifi.
+Frontend (`webapp/`, Next.js):
+
+```
+node                    >= 20.11 LTS
+next                    == 14.2.5      # App Router
+react / react-dom       == 18.3.1
+typescript              == 5.4.5
+three                   == 0.165.0     # npm dependency, imperative use — NOT react-three-fiber
+firebase                == 10.12.2     # client SDK, auth only
+firebase-admin          == 12.1.1      # server-side ID token verification
+mongodb                 == 6.7.0       # official driver; no ODM
+tailwindcss             == 3.4.4
+```
+
+**`three` is used imperatively and `react-three-fiber` is deliberately excluded** (FR-42).
+Rendering 50,000 instanced cells at 30 FPS through React reconciliation is the fastest way to
+lose the frame-rate claim; the viewer is a `useRef` canvas driven by a plain
+`requestAnimationFrame` loop.
 
 ### 2.2 Setup — identical on macOS and Windows
 
@@ -67,15 +83,41 @@ source .venv/bin/activate
 
 pip install -r requirements.txt
 pytest -q                      # must pass before you write anything
-python -m avr25d.server.app --fixtures   # dashboard on http://localhost:8000
+
+# backend — pipeline + WebSocket frame stream
+python -m avr25d.server.app --fixtures         # ws://localhost:8000/stream
+
+# frontend — Next.js app, in a second terminal
+cd webapp && pnpm install && pnpm dev          # http://localhost:3000
 ```
+
+### 2.3 Cloud services
+
+Both are cloud-only by decision (`PRD.md` R-11). Two accounts, set up on Day 1:
+
+- **Firebase** — one project, Authentication enabled with Email/Password and Google providers.
+  Client config goes in `webapp/.env.local`; the Admin service-account JSON goes in
+  `FIREBASE_SERVICE_ACCOUNT` as a single-line env var and is **never committed**.
+- **MongoDB Atlas** — free M0 cluster, one database `avr25d`, one user. Connection string in
+  `MONGODB_URI`.
+
+`webapp/.env.local.example` lists every variable with a comment. `.env.local` is gitignored.
+Anyone who commits a service account key rotates it immediately and tells the team.
+
+### 2.4 Serve the demo from localhost, not from Vercel
+
+**NFR-9, and it will bite you if you forget it.** A page served over HTTPS from Vercel cannot
+open a `ws://localhost:8000` connection — browsers block mixed content, and the frame stream
+silently never connects. The Vercel deployment exists so the submission has a live link; the
+**live demo runs `pnpm dev` on the demo machine at `http://localhost:3000`**, talking to the
+local FastAPI server. Verify this on Day 7, not Day 13.
 
 **NFR-4 is load-bearing.** No CUDA, no `spconv`, no `torchsparse`, no compiled extension, no
 platform-specific build step. If a dependency needs a C++ toolchain, it does not go in
 `requirements.txt`. Numba is optional and every Numba-accelerated function has a NumPy
 sibling selected by `config.yaml: use_numba`.
 
-### 2.3 Day-1 cross-platform smoke test
+### 2.5 Day-1 cross-platform smoke test
 
 Both a Mac and the Windows box run `pytest -q` and `--fixtures` on Day 1 evening. Divergence
 found on Day 1 is an hour; found on Day 11 it is the project (risk R-5).
@@ -274,24 +316,47 @@ sih2026/
 │   ├── io/
 │   │   ├── kitti.py                # .bin / .label readers
 │   │   └── replay.py               # frame-log record and playback
+│   ├── synth/                      # synthetic scenes with exact ground truth (PRD §9.3)
+│   │   ├── raycast.py              # spherical ray-cast vs plane / AABB / cylinder
+│   │   ├── scenegen.py             # scene assembly from a spec CSV
+│   │   ├── export.py               # write KITTI-format .bin + .label
+│   │   └── scenes/*.csv            # one primitive per row
 │   └── server/
 │       ├── app.py                  # FastAPI + WebSocket, pipeline driver
 │       ├── protocol.py             # FrameMessage encode/decode — FROZEN DAY 1
 │       └── fixtures.py             # synthetic schema-valid frames
-├── web/
-│   ├── index.html
-│   ├── main.js                     # app shell, WebSocket client, view routing
-│   ├── scene.js                    # Three.js scene, instanced cell rendering
-│   ├── views.js                    # 4 views, A/B wipe, ring overlay
-│   ├── hud.js                      # metrics panel
-│   ├── palette.js                  # class colours — single source of truth
-│   └── vendor/three.module.js      # vendored, no CDN
-├── matlab/
-│   ├── lidar_raycast.m             # spherical ray-cast against primitives
-│   ├── scenegen.m                  # scene assembly from a spec table
-│   ├── export_kitti.m              # write .bin + .label
-│   ├── run_all_scenes.m
-│   └── scenes/*.csv                # scene specifications
+├── webapp/                         # Next.js 14, App Router, TypeScript
+│   ├── app/
+│   │   ├── layout.tsx  page.tsx
+│   │   ├── (auth)/login/page.tsx   # Firebase Auth gate
+│   │   ├── dashboard/page.tsx      # the live viewer
+│   │   ├── runs/page.tsx           # run history from MongoDB
+│   │   ├── runs/[id]/page.tsx      # one run: config, results, decision log
+│   │   └── api/
+│   │       ├── runs/route.ts       # POST/GET runs      (token-verified)
+│   │       ├── decisions/route.ts  # POST batched decision records
+│   │       └── scenes/route.ts     # scene registry + ground truth
+│   ├── components/
+│   │   ├── viewer/                 # Shubham — imperative Three.js, no React state
+│   │   │   ├── Viewer.tsx  useThreeScene.ts  instancedCells.ts
+│   │   │   ├── ringOverlay.ts  wipe.ts  views.ts
+│   │   ├── hud/                    # Navya
+│   │   │   ├── Hud.tsx  LatencyBars.tsx  MemoryPanel.tsx  ModeBadge.tsx
+│   │   └── decision/DecisionPanel.tsx  TrackList.tsx
+│   ├── lib/
+│   │   ├── firebase/client.ts  admin.ts
+│   │   ├── mongo.ts                # cached client, collections, indexes
+│   │   ├── protocol.ts             # FrameMessage decode — mirrors protocol.py
+│   │   ├── palette.ts              # class colours — single source of truth
+│   │   └── ws.ts                   # WebSocket client, reconnect, backpressure
+│   ├── .env.local.example
+│   └── package.json
+├── hardware/                       # companion workstream — PRD §16
+│   ├── docs/DESIGN_REPORT.md  LINK_BUDGET.md  BOM.md
+│   ├── matlab/link_budget.m  range_accuracy.m  snr_sweep.m
+│   │           scan_coverage.m  power_budget.m
+│   ├── simulink/tof_receiver_chain.slx
+│   └── figures/
 ├── tools/
 │   ├── ring_table.py               # §3.6 derivation
 │   └── fetch_kitti.sh
@@ -646,52 +711,112 @@ worker thread and pushes `FrameMessage`s on a fixed cadence, dropping frames rat
 queueing them if a consumer falls behind — a demo must degrade in frame rate, never in
 latency.
 
-### 6.13 `web/` · Shubham (scene) and Navya (HUD, transport)
+### 6.13 `webapp/components/viewer/` — the Three.js viewer · Shubham
 
-**`scene.js` (Shubham).** Three.js scene, camera, lighting. Cells render as a single
-`InstancedMesh` of unit boxes, per-instance matrix from `cell_centres` + `cell_extents` +
-`z_ground`/`z_obstacle`, per-instance colour from `palette.js`. One draw call for ~50,000
-cells. Frustum culling on; distance LOD drops cells beyond a radius when the instance count
-exceeds budget. Fallback if instancing underperforms (R-4): render cell centroids as a
-`Points` cloud with per-point size — visually near-identical at demo zoom and much cheaper.
+Owns the entire rendering path. **No React state touches per-frame data** (FR-42).
 
-**`views.js` (Shubham).** Four views (FR-25), ring-boundary overlay (FR-27), A/B wipe between
-uniform and adaptive over the same frame (FR-29). The wipe is the single most persuasive
-thing on the screen: same scan, same camera, a draggable divider, cell counts live on both
-sides. Build it early.
+```ts
+// useThreeScene.ts
+export function useThreeScene(canvasRef: RefObject<HTMLCanvasElement>) {
+  // Creates renderer/scene/camera ONCE in an effect keyed on [].
+  // Returns an imperative handle. Frames arrive via handle.pushFrame(msg) from the
+  // WebSocket callback and are written straight into GPU buffers. React never re-renders.
+}
 
-**`hud.js` (Navya).** Metrics panel (FR-28): FPS, per-stage latency bars, total latency,
-occupied cells, memory both sides, reduction factor, active perception mode, frame index.
-Numbers come from `stats` and are never computed in the browser — one source of truth.
-
-**`main.js` (Navya).** App shell, WebSocket client, binary frame decode into typed arrays,
-view routing, keyboard shortcuts, route and track overlays, decision panel showing the
-`reason` string.
-
-**`palette.js`.** Class colours from PRD §6.1, in one file. Both developers import it; nobody
-hard-codes a hex value anywhere else.
-
-### 6.14 `matlab/` · Khanak
-
-```matlab
-% lidar_raycast.m — base-language MATLAB only. Runs unmodified in GNU Octave.
-function [pts, labels] = lidar_raycast(scene, sensor)
-%   64 beams x 1800 azimuths. For each ray, intersect against every primitive
-%   (plane / axis-aligned box / cylinder), keep the nearest hit, emit the point and
-%   the primitive's class label. Adds Gaussian range noise, sigma = 0.02 m, and drops
-%   returns beyond r_max, so the synthetic clouds have realistic density falloff.
-
-% scenegen.m     — assemble a scene struct from scenes/*.csv
-% export_kitti.m — write float32 [x y z intensity] .bin + uint32 .label
-% run_all_scenes.m — regenerate every scene into data/synthetic/
+// instancedCells.ts
+export function updateCells(mesh: THREE.InstancedMesh, cells: CellArrays): void
+// Writes per-instance matrix from (centre, extent, z_ground, z_obstacle) and per-instance
+// colour from palette.ts. One draw call for ~50,000 cells. Reallocates the InstancedMesh
+// only when n exceeds the current capacity, growing in powers of two.
 ```
 
-**No toolbox functions.** Not `pcread`, not `lidarScenario`, nothing from Automated Driving or
-Lidar Toolbox. Base language only, which is what makes the files run in free Octave and takes
-licensing off the critical path (risk R-8).
+**Why `useRef` and not `useState`.** A `FrameMessage` arrives 30 times a second carrying
+typed arrays for tens of thousands of cells. Putting that in React state would run
+reconciliation 30 times a second over data only a WebGL buffer ever reads. The canvas is a
+ref, the render loop is a plain `requestAnimationFrame`, and React renders only the chrome
+around the canvas. This is FR-42 and risk R-13.
 
-A scene CSV is one primitive per row, which is the deliberate design: authoring a new hazard
-scene means editing a spreadsheet, not writing code.
+**Views** (`views.ts`, FR-25): raw cloud, uniform 5 cm grid, adaptive grid, decision layer.
+Plus `ringOverlay.ts` (FR-27) and `wipe.ts` (FR-29).
+
+**The A/B wipe is the single most persuasive object in the submission.** Same scan, same
+camera, a draggable divider, live cell counts on both sides reading 16,000,000 against
+705,771. Implemented as two scissor-rect renders of the same scene graph with different cell
+sets — not two canvases, which would double the WebGL context cost.
+
+**Performance fallback** (risk R-4): if instancing underperforms, render cell centroids as a
+`THREE.Points` cloud with per-point size. Visually near-identical at demo zoom, far cheaper.
+
+**Tests:** T-V1, T-V2, T-V3, T-V5, T-V6, T-W7.
+
+### 6.14 `webapp/app/`, `lib/`, `components/hud/` — platform, auth, persistence · Navya
+
+Owns the Next.js application, the auth gate, the MongoDB layer, the HUD and the decision panel.
+
+```ts
+// lib/ws.ts — the realtime path. Bypasses Next.js entirely (FR-41).
+export function connectFrames(url: string, onFrame: (m: FrameMessage) => void): () => void
+// Direct browser -> ws://localhost:8000/stream. Exponential-backoff reconnect.
+// Drops frames rather than queueing when the consumer falls behind — degrade in frame
+// rate, never in latency.
+
+// lib/protocol.ts — mirrors avr25d/server/protocol.py. Decodes the JSON header, then maps
+// each payload onto a typed-array view over the received ArrayBuffer. Zero copies.
+
+// lib/firebase/admin.ts
+export async function requireUser(req: Request): Promise<DecodedIdToken>
+// Verifies the Bearer ID token with the Admin SDK. Every route handler that writes calls
+// this FIRST (FR-37). No handler ever trusts a client-supplied uid.
+
+// lib/mongo.ts — module-scoped cached MongoClient (Next.js route handlers are per-request;
+// creating a client per request exhausts the Atlas connection pool within minutes).
+```
+
+**MongoDB schema.** Four collections, indexed on Day 5.
+
+| Collection | Document | Indexes |
+|---|---|---|
+| `runs` | `{_id, uid, startedAt, finishedAt, gitCommit, platform, config, results, mode}` — one per pipeline or benchmark run, carrying the full `config.yaml` snapshot and `results.json` payload (FR-38) | `{uid:1, startedAt:-1}` |
+| `decisions` | `{_id, runId, frameId, tSec, selected, risk, etaS, reason, trackIds, changed}` — the routing audit trail (FR-39) | `{runId:1, frameId:1}` |
+| `scenes` | `{_id, name, primitives, groundTruth:{potholeDepth, clearance, curbHeight, truckSpeed}}` (FR-40) | `{name:1}` unique |
+| `users` | `{_id: firebaseUid, email, displayName, createdAt}` | `_id` |
+
+**Decision writes are batched** (FR-39, NFR-10). A record is queued when the selected route,
+risk level or reason string changes, and otherwise at most once every 60 frames. The queue
+flushes on a 2-second timer via `insertMany`, off the render path and never awaited inside
+the frame loop. At 30 FPS the naive alternative is 30 Atlas round-trips per second, which
+would both dominate the latency budget and store thirty near-identical documents per second.
+
+**Why `runs` matters beyond the demo.** Every number in the deck traces to a `results.json`,
+and every `results.json` now lives in a `runs` document with the exact config and git commit
+that produced it. When a judge asks "where did that 22.67× come from?", the answer is a run
+id, not a memory.
+
+**HUD** (`components/hud/`, FR-28): FPS, per-stage latency bars, total latency, occupied
+cells, memory both sides, reduction factor, **perception-mode badge** (FR-6), frame index.
+Every value comes from `stats` in the `FrameMessage` — never computed in the browser, so the
+HUD and `results.json` cannot disagree.
+
+**Tests:** T-V4, T-W1 … T-W6.
+
+### 6.15 `avr25d/synth/` — synthetic scenes with exact ground truth · Anuj
+
+Moved here from MATLAB (PRD §9.3). About 150 lines, and it shares its spherical projection
+maths with `perception/range_proj.py`, which Anuj is writing anyway.
+
+```python
+def raycast(scene: Scene, sensor: SensorSpec) -> tuple[np.ndarray, np.ndarray]:
+    """64 beams x 1800 azimuths. For each ray, intersect against every primitive
+    (plane / axis-aligned box / cylinder), keep the nearest hit, emit the point and the
+    primitive's class label. Adds Gaussian range noise (sigma = 0.02 m) and drops returns
+    beyond r_max, so synthetic clouds have realistic density falloff.
+    Returns (xyzi float32[n,4], labels uint32[n])."""
+
+def load_scene(csv_path) -> Scene:   # one primitive per row
+def export_kitti(pts, labels, out_dir, frame_id) -> None
+```
+
+Scene CSV — one primitive per row, so authoring a hazard scene is editing a table:
 
 ```csv
 type,   x,     y,     z,     sx,   sy,   sz,   class, note
@@ -701,7 +826,46 @@ box,    25.0,  0.0,   3.10,  6.0,  0.4,  0.5,  3,     gantry beam, 3.10 m cleara
 cyl,    25.0, -3.0,   1.55,  0.3,  0.3,  3.10, 3,     gantry support post
 ```
 
+`x` forward, `y` left, `z` up, sensor at the origin 1.7 m above the road. `class` is the
+taxonomy from `PRD.md` §6.1.
+
+**Because the scene is analytic, ground truth is exact and free** — the pothole is 0.220 m
+deep and the gantry clearance is 3.100 m to machine precision. That is what turns hazard
+preservation from a demo into a measurement with an error in metres (PRD §11.4). Ground-truth
+values are written to the `scenes` collection (FR-40) so the benchmark and the dashboard read
+truth from one place.
+
+Five scenes: `S1_flat_road`, `S2_pothole`, `S3_overhang`, `S4_curb`, `S5_crossing_truck`
+(40 frames), plus two adversarial scenes on Days 9–10.
+
 **Tests:** T-H4.
+
+### 6.16 `hardware/` — drone LiDAR sensing payload · Khanak and Veda
+
+Companion workstream, specified in `PRD.md` §16. **No software module depends on it** and it
+introduces no runtime dependency; it is developed and presented in parallel.
+
+| File | Produces |
+|---|---|
+| `matlab/link_budget.m` | Received optical power and SNR against range, for reflectivity 0.1–0.9 (HW-1) |
+| `matlab/range_accuracy.m` | `σ_range = c·σ_t / 2` error budget; walk error with and without CFD (HW-4) |
+| `matlab/snr_sweep.m` | Sweeps over aperture, reflectivity and sunlight background (HW-1) |
+| `matlab/scan_coverage.m` | MEMS scan pattern → angular sampling → point density against range (HW-5) |
+| `matlab/power_budget.m` | Per-component power and mass, totalled against the drone payload limit (HW-6) |
+| `simulink/tof_receiver_chain.slx` | Pulse → APD → TIA → CFD → TDC with noise; measured against true range (HW-3) |
+| `docs/DESIGN_REPORT.md` | The design, with every figure reproducible from the scripts above (HW-8) |
+| `docs/BOM.md` | Costed component list with justification |
+
+**Every `.m` file is base-language only** and runs unmodified in free GNU Octave. The only
+Simulink-dependent item is the receiver-chain model, and it has a documented pure-MATLAB
+equivalent: discrete-time convolution of the laser pulse with the detector impulse response,
+plus shot and thermal noise, with the CFD and TDC applied numerically. Same waveforms, same
+range-error figures, no Simulink. Take that path immediately if a licence is not available
+(risk R-12) rather than spending days chasing one.
+
+**Eye safety is not optional** (HW-2). The IEC 60825-1 Class 1 accessible-emission limit at
+905 nm must be worked through explicitly in the report. A LiDAR design that does not address
+it is not a credible design, and it is exactly the question a DRDO evaluator asks.
 
 ---
 
@@ -788,39 +952,40 @@ for your team, say so at the Day 1 standup — the plan can absorb it now, not o
 | Owner | Task |
 |---|---|
 | **Anuj** | **First action of the sprint:** start the SemanticKITTI subset download (seq 04, then 00, then 05). It is bandwidth-bound, so it runs unattended all day. Then begin `geometric_seg.py` (§6.5). |
-| **Sameer** | Repo scaffold, `requirements.txt`, `config.yaml`, `tools/ring_table.py`. Write and **freeze `protocol.py`** (§5.2), then `fixtures.py` (§5.3) and push both by 14:00 — the frontend pair is blocked until this lands, so it is the highest-priority item on the board. Then start `core/grid.py`. |
-| **Shubham** | Three.js scene skeleton, vendored `three.module.js`, orbit camera, ground reference, `palette.js`. From 14:00, render fixture cells as an `InstancedMesh`. |
-| **Navya** | `index.html` shell, WebSocket client, binary frame decode, HUD panel laid out with live fixture numbers. |
-| **Khanak** | Install MATLAB Online or Octave. Receive the `lidar_raycast.m` seed from Sameer, get it running, produce `S1_flat_road`. |
+| **Sameer** | Repo scaffold, `requirements.txt`, `config.yaml`, `tools/ring_table.py`. Write and **freeze `protocol.py`** (§5.2), then `fixtures.py` (§5.3) and push both by 14:00 — the frontend pair is blocked until this lands. Then start `core/grid.py`. |
+| **Navya** | **Create the Firebase project and the Atlas M0 cluster** (§2.3) — external accounts are lead-time items, so they go first. Then `create-next-app`, Tailwind, `.env.local.example`, and `lib/protocol.ts` decoding fixture frames. |
+| **Shubham** | Three.js scene inside a `useRef` canvas — renderer, orbit camera, ground reference, `lib/palette.ts`. From 14:00, render fixture cells as one `InstancedMesh`. |
+| **Khanak** | Install MATLAB/Octave; confirm whether Simulink is available (risk R-12) and tell the team either way. Read `PRD.md` §16. Draft the payload architecture block diagram. |
 | **Veda** | Confirm deck template and submission mechanics (Q-2, Q-3). Deck outline. Start prior-art search. |
 
-**Exit criteria.** `pytest -q` green on both a Mac and the Windows box. `--fixtures` serves a
-dashboard rendering ~50,000 synthetic cells. KITTI seq 04 downloading. Nobody is blocked.
+**Exit criteria.** `pytest -q` green on both a Mac and the Windows box. `pnpm dev` serves a
+page rendering ~50,000 fixture cells. Firebase project and Atlas cluster exist. KITTI seq 04
+downloading. Nobody is blocked.
 
 #### Day 2 — Sat 29 Aug · The grid exists
 
 | Owner | Task |
 |---|---|
-| **Sameer** | Finish `core/grid.py`: ring table, `ring_of`, `cell_of`, `cell_centres`, `cell_extents`. Tests T-G1, T-G2, T-G3, T-G4. |
+| **Sameer** | Finish `core/grid.py`: ring table, `ring_of`, `cell_of`, `cell_centres`, `cell_extents`. Tests T-G1 – T-G4. |
 | **Anuj** | Finish `geometric_seg.py`. `io/kitti.py` readers. |
-| **Shubham** | Class-coloured instanced cells, correct per-instance sizing from `cell_extents`, elevation-shading toggle. |
-| **Navya** | HUD skeleton complete against fixtures. View switching, frame stepping, pause. |
-| **Khanak** | `S2_pothole`. Verify the depression is visible in the point cloud, not just in the CSV. |
+| **Navya** | Firebase Auth: login page, both providers, middleware gating `/dashboard` (FR-36). `lib/ws.ts` with reconnect. |
+| **Shubham** | Class colouring, per-instance sizing from `cell_extents`, elevation-shading toggle. |
+| **Khanak** | `link_budget.m` — received power against range. First numbers out. |
 | **Veda** | Prior-art and novelty write-up. Draft slides 1–2. |
 
-**Exit criterion.** `RingGrid` reports exactly **662 rings and 705,771 cells**, and the
-conservation test T-G4 passes including its adversarial inputs.
+**Exit criteria.** `RingGrid` reports **662 rings and 705,771 cells**; T-G4 passes including
+its adversarial inputs. T-W1 passes — unauthenticated users cannot reach `/dashboard`.
 
 #### Day 3 — Sun 30 Aug · First real scan end-to-end
 
 | Owner | Task |
 |---|---|
-| **Sameer** | `core/cell.py`: SoA arrays, `accumulate` with `np.add.at` scatter-reduce, `z_ground` estimator, ring-neighbour table. Wire `server/app.py` to drive the real pipeline. |
-| **Anuj** | `labelmap.py` (19→5 merge including the `moving-*` IDs). First labelled KITTI scan into the grid. |
+| **Sameer** | `core/cell.py`: SoA arrays, `accumulate` scatter-reduce, `z_ground` estimator, ring-neighbour table. `server/app.py` driving the real pipeline. |
+| **Anuj** | `labelmap.py` (19→5 including `moving-*`). **`avr25d/synth/` ray-caster** (§6.15) plus scenes `S1`, `S2`, `S3` — needed by Day 4. |
 | **Shubham** | View 1 (raw cloud) and View 3 (adaptive grid) on real streamed frames. |
-| **Navya** | HUD wired to real `stats` rather than fixtures. |
-| **Khanak** | `S3_overhang` with 3.10 m clearance. |
-| **Veda** | Slides 3–4. Begin the judge Q&A bank. |
+| **Navya** | HUD wired to real `stats`. View switching, frame stepping, pause. |
+| **Khanak** | `range_accuracy.m` — jitter and walk error into a range error budget. |
+| **Veda** | Slides 3–4. Begin the judge Q&A bank. Start the payload design report skeleton with Khanak. |
 
 **Exit criterion.** A real KITTI scan, geometrically segmented, projected into the adaptive
 grid, rendered class-coloured in the browser, with `n_points_conserved == n_points` on the HUD.
@@ -836,12 +1001,12 @@ grid, rendered class-coloured in the browser, with `n_points_conserved == n_poin
 | **Sameer** | `cell.analyse()`: slope, roughness, OVERHANG, NEGATIVE_OBSTACLE, STEP, VOID_UNOBSERVED, LOW_CONFIDENCE. |
 | **Anuj** | Acquire an ONNX SemanticKITTI checkpoint (Q-4). Export and int8-quantise. Begin `range_proj.py`. |
 | **Shubham** | View 2 — the uniform 5 cm grid, needed for the comparison. |
-| **Navya** | Memory comparison panel, reduction factor, per-stage latency bars. |
-| **Khanak** | `S4_curb` at 0.15 m. |
+| **Navya** | `lib/mongo.ts` and `app/api/runs/route.ts` with `requireUser` token verification (FR-37). |
+| **Khanak** | `snr_sweep.m` — reflectivity, aperture and sunlight background sweeps. |
 | **Veda** | Slide 5. Full deck draft with `_measured_` placeholders intact. |
 
-**Exit criterion.** Overhang and pothole flags fire correctly on `S3` and `S2`; `S1_flat_road`
-produces **zero** hazard flags.
+**Exit criteria.** Overhang and pothole flags fire on `S3` and `S2`; `S1_flat_road` produces
+**zero** flags. T-W2 passes on the `runs` route.
 
 #### Day 5 — Tue 1 Sep · The money shot
 
@@ -849,24 +1014,24 @@ produces **zero** hazard flags.
 |---|---|
 | **Shubham** | **The A/B wipe** (FR-29) and the ring overlay (FR-27). Highest-value visual in the submission — build it today, not in the final week. |
 | **Sameer** | `bench/baselines.py`, `bench/memory.py`. |
-| **Anuj** | `onnx_infer.py` and k-NN reprojection in `range_proj.py`. |
-| **Navya** | Perception-mode badge (FR-6). Track list panel scaffold. |
-| **Khanak** | Begin `S5_crossing_truck` (40 frames). |
-| **Veda** | Video script, timed to 3:00, beats matched to the run-book. |
+| **Anuj** | `onnx_infer.py`; k-NN reprojection in `range_proj.py`. Scenes `S4`, `S5`. |
+| **Navya** | Mongo collections and indexes created. `app/api/scenes/route.ts`; scene ground truth registered (FR-40). |
+| **Khanak** | `scan_coverage.m` — MEMS scan pattern to angular sampling and point density. |
+| **Veda** | Video script timed to 3:00, beats matched to the run-book. |
 
-**Exit criterion.** The draggable divider shows uniform vs adaptive on the *same* scan with
-live cell counts on both sides, reading **16,000,000 vs 705,771**.
+**Exit criteria.** The draggable divider shows uniform against adaptive on the *same* scan
+with live cell counts reading **16,000,000 vs 705,771**. T-W5 passes.
 
 #### Day 6 — Wed 2 Sep · Perception lands
 
 | Owner | Task |
 |---|---|
-| **Anuj** | ONNX inference producing sane labels on real scans with measured CPU latency. **Kick off the label-cache build overnight.** |
-| **Sameer** | `bench/latency.py`. Per-stage timing wired through the pipeline into `stats`. |
+| **Anuj** | ONNX inference producing sane labels with measured CPU latency. **Kick off the label-cache build overnight.** |
+| **Sameer** | `bench/latency.py`; per-stage timing wired into `stats`. |
 | **Shubham** | Wipe polish; performance pass on instance count. |
-| **Navya** | Full HUD per FR-28 — every field populated from real frames. |
-| **Khanak** | Finish `S5_crossing_truck`. |
-| **Veda** | Q&A bank to 12 questions. Rehearse narration against the draft deck. |
+| **Navya** | Full HUD per FR-28, including the **perception-mode badge** (FR-6). |
+| **Khanak** | `power_budget.m`; begin the component selection table. |
+| **Veda** | Q&A bank to 12 questions. Payload design report: architecture and component-justification sections. |
 
 **Exit criterion.** Network labels visibly better than geometric labels on the same scan, with
 both modes selectable and the active mode shown on the HUD.
@@ -885,27 +1050,27 @@ one module deliberately not pre-assigned to a single person.
 | **Anuj** | `decision/traversability.py` and `decision/tracker.py`. Verify the overnight label cache. |
 | **Sameer** | `decision/costmap.py` — polar → 160 × 160 ego-front Cartesian resample. |
 | **Shubham** | View 4 scaffold: track markers and predicted trajectories. |
-| **Navya** | Decision panel scaffold: route, risk, ETA, reason string. |
-| **Khanak** | Regenerate S1–S5 with final parameters. Begin `GROUND_TRUTH.md`. |
+| **Navya** | `app/api/decisions/route.ts` with **batched writes** (FR-39). **Verify the localhost-vs-Vercel mixed-content path today** (NFR-9) — not on Day 13. |
+| **Khanak** | Simulink receiver chain, or the pure-MATLAB fallback if Day 1 found no licence. |
 | **Veda** | Deck to near-final. Q&A bank to 20 questions. |
 
-**Exit criterion.** On `S5`, the tracker holds one stable ID across all 40 frames and estimates
-speed within 0.5 m/s of the true 8.0 m/s.
+**Exit criteria.** On `S5` the tracker holds one stable ID across all 40 frames with speed
+within 0.5 m/s of 8.0 m/s. NFR-9 confirmed: the demo path is `http://localhost:3000`.
 
 #### Day 8 — Fri 4 Sep · Planning and explanation
 
 | Owner | Task |
 |---|---|
-| **Sameer** | `decision/planner.py` (A*, primary + genuinely distinct alternative) and `decision/explain.py`. |
+| **Sameer** | `decision/planner.py` (A*, primary plus a genuinely distinct alternative) and `decision/explain.py`. |
 | **Anuj** | `bench/distance_bins.py` and `bench/hazard.py`. |
 | **Shubham** | View 4 complete: routes, risk shading, legible from three metres. |
-| **Navya** | Decision panel complete and readable at projector resolution. |
-| **Khanak** | Deliver `GROUND_TRUTH.md` to Anuj. |
-| **Veda** | Assemble the demo run-book with Sameer. |
+| **Navya** | Decision panel: route, risk, ETA, reason string. `/runs` history page. |
+| **Khanak** | Finish the receiver-chain model; produce measured-against-true range plots. |
+| **Veda** | Assemble the demo run-book with Sameer. Payload BOM table. |
 
-**Exit criterion.** On `S5`, a tracked crossing truck triggers a reroute and the dashboard
+**Exit criteria.** On `S5`, a tracked crossing truck triggers a reroute and the dashboard
 shows the alternative route with a reason string naming the track, its speed and the predicted
-intersection time.
+intersection time. T-W4 passes — reroutes plus heartbeats, not one write per frame.
 
 ---
 
@@ -915,44 +1080,43 @@ intersection time.
 
 | Owner | Task |
 |---|---|
-| **Sameer** | `core/refine.py` — bounded local refinement (FR-17, FR-18), **plus uncertainty-driven refinement** *[pulled forward]*: refine on low `confidence`, not only on motion and roughness. This completes the `R = f(distance, complexity, semantics, uncertainty)` claim that slide 2 makes. |
-| **Anuj** | Perception improvement prep: assemble the 5-class fine-tuning split; resolve Q-1 definitively (is the Windows GPU usable?). |
-| **Shubham** | LOD tuning; verify ≥30 FPS at 100k instances (FR-30). |
-| **Navya** | Refinement visualisation — sub-cells visibly distinct from parents. |
-| **Khanak** | Adversarial scene: pothole partially occluded by a parked vehicle. |
-| **Veda** | Record a rough-cut video against the current build to find problems while they are still fixable. |
+| **Sameer** | `core/refine.py` — bounded refinement (FR-17, FR-18) **plus uncertainty-driven refinement** *[pulled forward]*, completing the `R = f(distance, complexity, semantics, uncertainty)` claim slide 2 makes. |
+| **Anuj** | Fine-tuning split prep. **Resolve Q-1 definitively.** Adversarial scene: occluded pothole. |
+| **Shubham** | LOD tuning; verify ≥30 FPS at 100k instances (FR-30) and the React render count (T-W7). |
+| **Navya** | `/runs/[id]` detail page: config, results, decision log. |
+| **Khanak** | Eye-safety calculation (HW-2) worked through against IEC 60825-1. |
+| **Veda** | Payload design report first full draft. Record a rough-cut video against the current build. |
 
-**Exit criterion.** A distant moving vehicle is visibly resolved at finer resolution than the
-empty road beside it, and T-R2 confirms the refinement stays within `max_cells` on an
-adversarial scene.
+**Exit criteria.** A distant moving vehicle is visibly resolved finer than the empty road
+beside it; T-R2 and T-W7 pass.
 
 #### Day 10 — Sun 6 Sep · Perception improvement *[pulled forward, conditional]*
 
 | Owner | Task |
 |---|---|
-| **Anuj** | **If Q-1 says the GPU is usable:** fine-tune the network directly on the 5-class taxonomy rather than remapping a 19-class output. **If not:** decoder-head-only fine-tune on CPU over a small subset — a few hundred iterations is affordable and still a real gain — plus temperature calibration of the confidence output, which feeds Day 9's uncertainty-driven refinement. Either way, run it overnight. |
-| **Sameer** | `--replay` and `--record`. Record the demo sequence log early so the fallback exists well before it is needed. |
-| **Shubham + Navya** | Visual polish. Verify on the actual demo machine at projector resolution. |
-| **Khanak** | Second adversarial scene: low-clearance tunnel with a curb inside it. |
-| **Veda** | Fix everything the rough-cut video exposed. |
+| **Anuj** | **If Q-1 says the GPU is usable:** fine-tune on the 5-class taxonomy. **If not:** decoder-head-only fine-tune on CPU over a small subset plus temperature calibration of confidence, which feeds Day 9's uncertainty-driven refinement. Either way, run it overnight. Adversarial scene: low-clearance tunnel with a curb. |
+| **Sameer** | `--replay` and `--record`. Record the demo sequence log early. |
+| **Shubham + Navya** | Polish. Deploy to Vercel for the submission link, keeping localhost as the demo path. |
+| **Khanak** | Regenerate every payload figure from its script; confirm reproducibility (HW-8). |
+| **Veda** | Fix everything the rough cut exposed. |
 
-**Exit criterion.** A measured before/after mIoU comparison exists, whichever branch was taken.
-If neither improved anything, that is a finding — record it and move on. Do not spend Day 11
-chasing it.
+**Exit criterion.** A measured before/after mIoU comparison exists, whichever branch was
+taken. If neither improved anything, that is a finding — record it and move on. Do not spend
+Day 11 chasing it.
 
 #### Day 11 — Mon 7 Sep · Expanded evaluation · **FEATURE FREEZE 21:00**
 
 | Owner | Task |
 |---|---|
-| **Anuj** | `bench/report.py`. **First full `make bench`.** Multi-sequence evaluation *[pulled forward]* — report per-sequence variance rather than a single number, which is a materially stronger accuracy claim than one sequence. |
-| **Sameer** | Final integration. Fix whatever the full bench run exposes. Then: nothing new. |
-| **Shubham + Navya** | Final polish. Keyboard shortcuts for the entire demo sequence verified. |
-| **Khanak** | Cross-check `GROUND_TRUTH.md` against the hazard benchmark output. |
-| **Veda** | Deck final except for `_measured_` placeholders. |
+| **Anuj** | `bench/report.py`. **First full `make bench`.** Multi-sequence evaluation *[pulled forward]* with per-sequence variance. |
+| **Sameer** | Final integration. Fix whatever the full bench exposes. Then: nothing new. |
+| **Shubham + Navya** | Final polish. Demo keystroke sequence verified end to end. |
+| **Khanak** | Payload design report complete. |
+| **Veda** | Deck final except for `_measured_` placeholders. Rehearse the Q&A bank with the team. |
 
-**Exit criterion at 21:00.** The full pipeline runs end-to-end on KITTI and on all synthetic
-scenes. `make bench` produces a complete `results.json`. **After this point, no new features.
-Bugs, numbers, polish and rehearsal only.**
+**Exit criterion at 21:00.** Full pipeline runs end to end on KITTI and every synthetic scene;
+`make bench` produces a complete `results.json`; the payload report is done. **After this
+point, no new features. Bugs, numbers, polish and rehearsal only.**
 
 ---
 
@@ -962,22 +1126,23 @@ Bugs, numbers, polish and rehearsal only.**
 
 | Owner | Task |
 |---|---|
-| **Anuj** | Final benchmark runs: ≥200 scans for latency, full subset for accuracy, all scenes for hazards. Produce the authoritative `results.json` and hand it to Veda. No changes after handover. |
+| **Anuj** | Final benchmark runs: ≥200 scans for latency, full subset for accuracy, all scenes for hazards. Produce the authoritative `results.json`, persist it as a `runs` document, hand it to Veda. No changes after handover. |
 | **Sameer** | Bug fixes only. Re-record the demo replay log against the frozen build. |
 | **Shubham + Navya** | Bug fixes only. |
-| **Khanak** | Cross-check every number destined for the deck against `results.json`. |
+| **Khanak** | **Cross-check every number destined for the deck against `results.json`** — software and payload both. |
 | **Veda** | **Fill every `_measured_` placeholder from `results.json` only.** |
 
 **Exit criterion.** Zero `_measured_` placeholders remain anywhere, and every filled number
-traces to a line in `results.json`.
+traces to a line in `results.json` or to a payload script.
 
 #### Day 13 — Wed 9 Sep · Video and rehearsal
 
 | Owner | Task |
 |---|---|
-| **Veda** | Record and edit the final 3-minute video. Finalise the deck. |
+| **Veda** | Finalise the deck, including the payload slide. Record the narration. |
+| **Navya** | **Edit the 3-minute video** — picked up from Veda, whose load peaks here (§8 note). |
 | **Sameer** | Run the demo. Nothing else. |
-| **All** | Three full timed demo rehearsals, including the two failure paths (replay fallback, LOD drop). |
+| **All** | Three full timed demo rehearsals, including both failure paths (replay fallback, LOD drop). |
 
 **Exit criteria.** Video rendered and stored **locally** on the presenting laptop. Deck final.
 Three clean rehearsals. Replay-log fallback verified on the demo machine.
@@ -988,6 +1153,12 @@ Morning buffer for whatever broke overnight. Final rehearsal. **Submit.** Live d
 
 Nothing is scheduled into this day on purpose. A fourteen-day plan with no slack is a
 thirteen-day plan that fails.
+
+**Load note.** Moving both non-tech members onto the payload leaves the evidence workstream
+thinner than it was. Veda still owns the deck, the script, the Q&A bank and the submission,
+but the video *edit* moves to Navya on Day 13 and the deck number cross-check moves to Khanak
+on Day 12. If Veda's Days 11–13 look overloaded at the Day 10 standup, move the Q&A rehearsal
+to Sameer — it is the most transferable item.
 
 ---
 
@@ -1065,6 +1236,18 @@ Test IDs are referenced from `PRD.md` §7. `pytest -q` runs the lot.
 | **T-B4** | Object recall matches a hand-computed value on a small fixture. |
 | **T-B5** | `make bench` regenerates `results.json` and `docs/RESULTS.md` reproducibly; two runs on the same input give identical accuracy numbers. |
 
+### Web platform
+
+| ID | Test |
+|---|---|
+| **T-W1** | An unauthenticated request to `/dashboard` redirects to `/login`. A signed-in user reaches it. Both Firebase providers (email/password, Google) complete a sign-in. |
+| **T-W2** | Every `app/api/*` write handler rejects a request with a missing, malformed or expired Firebase ID token with `401`, **before** touching MongoDB. Asserted per route, not once globally — a single unprotected handler is the whole vulnerability. |
+| **T-W3** | Completing a benchmark run inserts one `runs` document whose `config` and `results` round-trip byte-identically against the local `results.json`. |
+| **T-W4** | Over a 600-frame replay containing exactly 2 reroutes, the `decisions` collection receives 2 change-triggered records plus 10 heartbeats — not 600. Proves FR-39's batching rather than assuming it. |
+| **T-W5** | Each of the five scenes has a `scenes` document, and its `groundTruth` values equal the CSV specification exactly. |
+| **T-W6** | The frame stream connects browser→FastAPI directly: no Next.js route handler appears in the network trace for `/stream`, and killing the Next.js dev server mid-stream does not interrupt rendering. |
+| **T-W7** | Instrument a React render counter on the dashboard route: over 300 streamed frames it increments **fewer than 10 times**. Per-frame data must not be entering React state (FR-42). |
+
 ---
 
 ## 10. Demo run-book
@@ -1087,11 +1270,26 @@ Full version in `docs/RUNBOOK.md`. The 90-second sequence:
 - Backend crashes → `--replay demo.log` and continue. The replay log is first recorded on
   Day 10 and re-recorded against the frozen build on Day 12.
 - Rendering stutters → press `L` to drop to point-sprite LOD.
+- Login or Atlas unreachable → the pipeline, viewer and HUD are entirely local and keep
+  running; only run history and the audit log are affected. Say so plainly if asked and
+  continue — do not attempt to debug cloud connectivity in front of judges.
 - Everything fails → play the recorded video. It is on the presenting laptop, not in the cloud.
 
-**Pre-demo checklist:** laptop on mains power, display sleep off, notifications off, browser
-zoom at 100%, `data/` populated, one full silent run-through completed, video file present
-locally, replay log present locally.
+**Pre-demo checklist**, in order:
+
+1. Laptop on mains power; display sleep off; notifications off; browser zoom 100%.
+2. `data/` populated — KITTI subset and all synthetic scenes present.
+3. Backend up: `python -m avr25d.server.app --infer cached`.
+4. Frontend up **on localhost**: `cd webapp && pnpm dev`, then open
+   `http://localhost:3000`. **Not the Vercel URL** — an HTTPS origin cannot open
+   `ws://localhost` and the frame stream will silently never connect (NFR-9).
+5. **Sign in to Firebase now, before the audience arrives**, and leave the tab open. The ID
+   token refreshes for an hour, so an authenticated session survives a network drop that a
+   fresh login would not (risk R-11).
+6. Phone hotspot on and paired, as the second network.
+7. Confirm the Atlas connection once — load `/runs` and see history render.
+8. One full silent run-through completed.
+9. Video file and replay log both present **locally** on this laptop.
 
 ---
 
@@ -1154,3 +1352,12 @@ A checklist, not a feeling. Every line must be true on the evening of Wed 9 Sep.
 - [ ] Deck final; every number traced to `results.json`; no unmeasured claim anywhere
 - [ ] `README.md` lets a stranger clone and run it in under ten minutes
 - [ ] Every PS clause in `PRD.md` §15 maps to a passing test
+- [ ] Auth gate works; every write route rejects an unverified token (T-W1, T-W2)
+- [ ] A completed run appears in `runs`, and `/runs/[id]` renders its config and results
+- [ ] Decision batching verified — reroutes plus heartbeats, not one write per frame (T-W4)
+- [ ] React render count under 10 across 300 streamed frames (T-W7)
+- [ ] Demo verified from `http://localhost:3000`, not the deployed origin (NFR-9)
+- [ ] Vercel deployment live for the submission link
+- [ ] **Payload (companion):** design report complete; link budget, range accuracy, scan
+      coverage and power/mass figures all reproducible from their scripts; eye-safety
+      calculation present; payload slide in the deck
