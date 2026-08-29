@@ -414,7 +414,7 @@ is the core justification for 2.5D over 2D (PS-10), a qualitative claim is not e
 
 ### 9.3 Synthetic scenes with exact ground truth
 
-Generated in-repo by `avr25d/synth/` (§ `WORK_DISTRIBUTION.md`, Anuj). A spherical ray-caster
+Generated in-repo by `avr25d/synth/` (§ `WORK_DISTRIBUTION.md`, Sameer). A spherical ray-caster
 intersects 64 beams × 1800 azimuths against analytic primitives — planes, boxes, cylinders —
 and writes KITTI-format `.bin` (float32 x, y, z, intensity) and `.label` files.
 
@@ -650,12 +650,12 @@ deadline shifted (§12.1).
 
 | ID | Risk | L | I | Mitigation | Owner |
 |---|---|---|---|---|---|
-| **R-1** | No usable GPU; live network inference too slow for the demo | High | High | Cached-label mode (FR-6) with the mode shown on the HUD; live inference latency measured and reported separately; pipeline architecture makes perception a swappable stage | Anuj |
-| **R-2** | Pretrained ONNX weights unavailable, incompatible, or wrongly licensed | Med | High | Geometric fallback segmenter ships Day 1 before any model work (FR-5); the pipeline is never blocked on a model | Anuj |
-| **R-3** | SemanticKITTI download does not finish in time | Med | High | Start Day 1 hour 1; sequence 04 (271 scans) alone unblocks the smoke test; synthetic scenes are a complete independent data path | Anuj |
+| **R-1** | No usable GPU; live network inference too slow for the demo | High | High | Cached-label mode (FR-6) with the mode shown on the HUD; live inference latency measured and reported separately; pipeline architecture makes perception a swappable stage | Sameer |
+| **R-2** | Pretrained ONNX weights unavailable, incompatible, or wrongly licensed | Med | High | Geometric fallback segmenter ships Day 1 before any model work (FR-5); the pipeline is never blocked on a model | Sameer |
+| **R-3** | SemanticKITTI download does not finish in time | Med | High | Start Day 1 hour 1; sequence 04 (271 scans) alone unblocks the smoke test; synthetic scenes are a complete independent data path | Sameer |
 | **R-4** | Three.js cannot sustain frame rate at ~100k instanced cells | Med | Med | `InstancedMesh` + frustum culling + distance LOD; fallback to point-sprite rendering of cell centroids, which is visually nearly identical at demo zoom | Shubham |
-| **R-5** | Mac/Windows divergence burns days on environment issues | Med | High | NFR-3, NFR-4: pure NumPy core, no compiled deps, Numba behind a flag; both platforms smoke-tested Day 1 evening | Sameer |
-| **R-6** | Frontend blocked waiting on backend | High | High | `fixtures.py` on Day 1 emits schema-valid frames; protocol frozen Day 1; frontend never imports backend code (NFR-8) | Sameer |
+| **R-5** | Mac/Windows divergence burns days on environment issues | Med | High | NFR-3, NFR-4: pure NumPy core, no compiled deps, Numba behind a flag; both platforms smoke-tested Day 1 evening | Anuj |
+| **R-6** | Frontend blocked waiting on backend | High | High | `fixtures.py` on Day 1 emits schema-valid frames; protocol frozen Day 1; frontend never imports backend code (NFR-8) | Anuj |
 | **R-7** | Live demo fails in front of judges | Med | High | `--replay` mode from a saved frame log; pre-recorded video as backup; demo run-book with a rehearsed recovery path; NFR-6 cold-start bound | Sameer |
 | **R-8** | MATLAB licence unavailable to the non-tech pair | Med | Med | All `.m` files are base-language only and run unmodified in free GNU Octave (§9.3) | Khanak |
 | **R-9** | The team over-commits and misses the deadline | Med | High | §12.1 cut line is explicit and dated; features are cut, never quality; Day 11 (Mon 7 Sep) is a hard feature freeze with three clear days after it | Sameer |
@@ -688,10 +688,10 @@ deadline shifted (§12.1).
 
 | ID | Question | Needed by | Owner |
 |---|---|---|---|
-| **Q-1** | Exact GPU in the Windows box — does it support CUDA and with how much VRAM? Changes nothing structurally, but if it is usable, live inference goes on the HUD as a real number rather than a projected one. | Day 2 | Anuj |
+| **Q-1** | Exact GPU in the Windows box — does it support CUDA and with how much VRAM? Changes nothing structurally, but if it is usable, live inference goes on the HUD as a real number rather than a projected one. | Day 2 | Sameer |
 | **Q-2** | Does the internal hackathon require a specific deck template or slide count? | Day 2 | Veda |
 | **Q-3** | Is the live demo on our hardware or a provided machine? Determines whether NFR-4 cross-platform work is essential or merely prudent. | Day 3 | Veda |
-| **Q-4** | Which pretrained SemanticKITTI range-image checkpoint is available under a licence permitting hackathon use? | Day 2 | Anuj |
+| **Q-4** | Which pretrained SemanticKITTI range-image checkpoint is available under a licence permitting hackathon use? | Day 2 | Sameer |
 
 ---
 

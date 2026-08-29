@@ -457,7 +457,7 @@ Each module below lists its owner, its public interface, what it depends on, and
 The interface is a contract: write the signature and a stub that returns correctly shaped
 zeros **first**, push it, then fill in the body.
 
-### 6.1 `core/grid.py` — ring table and projection · Sameer
+### 6.1 `core/grid.py` — ring table and projection · Anuj
 
 ```python
 class RingGrid:
@@ -495,7 +495,7 @@ conservation test, and it is the one line most likely to be forgotten.
 
 **Tests:** T-G1, T-G2, T-G3, T-G4, T-G6.
 
-### 6.2 `core/cell.py` — accumulation and analysis · Sameer
+### 6.2 `core/cell.py` — accumulation and analysis · Anuj
 
 ```python
 class CellGrid:
@@ -530,7 +530,7 @@ once at startup.
 
 **Tests:** T-G5, T-H1, T-H2, T-H3.
 
-### 6.3 `core/refine.py` — bounded local refinement · Sameer
+### 6.3 `core/refine.py` — bounded local refinement · Anuj
 
 ```python
 def refine(cells: CellGrid, grid: RingGrid, cfg) -> RefinedOverlay:
@@ -546,7 +546,7 @@ only — not for all 705,771, which would be a large per-frame allocation.
 
 **Tests:** T-R1, T-R2.
 
-### 6.4 `perception/range_proj.py` · Anuj
+### 6.4 `perception/range_proj.py` · Sameer
 
 ```python
 def to_range_image(xyz, intensity, h=64, w=2048, fov_up=3.0, fov_down=-25.0):
@@ -563,7 +563,7 @@ whichever point won the depth test, which visibly shreds object boundaries.
 
 **Tests:** T-P2, T-P4.
 
-### 6.5 `perception/geometric_seg.py` — build this first · Anuj
+### 6.5 `perception/geometric_seg.py` — build this first · Sameer
 
 ```python
 def segment(xyz, intensity, cfg) -> np.ndarray:
@@ -584,7 +584,7 @@ that shows what the network buys.
 
 **Tests:** T-P5.
 
-### 6.6 `perception/onnx_infer.py` · Anuj
+### 6.6 `perception/onnx_infer.py` · Sameer
 
 ```python
 class OnnxSegmenter:
@@ -601,7 +601,7 @@ taxonomy is Phase 2 — for Phase 1, merging a pretrained output is both faster 
 
 **Tests:** T-P1, T-P3.
 
-### 6.7 `perception/cache.py` · Anuj
+### 6.7 `perception/cache.py` · Sameer
 
 ```python
 def build_cache(scan_paths, segmenter, out_dir) -> None:
@@ -615,7 +615,7 @@ class LabelCache:
 Storage is `n_points × 1` byte per scan — about 120 KB, so 1000 scans is 120 MB. Built
 overnight Day 6→7 while everyone sleeps, which is the only free compute the team has.
 
-### 6.8 `decision/traversability.py` · Anuj
+### 6.8 `decision/traversability.py` · Sameer
 
 ```python
 def score(cells: CellGrid, cfg) -> np.ndarray:
@@ -633,7 +633,7 @@ Weights sum to 1.0 and live in config with a one-line justification each (NFR-7)
 
 **Tests:** T-D1.
 
-### 6.9 `decision/tracker.py` · Anuj
+### 6.9 `decision/tracker.py` · Sameer
 
 ```python
 class Tracker:
@@ -650,7 +650,7 @@ adjacency is already known from the neighbour table in §6.2.
 
 **Tests:** T-D2.
 
-### 6.10 `decision/costmap.py`, `planner.py`, `explain.py` · Sameer
+### 6.10 `decision/costmap.py`, `planner.py`, `explain.py` · Anuj
 
 ```python
 def build_costmap(cells, trav, tracks, grid, cfg) -> Costmap:
@@ -684,7 +684,7 @@ def explain(decision_ctx) -> str:
 
 **Tests:** T-D3, T-D4, T-D5, T-D6.
 
-### 6.11 `bench/` · Anuj
+### 6.11 `bench/` · Sameer
 
 `baselines.py` implements B0–B4 from PRD §10.1 as pure functions of `(n_points, n_occ, ...)`,
 so the memory comparison is auditable arithmetic rather than an opaque measurement.
@@ -699,7 +699,7 @@ make bench      # -> results.json + docs/RESULTS.md, one command, fully reproduc
 
 **Tests:** T-B1 … T-B5.
 
-### 6.12 `server/app.py` · Sameer
+### 6.12 `server/app.py` · Anuj
 
 ```python
 # python -m avr25d.server.app [--fixtures] [--infer live|cached|geometric]
@@ -799,10 +799,10 @@ HUD and `results.json` cannot disagree.
 
 **Tests:** T-V4, T-W1 … T-W6.
 
-### 6.15 `avr25d/synth/` — synthetic scenes with exact ground truth · Anuj
+### 6.15 `avr25d/synth/` — synthetic scenes with exact ground truth · Sameer
 
 Moved here from MATLAB (PRD §9.3). About 150 lines, and it shares its spherical projection
-maths with `perception/range_proj.py`, which Anuj is writing anyway.
+maths with `perception/range_proj.py`, which Sameer is writing anyway.
 
 ```python
 def raycast(scene: Scene, sensor: SensorSpec) -> tuple[np.ndarray, np.ndarray]:
@@ -951,8 +951,8 @@ for your team, say so at the Day 1 standup — the plan can absorb it now, not o
 
 | Owner | Task |
 |---|---|
-| **Anuj** | **First action of the sprint:** start the SemanticKITTI subset download (seq 04, then 00, then 05). It is bandwidth-bound, so it runs unattended all day. Then begin `geometric_seg.py` (§6.5). |
-| **Sameer** | Repo scaffold, `requirements.txt`, `config.yaml`, `tools/ring_table.py`. Write and **freeze `protocol.py`** (§5.2), then `fixtures.py` (§5.3) and push both by 14:00 — the frontend pair is blocked until this lands. Then start `core/grid.py`. |
+| **Sameer** | **First action of the sprint:** start the SemanticKITTI subset download (seq 04, then 00, then 05). It is bandwidth-bound, so it runs unattended all day. Then begin `geometric_seg.py` (§6.5). |
+| **Anuj** | Repo scaffold, `requirements.txt`, `config.yaml`, `tools/ring_table.py`. Write and **freeze `protocol.py`** (§5.2), then `fixtures.py` (§5.3) and push both by 14:00 — the frontend pair is blocked until this lands. Then start `core/grid.py`. |
 | **Navya** | **Create the Firebase project and the Atlas M0 cluster** (§2.3) — external accounts are lead-time items, so they go first. Then `create-next-app`, Tailwind, `.env.local.example`, and `lib/protocol.ts` decoding fixture frames. |
 | **Shubham** | Three.js scene inside a `useRef` canvas — renderer, orbit camera, ground reference, `lib/palette.ts`. From 14:00, render fixture cells as one `InstancedMesh`. |
 | **Khanak** | Install MATLAB/Octave; confirm whether Simulink is available (risk R-12) and tell the team either way. Read `PRD.md` §16. Draft the payload architecture block diagram. |
@@ -966,8 +966,8 @@ downloading. Nobody is blocked.
 
 | Owner | Task |
 |---|---|
-| **Sameer** | Finish `core/grid.py`: ring table, `ring_of`, `cell_of`, `cell_centres`, `cell_extents`. Tests T-G1 – T-G4. |
-| **Anuj** | Finish `geometric_seg.py`. `io/kitti.py` readers. |
+| **Anuj** | Finish `core/grid.py`: ring table, `ring_of`, `cell_of`, `cell_centres`, `cell_extents`. Tests T-G1 – T-G4. |
+| **Sameer** | Finish `geometric_seg.py`. `io/kitti.py` readers. |
 | **Navya** | Firebase Auth: login page, both providers, middleware gating `/dashboard` (FR-36). `lib/ws.ts` with reconnect. |
 | **Shubham** | Class colouring, per-instance sizing from `cell_extents`, elevation-shading toggle. |
 | **Khanak** | `link_budget.m` — received power against range. First numbers out. |
@@ -980,8 +980,8 @@ its adversarial inputs. T-W1 passes — unauthenticated users cannot reach `/das
 
 | Owner | Task |
 |---|---|
-| **Sameer** | `core/cell.py`: SoA arrays, `accumulate` scatter-reduce, `z_ground` estimator, ring-neighbour table. `server/app.py` driving the real pipeline. |
-| **Anuj** | `labelmap.py` (19→5 including `moving-*`). **`avr25d/synth/` ray-caster** (§6.15) plus scenes `S1`, `S2`, `S3` — needed by Day 4. |
+| **Anuj** | `core/cell.py`: SoA arrays, `accumulate` scatter-reduce, `z_ground` estimator, ring-neighbour table. `server/app.py` driving the real pipeline. |
+| **Sameer** | `labelmap.py` (19→5 including `moving-*`). **`avr25d/synth/` ray-caster** (§6.15) plus scenes `S1`, `S2`, `S3` — needed by Day 4. |
 | **Shubham** | View 1 (raw cloud) and View 3 (adaptive grid) on real streamed frames. |
 | **Navya** | HUD wired to real `stats`. View switching, frame stepping, pause. |
 | **Khanak** | `range_accuracy.m` — jitter and walk error into a range error budget. |
@@ -998,8 +998,8 @@ grid, rendered class-coloured in the browser, with `n_points_conserved == n_poin
 
 | Owner | Task |
 |---|---|
-| **Sameer** | `cell.analyse()`: slope, roughness, OVERHANG, NEGATIVE_OBSTACLE, STEP, VOID_UNOBSERVED, LOW_CONFIDENCE. |
-| **Anuj** | Acquire an ONNX SemanticKITTI checkpoint (Q-4). Export and int8-quantise. Begin `range_proj.py`. |
+| **Anuj** | `cell.analyse()`: slope, roughness, OVERHANG, NEGATIVE_OBSTACLE, STEP, VOID_UNOBSERVED, LOW_CONFIDENCE. |
+| **Sameer** | Acquire an ONNX SemanticKITTI checkpoint (Q-4). Export and int8-quantise. Begin `range_proj.py`. |
 | **Shubham** | View 2 — the uniform 5 cm grid, needed for the comparison. |
 | **Navya** | `lib/mongo.ts` and `app/api/runs/route.ts` with `requireUser` token verification (FR-37). |
 | **Khanak** | `snr_sweep.m` — reflectivity, aperture and sunlight background sweeps. |
@@ -1013,8 +1013,8 @@ grid, rendered class-coloured in the browser, with `n_points_conserved == n_poin
 | Owner | Task |
 |---|---|
 | **Shubham** | **The A/B wipe** (FR-29) and the ring overlay (FR-27). Highest-value visual in the submission — build it today, not in the final week. |
-| **Sameer** | `bench/baselines.py`, `bench/memory.py`. |
-| **Anuj** | `onnx_infer.py`; k-NN reprojection in `range_proj.py`. Scenes `S4`, `S5`. |
+| **Anuj** | `bench/baselines.py`, `bench/memory.py`. |
+| **Sameer** | `onnx_infer.py`; k-NN reprojection in `range_proj.py`. Scenes `S4`, `S5`. |
 | **Navya** | Mongo collections and indexes created. `app/api/scenes/route.ts`; scene ground truth registered (FR-40). |
 | **Khanak** | `scan_coverage.m` — MEMS scan pattern to angular sampling and point density. |
 | **Veda** | Video script timed to 3:00, beats matched to the run-book. |
@@ -1026,8 +1026,8 @@ with live cell counts reading **16,000,000 vs 705,771**. T-W5 passes.
 
 | Owner | Task |
 |---|---|
-| **Anuj** | ONNX inference producing sane labels with measured CPU latency. **Kick off the label-cache build overnight.** |
-| **Sameer** | `bench/latency.py`; per-stage timing wired into `stats`. |
+| **Sameer** | ONNX inference producing sane labels with measured CPU latency. **Kick off the label-cache build overnight.** |
+| **Anuj** | `bench/latency.py`; per-stage timing wired into `stats`. |
 | **Shubham** | Wipe polish; performance pass on instance count. |
 | **Navya** | Full HUD per FR-28, including the **perception-mode badge** (FR-6). |
 | **Khanak** | `power_budget.m`; begin the component selection table. |
@@ -1047,8 +1047,8 @@ one module deliberately not pre-assigned to a single person.
 
 | Owner | Task |
 |---|---|
-| **Anuj** | `decision/traversability.py` and `decision/tracker.py`. Verify the overnight label cache. |
-| **Sameer** | `decision/costmap.py` — polar → 160 × 160 ego-front Cartesian resample. |
+| **Sameer** | `decision/traversability.py` and `decision/tracker.py`. Verify the overnight label cache. |
+| **Anuj** | `decision/costmap.py` — polar → 160 × 160 ego-front Cartesian resample. |
 | **Shubham** | View 4 scaffold: track markers and predicted trajectories. |
 | **Navya** | `app/api/decisions/route.ts` with **batched writes** (FR-39). **Verify the localhost-vs-Vercel mixed-content path today** (NFR-9) — not on Day 13. |
 | **Khanak** | Simulink receiver chain, or the pure-MATLAB fallback if Day 1 found no licence. |
@@ -1061,8 +1061,8 @@ within 0.5 m/s of 8.0 m/s. NFR-9 confirmed: the demo path is `http://localhost:3
 
 | Owner | Task |
 |---|---|
-| **Sameer** | `decision/planner.py` (A*, primary plus a genuinely distinct alternative) and `decision/explain.py`. |
-| **Anuj** | `bench/distance_bins.py` and `bench/hazard.py`. |
+| **Anuj** | `decision/planner.py` (A*, primary plus a genuinely distinct alternative) and `decision/explain.py`. |
+| **Sameer** | `bench/distance_bins.py` and `bench/hazard.py`. |
 | **Shubham** | View 4 complete: routes, risk shading, legible from three metres. |
 | **Navya** | Decision panel: route, risk, ETA, reason string. `/runs` history page. |
 | **Khanak** | Finish the receiver-chain model; produce measured-against-true range plots. |
@@ -1080,8 +1080,8 @@ intersection time. T-W4 passes — reroutes plus heartbeats, not one write per f
 
 | Owner | Task |
 |---|---|
-| **Sameer** | `core/refine.py` — bounded refinement (FR-17, FR-18) **plus uncertainty-driven refinement** *[pulled forward]*, completing the `R = f(distance, complexity, semantics, uncertainty)` claim slide 2 makes. |
-| **Anuj** | Fine-tuning split prep. **Resolve Q-1 definitively.** Adversarial scene: occluded pothole. |
+| **Anuj** | `core/refine.py` — bounded refinement (FR-17, FR-18) **plus uncertainty-driven refinement** *[pulled forward]*, completing the `R = f(distance, complexity, semantics, uncertainty)` claim slide 2 makes. |
+| **Sameer** | Fine-tuning split prep. **Resolve Q-1 definitively.** Adversarial scene: occluded pothole. |
 | **Shubham** | LOD tuning; verify ≥30 FPS at 100k instances (FR-30) and the React render count (T-W7). |
 | **Navya** | `/runs/[id]` detail page: config, results, decision log. |
 | **Khanak** | Eye-safety calculation (HW-2) worked through against IEC 60825-1. |
@@ -1094,8 +1094,8 @@ beside it; T-R2 and T-W7 pass.
 
 | Owner | Task |
 |---|---|
-| **Anuj** | **If Q-1 says the GPU is usable:** fine-tune on the 5-class taxonomy. **If not:** decoder-head-only fine-tune on CPU over a small subset plus temperature calibration of confidence, which feeds Day 9's uncertainty-driven refinement. Either way, run it overnight. Adversarial scene: low-clearance tunnel with a curb. |
-| **Sameer** | `--replay` and `--record`. Record the demo sequence log early. |
+| **Sameer** | **If Q-1 says the GPU is usable:** fine-tune on the 5-class taxonomy. **If not:** decoder-head-only fine-tune on CPU over a small subset plus temperature calibration of confidence, which feeds Day 9's uncertainty-driven refinement. Either way, run it overnight. Adversarial scene: low-clearance tunnel with a curb. |
+| **Anuj** | `--replay` and `--record`. Record the demo sequence log early. |
 | **Shubham + Navya** | Polish. Deploy to Vercel for the submission link, keeping localhost as the demo path. |
 | **Khanak** | Regenerate every payload figure from its script; confirm reproducibility (HW-8). |
 | **Veda** | Fix everything the rough cut exposed. |
@@ -1108,8 +1108,8 @@ Day 11 chasing it.
 
 | Owner | Task |
 |---|---|
-| **Anuj** | `bench/report.py`. **First full `make bench`.** Multi-sequence evaluation *[pulled forward]* with per-sequence variance. |
-| **Sameer** | Final integration. Fix whatever the full bench exposes. Then: nothing new. |
+| **Sameer** | `bench/report.py`. **First full `make bench`.** Multi-sequence evaluation *[pulled forward]* with per-sequence variance. |
+| **Anuj** | Final integration. Fix whatever the full bench exposes. Then: nothing new. |
 | **Shubham + Navya** | Final polish. Demo keystroke sequence verified end to end. |
 | **Khanak** | Payload design report complete. |
 | **Veda** | Deck final except for `_measured_` placeholders. Rehearse the Q&A bank with the team. |
@@ -1126,8 +1126,8 @@ point, no new features. Bugs, numbers, polish and rehearsal only.**
 
 | Owner | Task |
 |---|---|
-| **Anuj** | Final benchmark runs: ≥200 scans for latency, full subset for accuracy, all scenes for hazards. Produce the authoritative `results.json`, persist it as a `runs` document, hand it to Veda. No changes after handover. |
-| **Sameer** | Bug fixes only. Re-record the demo replay log against the frozen build. |
+| **Sameer** | Final benchmark runs: ≥200 scans for latency, full subset for accuracy, all scenes for hazards. Produce the authoritative `results.json`, persist it as a `runs` document, hand it to Veda. No changes after handover. |
+| **Anuj** | Bug fixes only. Re-record the demo replay log against the frozen build. |
 | **Shubham + Navya** | Bug fixes only. |
 | **Khanak** | **Cross-check every number destined for the deck against `results.json`** — software and payload both. |
 | **Veda** | **Fill every `_measured_` placeholder from `results.json` only.** |
@@ -1321,7 +1321,7 @@ evaluation value.
 | Days | Work | Owner |
 |---|---|---|
 | 11–13 Sep | Temporal accumulation across scans with ego-motion compensation from KITTI poses. Improves `z_ground` in sparse far-field cells and stabilises tracks. The largest remaining technical gain. | Sameer + Anuj |
-| 11–13 Sep | Complete the perception fine-tune if Day 10 took the CPU-only branch, or if GPU access arrives late. | Anuj |
+| 11–13 Sep | Complete the perception fine-tune if Day 10 took the CPU-only branch, or if GPU access arrives late. | Sameer |
 | 14–16 Sep | Dashboard: timeline scrubber, side-by-side scene comparison, exportable evidence screenshots for the deck and report. | Shubham + Navya |
 | 14–16 Sep | Further adversarial scenes: multiple simultaneous hazards, sparse-return conditions, a negative obstacle on a slope. | Khanak |
 | 14–17 Sep | Ablation studies: with and without refinement; network versus geometric segmenter; and the downstream planning cost on a uniform grid versus the adaptive one — which converts the 22.67× cell reduction into a measured compute saving rather than a memory claim. | Sameer + Anuj |

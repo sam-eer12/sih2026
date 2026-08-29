@@ -15,8 +15,8 @@
 
 | Person | Track | Role | Primary directories |
 |---|---|---|---|
-| **Sameer** | Backend / DL | Grid engine + integration lead | `avr25d/core/`, `avr25d/server/`, `avr25d/decision/{costmap,planner,explain}.py` |
-| **Anuj** | Backend / DL | Perception + benchmarking | `avr25d/perception/`, `avr25d/bench/`, `avr25d/io/`, `avr25d/decision/{traversability,tracker}.py` |
+| **Sameer** | Backend / DL | Perception + benchmarking, integration lead | `avr25d/perception/`, `avr25d/bench/`, `avr25d/io/`, `avr25d/synth/`, `avr25d/decision/{traversability,tracker}.py` |
+| **Anuj** | Backend / DL | Grid engine + server platform | `avr25d/core/`, `avr25d/server/`, `avr25d/decision/{costmap,planner,explain}.py` |
 | **Shubham** | Frontend / web | Three.js viewer — all rendering | `webapp/components/viewer/`, `lib/palette.ts` |
 | **Navya** | Frontend / web | Next.js platform — auth, persistence, HUD | `webapp/app/`, `lib/`, `components/hud/`, `components/decision/` |
 | **Khanak** | Non-tech | Drone LiDAR payload — design and model | `hardware/matlab/`, `hardware/simulink/` |
@@ -30,7 +30,7 @@ synthetic scene generation to the drone LiDAR sensing payload (`PRD.md` §16) �
 hardware-design deliverable presented on its own slide, not woven into the software narrative.
 The synthetic scenes did not go with it: they are the only source of exact hazard ground truth
 and `PRD.md` §11.4 depends on them, so the ray-caster moved into Python as `avr25d/synth/`
-under Anuj. Separately, the dashboard is now a Next.js application with Firebase Auth and
+under Sameer. Separately, the dashboard is now a Next.js application with Firebase Auth and
 MongoDB Atlas, which splits the frontend along a cleaner boundary — Shubham owns everything
 inside the canvas, Navya owns everything around it.
 
@@ -44,23 +44,23 @@ owner is ill, stuck, or pulled onto something urgent — decided now, calmly, ra
 
 | Module | Owner | Backup | Critical path? |
 |---|---|---|---|
-| `server/protocol.py` — **frozen Day 1** | Sameer | Anuj | **Yes — blocks 4 people** |
-| `server/fixtures.py` | Sameer | Anuj | **Yes — unblocks the frontend** |
-| `core/grid.py` | Sameer | Anuj | **Yes** |
-| `core/cell.py` | Sameer | Anuj | **Yes** |
-| `core/refine.py` | Sameer | Anuj | No |
-| `server/app.py` | Sameer | Navya | Yes |
-| `perception/geometric_seg.py` | Anuj | Sameer | **Yes — de-risks everything** |
-| `perception/onnx_infer.py`, `range_proj.py` | Anuj | Sameer | No — cached mode covers it |
-| `perception/cache.py`, `labelmap.py` | Anuj | Sameer | Yes |
-| `io/kitti.py` | Anuj | Sameer | **Yes** |
-| `decision/traversability.py`, `tracker.py` | Anuj | Sameer | No |
-| `decision/costmap.py`, `planner.py`, `explain.py` | Sameer | Anuj | No |
-| `bench/*` | Anuj | Sameer | Yes — Day 12 depends on it |
-| `avr25d/synth/*` | Anuj | Sameer | **Yes — §11.4 depends on it** |
+| `server/protocol.py` — **frozen Day 1** | Anuj | Sameer | **Yes — blocks 4 people** |
+| `server/fixtures.py` | Anuj | Sameer | **Yes — unblocks the frontend** |
+| `core/grid.py` | Anuj | Sameer | **Yes** |
+| `core/cell.py` | Anuj | Sameer | **Yes** |
+| `core/refine.py` | Anuj | Sameer | No |
+| `server/app.py` | Anuj | Navya | Yes |
+| `perception/geometric_seg.py` | Sameer | Anuj | **Yes — de-risks everything** |
+| `perception/onnx_infer.py`, `range_proj.py` | Sameer | Anuj | No — cached mode covers it |
+| `perception/cache.py`, `labelmap.py` | Sameer | Anuj | Yes |
+| `io/kitti.py` | Sameer | Anuj | **Yes** |
+| `decision/traversability.py`, `tracker.py` | Sameer | Anuj | No |
+| `decision/costmap.py`, `planner.py`, `explain.py` | Anuj | Sameer | No |
+| `bench/*` | Sameer | Anuj | Yes — Day 12 depends on it |
+| `avr25d/synth/*` | Sameer | Anuj | **Yes — §11.4 depends on it** |
 | `webapp/components/viewer/*` | Shubham | Navya | **Yes** |
 | `webapp/app/*`, `lib/*`, `components/hud/*` | Navya | Shubham | **Yes** |
-| Firebase project, Atlas cluster | Navya | Sameer | **Yes — external lead time** |
+| Firebase project, Atlas cluster | Navya | Anuj | **Yes — external lead time** |
 | `hardware/matlab/*`, `simulink/*` | Khanak | Veda | No — companion workstream |
 | `hardware/docs/*` | Veda | Khanak | No — companion workstream |
 | Deck, video, submission | Veda | Navya (video edit) | **Yes — it is the deliverable** |
@@ -74,12 +74,12 @@ while the hard core is still moving.
 ## 3. Who unblocks whom
 
 ```
-  Day 1, 14:00 ─ Sameer freezes protocol.py + fixtures.py
+  Day 1, 14:00 ─ Anuj freezes protocol.py + fixtures.py
                               │
         ┌─────────────────────┴─────────────────────┐
         ▼                                           ▼
-   Shubham + Navya build the ENTIRE dashboard   Sameer builds core/
-   against fixtures — zero backend dependency   Anuj builds perception/ + synth/
+   Shubham + Navya build the ENTIRE dashboard   Anuj builds core/
+   against fixtures — zero backend dependency   Sameer builds perception/ + synth/
         │                                           │
         └─────────────────────┬─────────────────────┘
                               ▼
@@ -96,7 +96,7 @@ software slips, the payload still lands.
 
 **The one hard blocker in the project** is `protocol.py` + `fixtures.py` on Day 1 afternoon.
 Two people cannot start until it lands, so it is the highest-priority item on the board and
-nothing else Sameer does on Day 1 comes before it.
+nothing else Anuj does on Day 1 comes before it.
 
 Everything else is soft:
 
@@ -112,16 +112,62 @@ Everything else is soft:
 
 ## 4. Backend track
 
-### 4.1 Sameer — Grid engine and integration lead
+### 4.1 Sameer — Perception, benchmarking and integration lead
 
-**Owns:** the mathematical core (`core/`), the wire protocol, the server, the planner, and the
-integration of everyone else's work.
+**Owns:** everything that turns points into labels, everything that turns runs into numbers,
+and — new in this revision — `avr25d/synth/`, the synthetic scenes that carry exact hazard
+ground truth. That last one arrived when MATLAB was redirected to the payload workstream. It
+is roughly 150 lines and shares its spherical-projection maths with `range_proj.py`, which you
+are writing anyway, so it is cheaper than it looks. It is still on the critical path for
+`PRD.md` §11.4.
 
 **Also responsible for:** running the daily 10:00 standup and the 21:00 integration
 checkpoint; keeping `main` green; making the call on what gets cut; running the live demo.
+Roughly 70% of the time is perception, the scenes and the benchmark harness; the rest is
+integration and unblocking. Days 11–12 lean heavily towards integration.
 
-Roughly 60% of the time is the grid engine and 40% is integration and unblocking. Days 11–12
-are almost entirely integration. Do not take on a second module before Day 7.
+**First action of the entire sprint:** start the SemanticKITTI download. It is bandwidth-bound
+rather than effort-bound, so it runs unattended in the background all day while you write
+code. Starting it on Day 2 instead of Day 1 is the easiest way to lose the project.
+
+| Day | Tasks | Acceptance criterion |
+|---|---|---|
+| **1 · Fri 28 Aug** | **08:00 — start the KITTI subset download** (seq 04, then 00, then 05; ~1000 scans, ~12 GB). Then begin `perception/geometric_seg.py`. | Seq 04 downloading. RANSAC ground fit working on a synthetic plane. |
+| **2 · Sat 29 Aug** | Finish `geometric_seg.py`: RANSAC ground plane, Euclidean clustering, bbox classification. `io/kitti.py` readers. | 5-class labels on a real KITTI scan. |
+| **3 · Sun 30 Aug** | `labelmap.py` (19→5 merge including the `moving-*` IDs). **`avr25d/synth/` ray-caster plus scenes `S1`, `S2`, `S3`** — Anuj needs them on Day 4. | End-to-end: KITTI scan → labels → grid → browser. `S1`–`S3` load in the pipeline. |
+| **4 · Mon 31 Aug** | Acquire an ONNX SemanticKITTI checkpoint (Q-4). Export and int8-quantise. Begin `range_proj.py`. | Checkpoint obtained and its licence confirmed usable. |
+| **5 · Tue 1 Sep** | `onnx_infer.py`. k-NN range-aware reprojection in `range_proj.py`. Scenes `S4_curb` and `S5_crossing_truck`. | T-P4 passes — 100% of points labelled. All five scenes exist. |
+| **6 · Wed 2 Sep** | Network labels on real scans with measured CPU latency. **Kick off the label-cache build overnight.** | Network labels visibly better than geometric on the same scan; both modes selectable. |
+| **7 · Thu 3 Sep** | `decision/traversability.py` and `decision/tracker.py`. Verify the overnight label cache. | Stable track ID across all 40 `S5` frames; speed within 0.5 m/s of 8.0 m/s. |
+| **8 · Fri 4 Sep** | `bench/distance_bins.py` and `bench/hazard.py`. | Binned mIoU computed; hazard scoring runs against `GROUND_TRUTH.md`. |
+| **9 · Sat 5 Sep** | Assemble the 5-class fine-tuning split. **Resolve Q-1 definitively** — is the Windows GPU usable? Adversarial scene: occluded pothole. | Q-1 answered and shared. Split assembled. Scene loads. |
+| **10 · Sun 6 Sep** | Perception improvement *[pulled forward]*: GPU fine-tune if Q-1 allows, otherwise CPU decoder-head-only fine-tune plus confidence calibration. Run overnight. Adversarial scene: low-clearance tunnel with a curb. | A measured before/after mIoU comparison exists, whichever branch was taken. |
+| **11 · Mon 7 Sep** | `bench/report.py`. **First full `make bench`.** Multi-sequence evaluation *[pulled forward]* with per-sequence variance. **Call the feature freeze at 21:00.** | Complete `results.json` with every section populated. Freeze called. |
+| **12 · Tue 8 Sep** | Authoritative benchmark runs: ≥200 scans for latency, full subset for accuracy, all scenes for hazards. Persist as a `runs` document and hand `results.json` to Veda. | Final `results.json` handed over and stored in MongoDB. **No changes after handover.** |
+| **13 · Wed 9 Sep** | Bug fixes only. **Run the demo rehearsals** — three full timed runs including both failure paths. | Three clean rehearsals including both failure paths. |
+| **14 · Thu 10 Sep** | Final rehearsal. Run the live demo. | Submitted. |
+
+**Depends on:** Anuj for `protocol.py` (Day 1), `CellGrid` (Day 3).
+**Unblocks:** Anuj's Day 4 hazard work — `S1`–`S3` must exist by the end of Day 3.
+**Unblocks:** Anuj on Day 3 (readers and labels), Veda on Day 12 (all numbers).
+
+**If the ONNX checkpoint does not materialise by Day 6 evening:** stop looking. The geometric
+segmenter carries the demo, and the deck says "the pipeline is model-agnostic; we demonstrate
+with a classical segmenter and a range-image CNN" — which is true, defensible, and a stronger
+position than a broken model dependency in the final week.
+
+### 4.2 Anuj — Grid engine and server platform
+
+**Owns:** the mathematical core (`core/`), the wire protocol, the server, and the planner —
+the pieces every other workstream builds against.
+
+**Your first action on Day 1:** `protocol.py` frozen and `fixtures.py` pushed **by 14:00**.
+Four people are blocked until it lands, so nothing else you do that day comes before it.
+
+Roughly 80% of the time is the grid engine and the server; the rest is wiring other people's
+modules into the pipeline as they land. The integration *lead* sits with Sameer, so surface
+cross-module breakage at the 21:00 checkpoint rather than absorbing it quietly. Do not take on
+a second module before Day 7.
 
 | Day | Tasks | Acceptance criterion |
 |---|---|---|
@@ -137,50 +183,11 @@ are almost entirely integration. Do not take on a second module before Day 7.
 | **10 · Sun 6 Sep** | `--replay` and `--record`. Record the demo sequence log early, so the fallback exists well before it is needed. | `--replay demo.log` runs the full sequence end to end. |
 | **11 · Mon 7 Sep** | Final integration. Fix whatever the full bench run exposes. **Feature freeze 21:00.** Then: nothing new. | Full pipeline runs on KITTI and all synthetic scenes. |
 | **12 · Tue 8 Sep** | Bug fixes only. Re-record the demo replay log against the frozen build. | Replay fallback verified on the demo machine. |
-| **13 · Wed 9 Sep** | Run the demo. Nothing else. | Three clean rehearsals including both failure paths. |
-| **14 · Thu 10 Sep** | Final rehearsal. Run the live demo. | Submitted. |
+| **13 · Wed 9 Sep** | Bug fixes only. Rehearsal support: the pipeline and the replay fallback. | Both failure paths exercised in rehearsal. |
+| **14 · Thu 10 Sep** | Demo support — stand by on the stack while Sameer presents. | Submitted. |
 
-**Depends on:** Anuj for `io/kitti.py` (Day 2) and labels (Day 2).
+**Depends on:** Sameer for `io/kitti.py` (Day 2) and labels (Day 2).
 **Unblocks:** everyone, on Day 1 at 14:00.
-
-### 4.2 Anuj — Perception and benchmarking
-
-**Owns:** everything that turns points into labels, everything that turns runs into numbers,
-and — new in this revision — `avr25d/synth/`, the synthetic scenes that carry exact hazard
-ground truth. That last one arrived when MATLAB was redirected to the payload workstream. It
-is roughly 150 lines and shares its spherical-projection maths with `range_proj.py`, which you
-are writing anyway, so it is cheaper than it looks. It is still on the critical path for
-`PRD.md` §11.4.
-
-**First action of the entire sprint:** start the SemanticKITTI download. It is bandwidth-bound
-rather than effort-bound, so it runs unattended in the background all day while you write
-code. Starting it on Day 2 instead of Day 1 is the easiest way to lose the project.
-
-| Day | Tasks | Acceptance criterion |
-|---|---|---|
-| **1 · Fri 28 Aug** | **08:00 — start the KITTI subset download** (seq 04, then 00, then 05; ~1000 scans, ~12 GB). Then begin `perception/geometric_seg.py`. | Seq 04 downloading. RANSAC ground fit working on a synthetic plane. |
-| **2 · Sat 29 Aug** | Finish `geometric_seg.py`: RANSAC ground plane, Euclidean clustering, bbox classification. `io/kitti.py` readers. | 5-class labels on a real KITTI scan. |
-| **3 · Sun 30 Aug** | `labelmap.py` (19→5 merge including the `moving-*` IDs). **`avr25d/synth/` ray-caster plus scenes `S1`, `S2`, `S3`** — Sameer needs them on Day 4. | End-to-end: KITTI scan → labels → grid → browser. `S1`–`S3` load in the pipeline. |
-| **4 · Mon 31 Aug** | Acquire an ONNX SemanticKITTI checkpoint (Q-4). Export and int8-quantise. Begin `range_proj.py`. | Checkpoint obtained and its licence confirmed usable. |
-| **5 · Tue 1 Sep** | `onnx_infer.py`. k-NN range-aware reprojection in `range_proj.py`. Scenes `S4_curb` and `S5_crossing_truck`. | T-P4 passes — 100% of points labelled. All five scenes exist. |
-| **6 · Wed 2 Sep** | Network labels on real scans with measured CPU latency. **Kick off the label-cache build overnight.** | Network labels visibly better than geometric on the same scan; both modes selectable. |
-| **7 · Thu 3 Sep** | `decision/traversability.py` and `decision/tracker.py`. Verify the overnight label cache. | Stable track ID across all 40 `S5` frames; speed within 0.5 m/s of 8.0 m/s. |
-| **8 · Fri 4 Sep** | `bench/distance_bins.py` and `bench/hazard.py`. | Binned mIoU computed; hazard scoring runs against `GROUND_TRUTH.md`. |
-| **9 · Sat 5 Sep** | Assemble the 5-class fine-tuning split. **Resolve Q-1 definitively** — is the Windows GPU usable? Adversarial scene: occluded pothole. | Q-1 answered and shared. Split assembled. Scene loads. |
-| **10 · Sun 6 Sep** | Perception improvement *[pulled forward]*: GPU fine-tune if Q-1 allows, otherwise CPU decoder-head-only fine-tune plus confidence calibration. Run overnight. Adversarial scene: low-clearance tunnel with a curb. | A measured before/after mIoU comparison exists, whichever branch was taken. |
-| **11 · Mon 7 Sep** | `bench/report.py`. **First full `make bench`.** Multi-sequence evaluation *[pulled forward]* with per-sequence variance. | Complete `results.json` with every section populated. |
-| **12 · Tue 8 Sep** | Authoritative benchmark runs: ≥200 scans for latency, full subset for accuracy, all scenes for hazards. Persist as a `runs` document and hand `results.json` to Veda. | Final `results.json` handed over and stored in MongoDB. **No changes after handover.** |
-| **13 · Wed 9 Sep** | Bug fixes only. Standby for rehearsal support. | — |
-| **14 · Thu 10 Sep** | Demo support. | — |
-
-**Depends on:** Sameer for `protocol.py` (Day 1), `CellGrid` (Day 3).
-**Unblocks:** Sameer's Day 4 hazard work — `S1`–`S3` must exist by the end of Day 3.
-**Unblocks:** Sameer on Day 3 (readers and labels), Veda on Day 12 (all numbers).
-
-**If the ONNX checkpoint does not materialise by Day 6 evening:** stop looking. The geometric
-segmenter carries the demo, and the deck says "the pipeline is model-agnostic; we demonstrate
-with a classical segmenter and a range-image CNN" — which is true, defensible, and a stronger
-position than a broken model dependency in the final week.
 
 ---
 
@@ -265,7 +272,7 @@ plus the Firebase project and the Atlas cluster.
 
 **Create the Firebase project and the Atlas cluster on Day 1 morning.** They are external
 dependencies with account-verification lead time, and everything else you own is blocked
-behind them. This is the same reasoning that puts Anuj's KITTI download first.
+behind them. This is the same reasoning that puts Sameer's KITTI download first.
 
 **Three things that will cost you a day each if missed:**
 
@@ -348,7 +355,7 @@ the question a DRDO evaluator will ask.
 typed into the report that the code does not produce. This is the same rule the software side
 follows with `results.json`, and for the same reason.
 
-**If you get stuck for more than two hours**, say so at standup. Anuj and Sameer can both seed
+**If you get stuck for more than two hours**, say so at standup. Sameer and Anuj can both seed
 a script skeleton in under an hour; grinding silently is what costs days.
 
 ### 6.2 Veda — payload documentation, evidence, and submission
@@ -356,7 +363,7 @@ a script skeleton in under an hour; grinding silently is what costs days.
 **Owns:** `hardware/docs/`, the deck, the video script, the Q&A bank, and the submission.
 
 **The rule that matters most:** *no number reaches a slide except from `results.json`, or from
-a payload script that produced it.* Anuj generates the software numbers, Khanak generates the
+a payload script that produced it.* Sameer generates the software numbers, Khanak generates the
 payload numbers, you consume both, and Khanak cross-checks the deck on Day 12. Placeholders
 stay as `_measured_` until then. A single unverifiable number is the fastest way to lose a
 technically strong submission.
@@ -467,7 +474,8 @@ Rehearse these with the team on Day 11. The best answer to a hard question is a 
 - **Branches live less than a day.** No overnight branches. A two-week project cannot absorb a
   two-day merge.
 - **Interfaces before bodies.** Push the signature and a correctly shaped stub, then fill it in.
-- **`protocol.py` is frozen after Day 1.** Changes need Sameer and a message to everyone.
+- **`protocol.py` is frozen after Day 1.** Changes need Sameer's sign-off and a message to
+  everyone.
 - **No number without a measurement.** Deck, video, and anything said to a judge.
 - **Feature freeze 21:00 Day 11 (Mon 7 Sep).** Not negotiable. Cutting features is how
   fixed-deadline projects ship.
@@ -490,8 +498,8 @@ Rehearse these with the team on Day 11. The best answer to a hard question is a 
 
 | Person | Days 1–3 · Foundations | Days 4–8 · Perception + decisions | Days 9–11 · Depth | Days 12–14 · Evidence |
 |---|---|---|---|---|
-| Sameer | **Heavy** — protocol, fixtures, grid, cells | Heavy — analysis, costmap, planner | **Heavy** — refinement, integration, freeze | Medium — demo only |
-| Anuj | **Heavy** — download, segmenter, readers, synth | **Heavy** — ONNX, tracker, scenes, benchmarks | Heavy — fine-tune, multi-sequence eval | **Heavy** — authoritative runs |
+| Sameer | **Heavy** — download, segmenter, readers, synth | **Heavy** — ONNX, tracker, scenes, benchmarks | **Heavy** — fine-tune, multi-sequence eval, freeze | **Heavy** — authoritative runs, demo |
+| Anuj | **Heavy** — protocol, fixtures, grid, cells | Heavy — analysis, costmap, planner | Heavy — refinement, integration | Medium — bug fixes, demo support |
 | Shubham | Medium — canvas, instancing | **Heavy** — uniform view, wipe, View 4 | Medium — LOD, render-count verification | Light — bug fixes |
 | Navya | **Heavy** — accounts, Next.js, auth | **Heavy** — Mongo, API routes, HUD, decision panel | Medium — run pages, Vercel deploy | Medium — video edit |
 | Khanak | Medium — toolchain, link budget | Medium — sweeps, receiver chain | Medium — eye safety, reproducibility | **Heavy** — deck cross-check, run-book |
@@ -499,19 +507,19 @@ Rehearse these with the team on Day 11. The best answer to a hard question is a 
 
 **Known concentration risks — two, both accepted deliberately.**
 
-*Sameer* owns the protocol, the grid, the cells, the planner, the integration and the demo.
-Those pieces are tightly coupled and splitting them would cost more in coordination than it
-saves in load. Anuj is the named backup on every one and reviews each as it merges, so the bus
-factor is two, not one.
+*Anuj* owns the protocol, the grid, the cells, the server and the planner. Those pieces are
+tightly coupled and splitting them would cost more in coordination than it saves in load.
+Sameer is the named backup on every one and reviews each as it merges, so the bus factor is
+two, not one.
 
-*Anuj* is the only Heavy in all four columns. He picked up `avr25d/synth/` when MATLAB moved
-to the payload workstream, on top of perception and the entire benchmark harness. The
-mitigations are that `synth/` is small and shares maths with `range_proj.py` which he is
-writing regardless, and that the scenes are front-loaded to Days 3 and 5 while the fine-tuning
-work on Days 9–10 is explicitly droppable if it does not pay off. **If Anuj is behind at the
-Day 5 standup, the first thing to hand to Sameer is `bench/baselines.py` and
-`bench/memory.py`** — they are self-contained and Sameer has already written the baseline
-arithmetic into `PRD.md` §10.1.
+*Sameer* is the only Heavy in all four columns, and carries the integration lead and the demo
+on top of perception, the benchmark harness and `avr25d/synth/` — which arrived when MATLAB
+moved to the payload workstream. The mitigations are that `synth/` is small and shares maths
+with `range_proj.py`, which is being written regardless, and that the scenes are front-loaded
+to Days 3 and 5 while the fine-tuning work on Days 9–10 is explicitly droppable if it does not
+pay off. **If Sameer is behind at the Day 5 standup, the first thing to hand to Anuj is
+`bench/baselines.py` and `bench/memory.py`** — they are self-contained and Anuj has already
+written the baseline arithmetic into `PRD.md` §10.1.
 
 **If either frontend developer finds slack**, the highest-value place to help is the A/B wipe
 on Day 5. It is the most persuasive artefact in the submission and the one most worth two
@@ -525,8 +533,8 @@ Ten days, calmer pace, same ownership.
 
 | Person | Phase 2 focus |
 |---|---|
-| **Sameer** | Temporal accumulation with ego-motion compensation; ablation studies |
-| **Anuj** | Complete the perception fine-tune; expand evaluation across sequences; per-sequence variance |
+| **Sameer** | Complete the perception fine-tune; expand evaluation across sequences; per-sequence variance |
+| **Anuj** | Temporal accumulation with ego-motion compensation; ablation studies |
 | **Shubham** | Timeline scrubber; side-by-side scene comparison; exportable evidence screenshots |
 | **Navya** | Saved-run comparison view; shareable read-only run links; history charts from MongoDB |
 | **Khanak** | Extend the receiver model with a full noise budget and a Monte-Carlo range-accuracy study |
@@ -538,12 +546,12 @@ Ten days, calmer pace, same ownership.
 
 Print this. Tick it tonight.
 
-- [ ] **Anuj** — KITTI download started (do this first, before anything else)
+- [ ] **Sameer** — KITTI download started (do this first, before anything else)
 - [ ] **Navya** — Firebase project created and Atlas M0 cluster provisioned (external lead time)
-- [ ] **Sameer** — `protocol.py` frozen and `fixtures.py` pushed **by 14:00**
+- [ ] **Anuj** — `protocol.py` frozen and `fixtures.py` pushed **by 14:00**
 - [ ] **Shubham + Navya** — `pnpm dev` serving a page that renders fixture cells
 - [ ] **Khanak** — MATLAB or Octave installed; **Simulink availability answered** (risk R-12)
 - [ ] **Veda** — Q-2 (deck template) and Q-3 (demo hardware) answered
 - [ ] **Everyone** — repo cloned, `pytest -q` green on your own machine
-- [ ] **Sameer** — cross-platform smoke test passed on both Mac and Windows
+- [ ] **Anuj** — cross-platform smoke test passed on both Mac and Windows
 - [ ] `RingGrid` reports **662 rings, 705,771 cells** — the number that says the core is real
