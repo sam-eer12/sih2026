@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "avr25d"
+version = "0.1.0"
+description = "AVR-25D — adaptive variable-resolution 2.5D LiDAR mapping (perception, synthetic scenes, benchmarks)"
+requires-python = ">=3.11"
+dependencies = [
+    "numpy>=2.0",
+    "scipy>=1.11",
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+infer = ["onnx", "onnxruntime"]
+dev = ["pytest>=8"]
+
+[tool.setuptools.packages.find]
+include = ["avr25d*"]
+
+[tool.setuptools.package-data]
+avr25d = ["config.yaml", "synth/scenes/*.csv"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

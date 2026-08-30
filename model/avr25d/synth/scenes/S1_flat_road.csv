@@ -1,0 +1,12 @@
+# S1_flat_road — control scene (PRD §9.3).
+#
+# Flat road, nothing else.  Two things are measured here: ground-plane RMS
+# error, and the false-positive hazard rate (T-H4).  Every hazard flag raised
+# on this scene is a bug, which makes it the test most likely to fail first
+# when a threshold gets tuned too aggressively.
+#
+# Convention: x,y,z is the CENTRE of the primitive, sx,sy,sz are FULL extents,
+# road frame (z = 0 is the road surface).  See synth/raycast.py.
+# frames: 1
+type,x,y,z,sx,sy,sz,class,vx,vy,hazard,note
+plane,0,0,0,200,200,0,1,0,0,control,road surface — flat and unobstructed

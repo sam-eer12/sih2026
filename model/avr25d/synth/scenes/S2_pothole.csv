@@ -1,0 +1,17 @@
+# S2_pothole — negative obstacle (PRD §9.3, FR-14, T-H2).
+#
+# A 1.4 m x 1.0 m depression 0.22 m deep at 12 m ahead.  A 2D occupancy grid
+# cannot represent this at all: nothing occupies the cell, so the hole reads as
+# free space.  The 2.5D map carries z_ground separately and the depth comes out
+# as a number in metres.
+#
+# The pit floor is NON_DRIVABLE_TERRAIN (2) rather than VOID: it is observed
+# ground, and z_ground is estimated from terrain-classified returns, so
+# labelling it void would delete the very measurement the hazard depends on.
+#
+# Convention: x,y,z is the CENTRE, sx,sy,sz are FULL extents, road frame.
+# A pit spanning z in [-0.22, 0] — rim flush with the road — is z=-0.11, sz=0.22.
+# frames: 1
+type,x,y,z,sx,sy,sz,class,vx,vy,hazard,note
+plane,0,0,0,200,200,0,1,0,0,,road surface
+pit,12.0,-0.5,-0.11,1.4,1.0,0.22,2,0,0,pothole,pothole — 0.22 m deep, rim flush with the road

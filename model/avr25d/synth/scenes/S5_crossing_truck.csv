@@ -1,0 +1,21 @@
+# S5_crossing_truck — dynamic object, 40 frames (PRD §9.3, FR-20, T-D2).
+#
+# A truck crosses left to right at 25 m ahead, at exactly 8.0 m/s.  Over 40
+# frames at 10 Hz it travels 31.2 m, from y = -16 m to y = +15.2 m, which puts
+# it across the primary route in the middle of the sequence and triggers the
+# reroute the decision layer has to explain.
+#
+# The two roadside poles are static and are there to be ignored: a tracker that
+# adopts them as tracks passes a one-object test and fails a real scene.
+#
+# Truck returns carry SemanticKITTI's moving-truck id (258), because the
+# primitive has a velocity — the same free MOVING supervision real KITTI gives
+# us (PRD §6.1, §6.3 bit 5).
+#
+# Convention: x,y,z is the CENTRE, sx,sy,sz are FULL extents, road frame.
+# frames: 40
+type,x,y,z,sx,sy,sz,class,vx,vy,hazard,note
+plane,0,0,0,200,200,0,1,0,0,,road surface
+box,25.0,-16.0,1.60,7.0,2.5,3.20,4,0.0,8.0,track,truck crossing left to right at 8.0 m/s
+cyl,20.0,-8.0,2.00,0.25,0.25,4.00,3,0,0,,roadside pole — static, must not become a track
+cyl,20.0,8.0,2.00,0.25,0.25,4.00,3,0,0,,roadside pole — static, must not become a track
