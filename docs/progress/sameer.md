@@ -4,6 +4,91 @@ Newest entry at the top. Format and rules: [`README.md`](./README.md).
 
 ---
 
+## Integration checkpoint · Sun 30 Aug 2026 — nothing outside `model/` exists
+
+Written as integration lead, not as a perception note. Days 1–6 of *my* board are
+complete and merged. Days 1–6 of the *sprint* are not, and the gap is not mine
+to close alone.
+
+**State of the repository.** Every commit in it is mine.
+
+| | State |
+|---|---|
+| `backend/` | `requirements.txt` and a virtualenv. **Zero `.py` files.** |
+| `frontend/` | Untouched `create-next-app` — `app/page.tsx` still renders the Next.js logo |
+| `server/protocol.py`, `server/fixtures.py` | Do not exist |
+| `core/grid.py`, `core/cell.py`, `tools/ring_table.py` | Do not exist |
+| `docs/progress/{anuj,shubham,navya,khanak,veda}.md` | 5-line stubs, unedited |
+
+**Exit criteria, Days 1–6.** One clause of six days is met.
+
+| Day | Criterion | Status |
+|---|---|---|
+| 1 | `pytest` green both platforms · `pnpm dev` renders 50k fixture cells · Firebase + Atlas exist · seq 04 downloading | Mine green on macOS arm64; seq 04 complete. Rest not started |
+| 2 | `RingGrid` reports 662 rings / 705,771 cells · T-W1 auth gate | Not started |
+| 3 | KITTI scan → labels → **grid → browser**, `n_points_conserved == n_points` on the HUD | My half done. Grid, server and viewer missing |
+| 4 | Overhang and pothole flags fire on `S3`/`S2`, zero on `S1` · T-W2 | Needs `cell.analyse()`. My scenes carry exact ground truth and are ready |
+| 5 | A/B wipe reading 16,000,000 vs 705,771 · T-W5 | Not started |
+| 6 | Network beats geometric · both modes selectable, mode on the HUD | **First half met, 2.9×.** Second half needs the server and the HUD |
+
+**Blocking the team.** `server/protocol.py`. `WORK_DISTRIBUTION.md` §3 marks it
+*"frozen Day 1 — blocks 4 people"*, §4.2 puts it at 14:00 on Day 1 ahead of
+everything else, and changes to it need my sign-off. It does not exist, so
+neither does `fixtures.py`, so the whole point of `IMPLEMENTATION_PLAN.md` §5.3,
+*"the anti-blocking device"* — that Shubham and Navya build the entire dashboard
+against schema-valid synthetic frames with **zero** backend dependency — has not
+been available to them for three days. This is the highest-leverage missing
+item in the sprint and it is not close.
+
+**Blocked, me, from Day 7.** Both of my next modules take Anuj's data structure:
+
+```python
+traversability.score(cells: CellGrid, cfg)    # §6.8
+Tracker.update(cells, grid, dt)               # §6.9
+```
+
+`WORK_DISTRIBUTION.md` §4.1 says it outright — *"Depends on: Anuj for
+`protocol.py` (Day 1), `CellGrid` (Day 3)."* Neither exists, so Day 7 cannot
+start as specified. Two ways round it, both of which I can take without touching
+Anuj's grid maths: write `protocol.py` and `fixtures.py` myself as the named
+backup, and write `traversability.py` against the documented §6.2/§6.3 cell
+fields with a test double so it drops in the day `core/cell.py` lands.
+
+**Loose ends that are mine and are not blocked on anyone.**
+
+- **Sequence 05 is 87/300 scans.** All 300 `.label` files are on disk; the point
+  clouds stopped when the fetch process died. `tools/fetch_kitti.py` is resumable
+  and skips what exists — this is one command, not a task.
+- **`backend/requirements.txt` pins `numpy==2.2.6` and `scipy==1.16.2`**, neither
+  of which builds on Python 3.14. Everything here runs on 2.5.2 / 1.18.1. Raised
+  on Day 3 and still open: refresh the pins or pin the interpreter to 3.12.
+  Whoever hits this next will lose an afternoon to it.
+
+**Ownership contradiction to settle at standup.** `WORK_DISTRIBUTION.md` §3 and
+§4.1 give me all of `bench/*`. `IMPLEMENTATION_PLAN.md` Days 5–6 assign
+`bench/baselines.py`, `bench/memory.py` and `bench/latency.py` to Anuj. Two of
+those three are §8's contingency — *"if Sameer is behind at the Day 5 standup,
+the first thing to hand to Anuj is `bench/baselines.py` and `bench/memory.py`"* —
+pre-applied to the schedule. I am ahead, not behind, so they come back to me
+unless Anuj wants them. `bench/latency.py` is not covered by that contingency at
+all and is simply assigned to two people.
+
+**What I propose at the 10:00 standup.** In priority order:
+
+1. **`protocol.py` and `fixtures.py` land today**, by Anuj if he can, by me if he
+   cannot. Nothing else on anyone's board is worth more than unblocking two
+   people who have been able to do nothing for three days.
+2. **`core/grid.py` next**, because `core/cell.py`, my Day 7, the A/B wipe and
+   the whole memory argument all sit behind it.
+3. I take `traversability.py` against the documented cell fields with a test
+   double in the meantime, so Day 7 is not lost waiting.
+
+Days 4–6 landed early because the KITTI download ran unattended while I wrote
+code — which is exactly what §4.1 said to do with it. That pattern is available
+to everyone and costs nothing.
+
+---
+
 ## Days 4–6 (early) · Sun 30 Aug 2026 — the perception network
 
 **Landed.** The network path, end to end, on real KITTI.
