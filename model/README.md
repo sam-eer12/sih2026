@@ -23,8 +23,14 @@ pytest -q
 | `avr25d/io/kitti.py` | SemanticKITTI `.bin` / `.label` readers and writers | — |
 | `avr25d/perception/labelmap.py` | SemanticKITTI 19 → AVR-25D 5 class merge | PRD §6.1 |
 | `avr25d/perception/geometric_seg.py` | RANSAC + clustering fallback segmenter | FR-5 |
+| `avr25d/perception/range_proj.py` | Cloud → 64×2048×6 range image, and back by k-NN | FR-2, FR-4 |
+| `avr25d/perception/onnx_infer.py` | ONNX Runtime CPU session wrapper | FR-1, FR-3 |
+| `avr25d/perception/cache.py` | Precomputed per-scan label store, memory-mapped | §6.7 |
 | `avr25d/synth/` | Ray-cast scenes with exact ground truth | PRD §9.3 |
 | `tests/` | `pytest -q` | IMPLEMENTATION_PLAN §9 |
+
+Operational scripts live in [`../tools/`](../tools/): `fetch_kitti.py` (dataset),
+`export_onnx.py` (checkpoint → ONNX), `build_cache.py` (overnight label cache).
 
 ## Synthetic scenes
 
@@ -98,6 +104,95 @@ The default subset (PRD §9.1, with per-sequence sampling this repo adds):
 — attribution, share-alike, and **non-commercial**. That is fine for the
 hackathon and it must be stated wherever the data is used; it also means no
 claim in the deck may imply a commercial product trained on this data.
+
+## Perception model
+
+**Q-4 — which pretrained checkpoint carries a usable licence?** Answered:
+**[lidar-bonnetal](https://github.com/PRBonn/lidar-bonnetal)** SqueezeSegV2, from
+the Photogrammetry and Robotics Lab at the University of Bonn. MIT licensed,
+served over plain HTTP with no account or click-through, and the checkpoint the
+RangeNet++ paper published. SalsaNext is also MIT but sits behind a Google Drive
+interstitial that cannot be scripted, which matters when the model has to
+rebuild on a fresh machine.
+
+Of the five architectures published there, SqueezeSegV2 is the one a CPU budget
+can afford: **0.93 M parameters, 3.6 MB of weights** against DarkNet21's 92 MB.
+
+```bash
+curl -O http://www.ipb.uni-bonn.de/html/projects/bonnetal/lidar/semantic/models/squeezesegV2.tar.gz
+tar xzf squeezesegV2.tar.gz -C data/checkpoints/
+python ../tools/export_onnx.py          # -> data/models/squeezesegV2_{fp32,int8}.onnx
+python ../tools/build_cache.py          # -> data/cache/network/
+```
+
+`export_onnx.py` reimplements the architecture rather than vendoring it, so the
+repository holds no third-party Python. It is verified rather than trusted: the
+published weights load with `strict=True`, so one wrong layer name or channel
+count fails the load instead of quietly producing a network that runs and is
+wrong. The exported graph then has to agree with the PyTorch reference —
+measured at **100.000% of pixels** on a real KITTI scan.
+
+### int8 is exported, and not used
+
+IMPLEMENTATION_PLAN §6.6 calls for dynamic int8 quantisation. Measured, on
+`00/000008`:
+
+| | Size | Latency | Argmax agreement with PyTorch |
+|---|---:|---:|---:|
+| fp32 | 3.71 MB | 86.0 ms | 100.000% |
+| int8 | 1.11 MB | 86.2 ms | 95.058% |
+
+Dynamic quantisation scales activations at runtime, so a Conv-only graph pays
+the quantise/dequantise cost without ever reaching an int8 kernel. It buys
+2.6 MB of disk we are not short of and spends 5% of pixels on it. `config.yaml`
+points at fp32 and says why. Both models are exported and both are tested;
+static quantisation with a calibration set from the 758 cached scans is the
+route worth trying if the network ever has to run live in the budget.
+
+### Measured accuracy — network against the FR-5 geometric fallback
+
+Same scans, same ground truth, five-class taxonomy. mIoU is over classes 1–4;
+SemanticKITTI excludes *unlabeled* from mIoU and so do we.
+
+| | seq 04, 46 scans (rural) | seq 00, 40 scans (urban) |
+|---|---:|---:|
+| **Network mIoU** | **0.823** | **0.868** |
+| Geometric mIoU | 0.287 | 0.371 |
+| Network point accuracy | 92.03% | 92.31% |
+| Geometric point accuracy | 49.98% | 50.71% |
+
+Per class, sequence 04:
+
+| Class | Support | Network IoU | Geometric IoU |
+|---|---:|---:|---:|
+| DRIVABLE | 1,971,649 | 0.952 | 0.627 |
+| NON_DRIVABLE_TERRAIN | 2,891,652 | **0.872** | **0.132** |
+| STATIC_OBSTACLE | 725,490 | 0.694 | 0.267 |
+| DYNAMIC_OBJECT | 73,842 | 0.772 | 0.124 |
+
+The `NON_DRIVABLE_TERRAIN` row is the whole argument for the network. It is 50%
+of sequence 04 by point count, and geometry cannot see it: flat grass beside a
+road is the same plane as the road, so RANSAC calls both DRIVABLE. Tarmac
+against verge is a *semantic* distinction, not a geometric one. That single row
+is why FR-2 specifies a network and not a threshold.
+
+### Measured latency
+
+Per scan, ~125,000 points, macOS arm64, `CPUExecutionProvider`, median of 46:
+
+| Stage | ms |
+|---|---:|
+| Range projection | 9.5 |
+| ONNX inference | 91.4 |
+| k-NN reprojection | 46.4 |
+| **Total, network** | **146.7** |
+| Total, geometric | 58.8 |
+
+NFR-1's 33 ms budget explicitly excludes live network inference, which is why
+`perception.mode` defaults to `cached`: `tools/build_cache.py` runs the network
+once over the subset — 758 scans in 2.0 minutes at 6.4 scan/s — and writes
+93.7 MB of `uint8` labels that `LabelCache` memory-maps in one call. Live
+inference stays available and is reported as its own number, per PRD §11.2.
 
 ## Progress
 

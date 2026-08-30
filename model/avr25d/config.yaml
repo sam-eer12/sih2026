@@ -50,8 +50,31 @@ decision:
 
 perception:
   mode: cached       # live | cached | geometric
-  model: models/salsanext_int8.onnx
-  knn_k: 5
+  model: data/models/squeezesegV2_fp32.onnx   # Q-4 resolved: lidar-bonnetal
+                     #   SqueezeSegV2, MIT, 0.93 M params, direct HTTP. See
+                     #   tools/export_onnx.py for the export and the licence.
+                     #
+                     #   fp32 and not int8, against IMPLEMENTATION_PLAN §6.6,
+                     #   because the measurement did not support the plan.
+                     #   Dynamic int8 quantisation of this model, measured on
+                     #   a real KITTI scan: 3.71 -> 1.11 MB, 86.0 -> 86.2 ms,
+                     #   and argmax agreement with the PyTorch reference falls
+                     #   from 100.000% to 95.058%.  Dynamic quantisation scales
+                     #   activations at runtime, so a Conv-only graph pays the
+                     #   quantise/dequantise cost without reaching an int8
+                     #   kernel: it buys 2.6 MB of disk we are not short of and
+                     #   spends 5% of pixels on it.  The int8 model is still
+                     #   exported and tested; point this key at it to compare.
+
+  knn:               # RangeNet++ range-aware label reprojection (FR-4).  These
+                     #   are the checkpoint's own post-processing parameters,
+                     #   from its arch_cfg.yaml — they are not ours to retune.
+    k: 5             # neighbours that vote
+    search: 5        # side of the pixel neighbourhood searched
+    cutoff: 1.0      # m — a neighbour further than this in range is a different
+                     #     surface and never votes; this is what stops a thin
+                     #     pole being erased by the wall behind it
+    sigma: 1.0       # m — Gaussian vote weight on the range difference
 
   range_image:
     h: 64            # HDL-64E beam count — FR-2
