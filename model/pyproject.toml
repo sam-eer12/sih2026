@@ -15,7 +15,8 @@ dependencies = [
 
 [project.optional-dependencies]
 infer = ["onnx", "onnxruntime"]
-dev = ["pytest>=8"]
+export = ["torch"]                  # tools/export_onnx.py only; not a runtime dep
+dev = ["pytest>=8", "onnx", "onnxruntime"]
 
 [tool.setuptools.packages.find]
 include = ["avr25d*"]

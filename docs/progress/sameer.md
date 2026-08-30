@@ -4,6 +4,110 @@ Newest entry at the top. Format and rules: [`README.md`](./README.md).
 
 ---
 
+## Days 4–6 (early) · Sun 30 Aug 2026 — the perception network
+
+**Landed.** The network path, end to end, on real KITTI.
+
+- `tools/export_onnx.py` — checkpoint → ONNX → int8, with verification.
+- `avr25d/perception/onnx_infer.py` — `OnnxSegmenter`, CPU-only ONNX Runtime.
+- `avr25d/perception/cache.py` — `build_cache` / `LabelCache`, memory-mapped.
+- `tools/build_cache.py` — the overnight job, resumable.
+- `tests/test_range_proj.py`, `test_onnx_infer.py`, `test_cache.py` — 44 tests,
+  covering T-P1 through T-P4. Suite is 121, all green.
+
+**Q-4 answered.** **lidar-bonnetal SqueezeSegV2** — MIT, University of Bonn,
+plain HTTP, no account. SalsaNext is also MIT but only reachable through a
+Google Drive interstitial that cannot be scripted, and 0.93 M parameters against
+DarkNet21's 21 M is the difference between a frame budget and an apology.
+
+**Acceptance.** Day 6's exit criterion — *"network labels visibly better than
+geometric labels on the same scan"* — **met, by a factor of 2.9.** Same scans,
+same ground truth, mIoU over classes 1–4:
+
+| | seq 04, 46 scans | seq 00, 40 scans |
+|---|---:|---:|
+| Network | **0.823** | **0.868** |
+| Geometric | 0.287 | 0.371 |
+| Network point accuracy | 92.03% | 92.31% |
+
+Day 4's *"acquire, export, int8-quantise"* — met, and the quantisation is the
+interesting part (below). Day 5's `onnx_infer.py` and the k-NN reprojection —
+met. Day 6's label cache — built, not merely kicked off: **758 scans, 93.7 MB,
+2.0 minutes.**
+
+**Blocked / blocking.** Nothing blocking me. Two things for Anuj:
+
+1. **`perception.mode` cannot be dispatched inside `perception/`.** Its three
+   values are `live | cached | geometric`, and `cached` needs a *frame id* —
+   which a `(xyz, intensity)` segmenter does not have. The mode switch has to
+   live where frame ids exist, i.e. the server. `LabelCache[frame_id]` is the
+   API; `OnnxSegmenter` and `GeometricSegmenter` are interchangeable callables
+   with a `.mode` string for the FR-6 HUD badge. I deliberately did not invent a
+   factory that would have forced a lie into one of the three.
+2. Still open from Day 3: **`z_obstacle` cannot serve as clearance.** PRD §6.2
+   defines it as the *maximum* non-ground return; §6.3 bit 2 computes clearance
+   as `z_obstacle − z_ground`. Under the S3 overpass deck that reads 4.60 m and
+   `OVERHANG` never fires. A separate minimum-overhead field is needed.
+
+**Decisions and surprises.**
+
+- **The architecture is reimplemented, not vendored, and it is verified rather
+  than trusted.** `export_onnx.py` rebuilds SqueezeSegV2 from the published
+  source (MIT, credited in the file header) so the repo holds no third-party
+  Python, then loads the released weights with `strict=True`. One wrong layer
+  name, channel count or ordering and the load fails instead of silently
+  producing a network that runs and is wrong. The exported graph then has to
+  reproduce PyTorch's argmax: measured **100.000% of pixels** on `00/000008`.
+- **int8 is exported and deliberately not used — against §6.6.** Measured:
+  3.71 → 1.11 MB, **86.0 → 86.2 ms**, and agreement with the PyTorch reference
+  falling **100.000% → 95.058%**. Dynamic quantisation scales activations at
+  runtime, so a Conv-only graph pays the quantise/dequantise cost without ever
+  reaching an int8 kernel. It buys 2.6 MB of disk we are not short of and spends
+  5% of pixels on it. `config.yaml` points at fp32 with that measurement written
+  next to the key. Static quantisation with a calibration set from the 758
+  cached scans is the version worth trying, and now cheap to try.
+- **`NON_DRIVABLE_TERRAIN` is the entire argument for the network**, and it is
+  now measured: IoU **0.132 geometric → 0.872 network** on sequence 04, where
+  that class is 50% of all points. Flat grass beside a road is the same plane as
+  the road, so RANSAC calls both DRIVABLE; tarmac against verge is a semantic
+  distinction and geometry has no access to it. Good slide.
+- **The softmax is dropped from the exported graph.** Argmax is invariant under
+  it, and 20 × 64 × 2048 exponentials per frame is real CPU time spent on a
+  value nothing reads. A caller wanting probabilities can soft-max the logits.
+- **Labels merge 20 → 5 *before* the k-NN vote, not after.** Voting in 5-class
+  space is what the taxonomy cares about, it stops three vehicle classes
+  splitting the vehicle vote against one road neighbour, and it keeps the vote
+  array at n×5 rather than n×20.
+- **The checkpoint validated `range_proj.py` after the fact.** Its
+  `arch_cfg.yaml` carries the same `img_means`/`img_stds` already hard-coded in
+  `KITTI_MEAN`/`KITTI_STD`, and the same k-NN post-processing parameters
+  (`knn 5, search 5, sigma 1.0, cutoff 1.0`) already defaulted in
+  `from_range_image`. Those are now in `config.yaml` sourced to the checkpoint,
+  not to us — they are not ours to retune.
+- **`range_proj.py` shipped on Day 3 with no tests; that is now fixed, and the
+  tests were checked by mutation.** Six deliberate defects injected into the
+  source — nearest-first scatter, no FOV clamp, cutoff removed, orphan fallback
+  removed, unflipped vertical axis, empty pixels allowed to vote. Five were
+  caught immediately; the sixth, the `range < 0` guard, was not, which is how a
+  genuinely untested line was found. It has a test now, and one line of dead
+  belt-and-braces was deleted once the mmap's own `mode="r"` was shown to carry
+  the read-only guarantee. Same treatment on `cache.py` and `onnx_infer.py`:
+  nine mutations, nine caught.
+- **The cache refuses to lie about itself.** `index.json` records the segmenter
+  mode and model path, and `build_cache` will not extend a geometric cache with
+  network labels or vice versa; `LabelCache` checks the blob length against the
+  index before trusting it. A demo showing geometric labels while the HUD reads
+  "network" is worse than one that crashes.
+- **`reproject` is 46 ms of the 147 ms**, a third of the network path, and it is
+  pure NumPy over 125k points. If live inference ever has to fit a budget, that
+  is the cheapest place to look after quantisation.
+- The network never predicts `VOID`. Ground-truth *unlabeled* is ~2% of points,
+  so whole-taxonomy mIoU reads 0.658/0.695 while classes 1–4 read 0.823/0.868.
+  SemanticKITTI excludes *unlabeled* from mIoU; the tables here do the same and
+  say so.
+
+---
+
 ## Day 3 (later) · Sun 30 Aug 2026 — dataset
 
 **Landed.** `tools/fetch_kitti.py`, and real KITTI on disk.
