@@ -1,7 +1,18 @@
 # Point clouds are never committed — regenerate synthetic scenes with
-#   python -m avr25d.synth.scenegen
-# and fetch KITTI with tools/fetch_kitti.sh
-data/
+#   python -m avr25d.synth
+# and fetch KITTI with ../tools/fetch_kitti.py
+#
+# `data/*` rather than `data/`: git does not descend into an excluded
+# directory, so the exported models below could not be re-included otherwise.
+data/*
+
+# ...except the exported ONNX models. 4.6 MB for both, and committing them
+# means a fresh clone can run the network without a 3.6 MB checkpoint
+# download and a PyTorch install. See data/models/NOTICE.md for the licence.
+!data/models/
+data/models/*
+!data/models/*.onnx
+!data/models/NOTICE.md
 
 __pycache__/
 *.py[cod]

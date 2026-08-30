@@ -118,10 +118,25 @@ rebuild on a fresh machine.
 Of the five architectures published there, SqueezeSegV2 is the one a CPU budget
 can afford: **0.93 M parameters, 3.6 MB of weights** against DarkNet21's 92 MB.
 
+**The exported models are committed** — `data/models/squeezesegV2_{fp32,int8}.onnx`,
+4.6 MB for both. A fresh clone can run the network path immediately, with no
+checkpoint download and no PyTorch. Provenance, the upstream MIT licence and the
+citation are in [`data/models/NOTICE.md`](data/models/NOTICE.md); it is the only
+thing under `data/` that is committed.
+
+To rebuild them from the published checkpoint instead:
+
 ```bash
 curl -O http://www.ipb.uni-bonn.de/html/projects/bonnetal/lidar/semantic/models/squeezesegV2.tar.gz
 tar xzf squeezesegV2.tar.gz -C data/checkpoints/
+pip install -e '.[export]'              # torch, for the export only
 python ../tools/export_onnx.py          # -> data/models/squeezesegV2_{fp32,int8}.onnx
+```
+
+The label cache needs the KITTI subset and is not committed (96 MB, and it is two
+minutes to rebuild):
+
+```bash
 python ../tools/build_cache.py          # -> data/cache/network/
 ```
 
