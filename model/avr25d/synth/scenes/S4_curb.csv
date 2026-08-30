@@ -1,0 +1,17 @@
+# S4_curb — step discontinuity (PRD §9.3, FR-15, T-H3).
+#
+# A 0.15 m kerb along the road edge at y = +6 m, with the raised footway behind
+# it.  Vehicle step limit is 0.12 m (config.yaml), so 0.15 m is mountable by
+# nothing in the fleet and the boundary is real rather than cosmetic.
+#
+# The kerb is the case where cell size decides the answer: a 0.50 m far-field
+# cell straddles the step and averages it away, a 0.05 m near-field cell
+# resolves it.  That is the adaptive-resolution argument, measured.
+#
+# Convention: x,y,z is the CENTRE, sx,sy,sz are FULL extents, road frame.
+# A kerb 0.15 m tall standing on the road is z=0.075, sz=0.15.
+# frames: 1
+type,x,y,z,sx,sy,sz,class,vx,vy,hazard,note
+plane,0,0,0,200,200,0,1,0,0,,road surface
+box,30.0,6.0,0.075,120.0,0.30,0.15,2,0,0,step,kerb — 0.15 m high along y = +6 m
+box,30.0,7.65,0.075,120.0,3.00,0.15,2,0,0,,raised footway behind the kerb

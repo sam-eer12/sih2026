@@ -1,0 +1,11 @@
+# Point clouds are never committed — regenerate synthetic scenes with
+#   python -m avr25d.synth.scenegen
+# and fetch KITTI with tools/fetch_kitti.sh
+data/
+
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+build/
+dist/

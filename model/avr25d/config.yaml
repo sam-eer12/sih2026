@@ -1,0 +1,124 @@
+# AVR-25D configuration — every tunable, with units and a stated reason (NFR-7).
+# IMPLEMENTATION_PLAN.md §7 is the authoritative listing; this file is that listing,
+# plus the perception/synth keys Sameer's modules need. Do not add a constant to code
+# that is not also here: "why 0.30?" is a question a judge will ask, and the answer
+# has to live in one file.
+
+grid:
+  s_min: 0.05        # m   — PS-6: "5cm cells within a 10m radius"
+  s_max: 0.50        # m   — PS-6: "50cm cells up to a 100m radius"
+  r_knee: 10.0       # m   — PS-6
+  r_max: 100.0       # m   — PS-6
+
+vehicle:
+  height: 3.50       # m   — medium logistics truck; drives OVERHANG (PRD A-2)
+  width: 2.50        # m   — drives costmap obstacle inflation
+  max_slope_deg: 15.0
+  max_step: 0.12     # m   — typical kerb-climb limit for a wheeled logistics vehicle
+
+hazards:
+  tau_pothole: 0.10  # m   — depth below ring-neighbourhood median -> NEGATIVE_OBSTACLE
+  tau_step: 0.08     # m   — z_ground jump to a 4-neighbour -> STEP
+  tau_conf: 96       # 0-255 — below this -> LOW_CONFIDENCE
+
+refine:
+  enabled: true
+  max_cells: 4096    # FR-18 — bounds worst-case latency and memory
+  roughness_thresh: 0.03   # m²
+  slope_thresh_deg: 10.0
+
+decision:
+  weights: {distance: 0.35, slope: 0.20, roughness: 0.15, obstacle: 0.20, clearance: 0.10}
+  horizon_s: 4.0
+  costmap: {extent_m: 40.0, res_m: 0.25}
+
+  # FR-19 traversability weights (IMPLEMENTATION_PLAN.md §6.8). Sum to 1.0.
+  traversability:
+    slope_penalty: 0.30      # dominant term: slope is the constraint that stops a
+                             #   loaded truck outright, and it is the best-measured
+                             #   quantity we have (ring-neighbour z_ground gradient).
+    roughness_penalty: 0.20  # ride quality and traction; noisier estimate than slope,
+                             #   so weighted below it.
+    step_penalty: 0.20       # a kerb is binary for a wheeled vehicle — equal weight to
+                             #   roughness because when it fires it usually decides.
+    class_penalty: 0.20      # semantic prior; deliberately not dominant, so a
+                             #   misclassification alone cannot condemn a cell.
+    clearance_penalty: 0.10  # lowest weight because OVERHANG constrains the vehicle
+                             #   envelope, not the surface — the ground stays drivable.
+    low_confidence_pull: 0.5 # LOW_CONFIDENCE cells are pulled toward 0.5: unknown is
+                             #   neither traversable nor blocked.
+
+perception:
+  mode: cached       # live | cached | geometric
+  model: models/salsanext_int8.onnx
+  knn_k: 5
+
+  range_image:
+    h: 64            # HDL-64E beam count — FR-2
+    w: 2048          # FR-2
+    fov_up: 3.0      # deg — HDL-64E, matches KITTI
+    fov_down: -25.0  # deg — HDL-64E, matches KITTI
+
+  geometric:         # FR-5 fallback segmenter — IMPLEMENTATION_PLAN.md §6.5
+    fit_radius: 30.0        # m  — RANSAC is fit over r < 30 m, where returns are dense
+                            #      enough for the fit to be trustworthy
+    ground_tol: 0.12        # m  — inlier band; DRIVABLE. Set equal to vehicle.max_step
+                            #      on purpose: ground is, by definition, what the
+                            #      vehicle can drive over, so the segmenter's notion
+                            #      of flat and the planner's notion of mountable are
+                            #      the same number. Six sigma above the 0.02 m range
+                            #      noise, so it is not a noise threshold in disguise.
+    terrain_tol: 0.30       # m  — points beyond fit_radius within this band of the
+                            #      extrapolated plane, but outside ground_tol ->
+                            #      NON_DRIVABLE_TERRAIN (the cautious class, because
+                            #      the fit is extrapolated out there)
+    max_normal_tilt_deg: 25.0  # reject RANSAC hypotheses whose normal tilts more than
+                               #   this from vertical — stops the fit locking onto a wall
+    iterations: 200         # RANSAC trials; deterministic given `seed`
+    seed: 20260828          # fixed — perception must be reproducible run to run
+    cluster_radius: 0.50    # m  — Euclidean clustering link distance
+    cluster_knn: 16         # neighbours per point in the clustering graph.  A k-NN
+                            #   graph filtered by cluster_radius is used instead of
+                            #   all pairs within the radius: it is O(n log n) with a
+                            #   16n bound on edges, so a dense urban scan cannot
+                            #   explode the pair count and blow the latency budget.
+    min_cluster_points: 12  # clusters smaller than this stay VOID (sensor noise)
+    terrain_slab:           # a large, low, flat cluster is raised ground — a footway
+                            #   or a verge — not an obstacle. Without this rule a
+                            #   0.15 m kerb line reads as a 120 m long wall.
+      max_height: 0.35      # m — vertical extent of the cluster
+      min_footprint: 3.00   # m — and it has to be big; a 0.3 m stub is a rock
+
+    dynamic:                # bbox gate separating DYNAMIC_OBJECT from STATIC_OBSTACLE.
+                            #   Two shapes qualify as traffic and nothing else does.
+      max_base_offset: 0.60 # m — base must sit near the ground plane; a floating
+                            #     cluster is structure, not traffic
+      vehicle:
+        min_height: 0.80    # m — a bicycle at rest
+        max_height: 4.50    # m — a laden truck; above this it is a building
+        min_footprint: 1.50 # m — longest horizontal extent of the smallest vehicle
+        max_footprint: 9.00 # m — ...and of the largest
+        min_aspect: 1.00    # footprint / height. A vehicle is at least as long as it
+                            #   is tall; a bridge pier or a lamp post is not. This one
+                            #   gate is what stops a 1.2 m diameter, 3.1 m tall pier
+                            #   from being tracked as a lorry.
+      person:
+        min_height: 0.80    # m — a crouching adult
+        max_height: 2.20    # m — above this a narrow upright thing is a post
+        max_footprint: 1.20 # m — a person plus a bag
+
+synth:                 # PRD §9.3 — synthetic scenes with exact ground truth
+  n_beams: 64
+  n_azimuth: 1800      # 0.2 deg azimuth sampling
+  fov_up: 3.0          # deg
+  fov_down: -25.0      # deg
+  sensor_height: 1.70  # m  — sensor origin above the road plane
+  r_max: 100.0         # m  — matches the grid envelope
+  range_sigma: 0.02    # m  — Gaussian range noise; realistic density falloff
+  dropout: 0.0         # fraction of returns randomly dropped (0 = none)
+  seed: 20260830       # fixed — scenes must regenerate byte-identically
+  frame_dt: 0.10       # s  — 10 Hz, matches KITTI
+
+runtime:
+  use_numba: false   # NFR-3 — NumPy path is always correct; Numba is opt-in
+  target_fps: 30

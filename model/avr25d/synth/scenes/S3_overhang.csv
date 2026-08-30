@@ -1,0 +1,33 @@
+# S3_overhang — overhead clearance (PRD §9.3, FR-13, T-H1).
+#
+# A road overpass at 26–50 m with 3.10 m of clearance over road that stays
+# perfectly drivable.  Vehicle height is 3.50 m (config.yaml), so the route is
+# blocked by the structure and not by the ground.
+#
+# Both halves of T-H1 matter.  Detecting the deck is the easy half; keeping the
+# ground beneath it classified DRIVABLE is the half that distinguishes 2.5D from
+# the 2D behaviour we are claiming to fix, which would mark the whole column
+# impassable and lose the road underneath it.
+#
+# WHY A DECK AND NOT A THIN GANTRY BEAM.  The HDL-64E's field of view stops at
+# +3 deg, so at 25 m it cannot see above 3.01 m in the road frame — a thin beam
+# at 3.10 m is not merely hard to measure, it is outside the sensor's field of
+# view entirely and returns nothing.  Even where a vertical face is visible, the
+# lowest beam that lands on it is quantised by the beam pitch: 0.31 m at 40 m,
+# six times the 0.05 m T-H1 asks for.
+#
+# A structure with depth along x fixes both.  Beams at +3.000, +2.556, +2.111
+# and +1.667 deg cross the 3.10 m plane at 26.7, 31.4, 38.0 and 48.1 m, so a
+# deck spanning 26–50 m is struck on its *underside* by four rings, and an
+# underside hit measures the clearance directly — 3.10 m to within the 0.02 m
+# range noise, rather than to within the beam pitch.  That is what makes the
+# T-H1 tolerance physically reachable instead of aspirational.
+#
+# Convention: x,y,z is the CENTRE, sx,sy,sz are FULL extents, road frame.
+# A deck 1.50 m thick with its underside at 3.10 m is z=3.85, sz=1.50.
+# frames: 1
+type,x,y,z,sx,sy,sz,class,vx,vy,hazard,note
+plane,0,0,0,200,200,0,1,0,0,,road surface
+box,38.0,0.0,3.85,24.0,20.0,1.50,3,0,0,clearance,overpass deck — underside at 3.10 m
+cyl,38.0,-9.0,1.55,1.2,1.2,3.10,3,0,0,,left pier
+cyl,38.0,9.0,1.55,1.2,1.2,3.10,3,0,0,,right pier

@@ -36,6 +36,7 @@ reason.
 | **[Product Requirements](docs/PRD.md)** | Problem framing, PS-clause traceability, 42 functional and 10 non-functional requirements, the data contract, metric definitions and measurement protocol, results tables, scope and cut line, risk register, and the companion payload workstream |
 | **[Implementation Plan](docs/IMPLEMENTATION_PLAN.md)** | Grid mathematics and derivation, repository layout, the frozen wire protocol, module-by-module specifications, configuration reference, the 14-day schedule, the 42-test plan, and the demo run-book |
 | **[Work Distribution](docs/WORK_DISTRIBUTION.md)** | Six owners, ownership and backup map, dependency graph, per-person day-by-day tasks with acceptance criteria, the drone payload design guide, and the evidence and submission workstream |
+| **[Progress log](docs/progress/)** | One file per contributor, updated the same day: what landed, whether the day's acceptance criterion was met, who is blocked, and every decision that diverged from the documents above |
 
 ## Stack
 
