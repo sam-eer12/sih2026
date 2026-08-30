@@ -4,6 +4,118 @@ Newest entry at the top. Format and rules: [`README.md`](./README.md).
 
 ---
 
+## Day 3 (later) · Sun 30 Aug 2026 — dataset
+
+**Landed.** `tools/fetch_kitti.py`, and real KITTI on disk.
+
+KITTI publishes the odometry point clouds as **one 84.8 GB zip** with no
+per-sequence download — the plan's "~12 GB for 1000 scans" assumed an access
+mode that does not exist. The archive is served with `Accept-Ranges: bytes` and
+a zip keeps its central directory at the end, so the fetcher reads the directory
+over HTTP and issues one ranged request per member it actually wants.
+**1.8 GB of payload out of an 84.8 GB archive — 2.3%.** `zipfile` does the ZIP64
+parsing; the script only has to supply a seekable file object over ranges.
+
+Written as `.py`, not the `fetch_kitti.sh` the plan names: the range-into-zip
+trick is not expressible in shell, and NFR-4 requires one source tree that runs
+on macOS and Windows. Stdlib only, so it runs before `pip install -e model/`.
+
+**Acceptance.** Day 2's *"5-class labels on a real KITTI scan"* — **met.**
+Sequence 04 complete: 271 scans, 271 labels, 519.9 MB. Sequences 00 and 05 in
+progress.
+
+First real numbers, geometric segmenter over all 271 scans of sequence 04,
+125,718 points/scan, macOS arm64 single core:
+
+| | |
+|---|---:|
+| mIoU (4 classes, VOID excluded) | **0.289** |
+| Point accuracy | 0.500 |
+| Latency, median / p95 / max | 58.1 / 70.1 / 135.1 ms |
+
+| Class | IoU | Share of truth |
+|---|---:|---:|
+| `DRIVABLE` | 0.627 | 33.9% |
+| `NON_DRIVABLE_TERRAIN` | **0.133** | **50.1%** |
+| `STATIC_OBSTACLE` | 0.268 | 12.6% |
+| `DYNAMIC_OBJECT` | 0.127 | 1.3% |
+
+Distance-binned (FR-33): 0.290 at 0–10 m, 0.291 at 10–30 m, 0.196 at 30–60 m,
+0.000 at 60–100 m (1,152 pts/scan in that bin).
+
+These are one-off measurements from a scratch script. `bench/` proper is Day 8
+and nothing here should reach a slide until it comes from `results.json`.
+
+**Blocked / blocking.** Nothing new. The KITTI download is no longer a blocker.
+
+**Decisions and surprises.**
+
+1. **The geometric segmenter's real weakness is now measured, and it is not the
+   one I expected.** `NON_DRIVABLE_TERRAIN` is 50% of sequence 04's points and
+   scores IoU 0.133. Sequence 04 is a road through fields; the segmenter calls
+   flat verge `DRIVABLE` and bushy verge `STATIC_OBSTACLE`. **Tarmac versus flat
+   grass is a semantic distinction, not a geometric one**, and no threshold
+   fixes it — which is a concrete, measured argument for the network rather than
+   an assumed one. Roughness could recover part of it (vegetation returns are
+   far rougher than tarmac) but that is Day 6 work, not a Day 3 tweak.
+2. **Live perception is 58 ms median, 135 ms worst case** — above the 33 ms a
+   30 FPS budget allows. Exactly why FR-6 decouples perception and runs the demo
+   from a label cache. The number is real and goes on the HUD as its own figure.
+3. **The plan's subset costs 3.5× its size to transfer, and it need not.**
+   KITTI's zip does not store members in frame order — within sequence 04, frame
+   `000000` sits at a *higher* offset than `000007`. Two consequences:
+   - Extraction now runs in `header_offset` order. Walking by filename seeks
+     backwards on nearly every file and threw away the read-ahead window each
+     time: one benchmark transferred **912 MB to extract 114 MB**.
+   - "The first N frames" is an expensive request, because those N frames are
+     strewn across the sequence's whole region. Measured, 8 MB blocks:
+
+     | Selection | Scans | Payload | Transfer |
+     |---|---:|---:|---:|
+     | Plan as written | 971 | 1.92 GB | 6.74 GB (3.5×) |
+     | 04 all | 271 | 0.55 GB | 0.55 GB (1.0×) |
+     | 00 first 400 | 400 | 0.77 GB | 3.53 GB (4.6×) |
+     | 00 **400 archive-contiguous** | 400 | 0.78 GB | **0.78 GB (1.0×)** |
+
+     So `--sampling contiguous` was added. Sequence 00 now takes 400 frames
+     adjacent in the archive, which land spread across frame ids 8–4524 — for a
+     *segmentation accuracy* set that is better sampling than 400 consecutive
+     frames of one stretch of road, and 4.6× cheaper. Sequence 05 keeps
+     `frames`, because temporal continuity is the entire point of that sequence.
+     The chosen frame ids are recorded in `data/kitti/manifest.json` so the
+     evaluation set is reproducible.
+4. **Throughput needed three fixes to be usable at all.** The first version ran
+   at 0.10 MB/s — five hours for the subset — against a link that measures
+   1.0 MB/s single-stream. Block-aligned caching, one kept-alive connection per
+   worker, and parallel prefetch (S3 shapes each connection separately, so one
+   stream cannot exceed ~1 MB/s no matter the local link) took it to **2.7 MB/s**.
+5. **`urllib` had no CA bundle** on this python.org build, so it failed
+   `CERTIFICATE_VERIFY_FAILED` on a machine where `curl` worked. The fetcher
+   resolves a bundle via `certifi`, then the system store, and says what to do if
+   neither is there. Anyone on a fresh macOS box would have hit this.
+
+**Q-4 resolved** — *which pretrained SemanticKITTI range-image checkpoint is
+available under a licence permitting hackathon use?* Two, both MIT, both
+verified reachable today:
+
+| Source | Licence | Models | Notes |
+|---|---|---|---|
+| [SalsaNext](https://github.com/TiagoCortinhal/SalsaNext) | MIT | SalsaNext, SemanticKITTI | ~6.7 M params, built for efficiency. The architecture the plan names. Weights are on Google Drive, so not scriptable. |
+| [lidar-bonnetal](https://github.com/PRBonn/lidar-bonnetal) (RangeNet++) | MIT | `squeezeseg` 3.4 MB, `squeezesegV2` 3.5 MB, `darknet21` 92 MB, `darknet53` 187 MB, `darknet53-512` 187 MB | Direct HTTP, all five returned 200 today. Same group whose k-NN reprojection `range_proj.py` implements. |
+
+**Recommendation:** SalsaNext first — it is the named architecture and the best
+accuracy-per-FLOP of the two. `squeezesegV2` from lidar-bonnetal as the fallback:
+3.5 MB, direct download, no Google Drive friction, and small enough that int8 CPU
+inference is plausible rather than hopeful.
+
+**Licence note that belongs in the deck.** SemanticKITTI is CC BY-NC-SA 4.0 —
+attribution, share-alike, **non-commercial**. Fine for the hackathon, but it must
+be stated wherever the data is used, and no claim may imply a commercial product
+trained on this data. This is exactly the kind of thing a DRDO evaluator asks
+about, and the answer should be on a slide rather than improvised.
+
+---
+
 ## Days 1–3 · Fri 28 – Sun 30 Aug 2026
 
 Landed as one branch, `sameer/perception-synth`, rather than three daily commits.
