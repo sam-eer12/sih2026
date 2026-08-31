@@ -186,7 +186,24 @@ class LabelCache:
     def __len__(self) -> int:
         return len(self._frames)
 
+    def for_frame(self, sequence: str, frame: int | str) -> np.ndarray:
+        """Labels for one frame of one sequence — the safe lookup.
+
+        Prefer this over ``cache[...]`` anywhere a frame *number* is in hand.
+        ``cache[8]`` means "the ninth cached scan", not "frame 000008", and on
+        a cache spanning several sequences those are different scans in
+        different sequences.  That mistake is silent whenever the two scans
+        happen to have the same point count, which is the one failure this
+        module exists to make impossible.
+        """
+        frame_str = frame if isinstance(frame, str) else f"{int(frame):06d}"
+        return self[f"{sequence}/{frame_str}"]
+
     def __getitem__(self, frame_id: int | str | np.integer) -> np.ndarray:
+        """Labels by cache id (``"04/000123"``) or by **position**.
+
+        An ``int`` is a position, not a frame number — see :meth:`for_frame`.
+        """
         if isinstance(frame_id, str):
             try:
                 i = self._by_id[frame_id]
