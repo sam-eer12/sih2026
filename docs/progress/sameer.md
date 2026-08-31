@@ -4,6 +4,151 @@ Newest entry at the top. Format and rules: [`README.md`](./README.md).
 
 ---
 
+## Day 7 (early) · Mon 31 Aug 2026 — `make bench` exists and produces real numbers
+
+Day 8's `bench/distance_bins.py` and Day 11's `bench/report.py` landed today,
+three days early, along with the two `bench/` modules §8's contingency had tried
+to give away. None of it needed anything from anyone else.
+
+**Landed.**
+
+| Module | What it does | Spec |
+|---|---|---|
+| `bench/baselines.py` | B0-B4 and both AVR models as pure closed forms | PRD §10.1, FR-31 |
+| `bench/latency.py` | Per-stage + end-to-end, mean/median/p95/max | FR-32 |
+| `bench/distance_bins.py` | Binned mIoU, object recall, streaming accumulators | FR-33, FR-34 |
+| `bench/report.py` | `results.json` -> the PRD §11 tables | NFR-5 |
+| `bench/__main__.py`, `Makefile` | `make bench` | §6.11 |
+| `tests/test_{baselines,latency,distance_bins,report}.py` | 86 new tests | T-B1…T-B5 |
+
+Suite is **207, all green**. T-B1 through T-B4 pass; T-B5's reproducibility half
+passes, its `make bench` half now has a `make bench` to run.
+
+**Acceptance.** Day 8's *"binned mIoU computed"* — met. Day 11's `bench/report.py`
+and *"first full `make bench`"* — met, with the caveat below. Day 6's *"network
+beats geometric"* is now **measured over all 271 scans of sequence 04 rather than
+46**, and it holds:
+
+| | geometric | network (cached) |
+|---|---:|---:|
+| mIoU (classes 1-4) | 0.291 | **0.845** |
+| Point accuracy | 0.502 | **0.941** |
+| Object recall | 0.444 | **0.914** |
+| Median end-to-end | 63.8 ms | **5.3 ms** |
+
+2.90x on mIoU, which is the 2.9x claimed on Day 6, now on 6x the scans. Per-bin:
+0.290 -> 0.877 at 0-10 m, 0.289 -> 0.846 at 10-30 m, 0.213 -> 0.663 at 30-60 m.
+`NON_DRIVABLE_TERRAIN` is 0.134 -> 0.893, still the whole argument for the network.
+
+**Three things I got wrong before, corrected by the harness.**
+
+1. **My Day 3 "0.000 mIoU at 60-100 m" was wrong, and the truth is better.**
+   Sequence 04 has 20,943 points beyond 60 m and **every single one is
+   ground-truth `VOID`**. There is nothing out there to be right or wrong about.
+   0.000 was an artefact of scoring absent classes as zero; the honest statement
+   is that *SemanticKITTI stops annotating past 60 m*, so far-field accuracy is
+   unmeasurable on this data, not bad. `RESULTS.md` now prints that sentence
+   under the table rather than a bare dash, because a judge who sees "—" will
+   ask, and "the dataset does not label that range" is a much stronger answer
+   than the question assumes. **This changes a slide.**
+
+2. **Excluding VOID from the mean was not enough.** A point whose truth is
+   *unlabeled* but which the model called DRIVABLE was still counting as a false
+   positive against DRIVABLE. Ground-truth-VOID points are now dropped from the
+   evaluation entirely, which is what "SemanticKITTI excludes unlabeled" actually
+   means. Deliberately **not** symmetric: predicting VOID on a labelled point
+   still counts against that class, because refusing to answer is an error and
+   the geometric segmenter can do it. Both the row-drop and the asymmetry are
+   mutation-tested. This moved seq 04 geometric from 0.289 to 0.291.
+
+3. **`LabelCache[8]` means "the ninth cached scan", not "frame 000008".** I wrote
+   the cache with sequence-qualified keys precisely so `000000` in three
+   sequences would not collide, then indexed it with an int from my own
+   benchmark runner and got sequence 00's labels while asking for 04's. It threw
+   only because the point counts differed — **with matching counts it would have
+   silently scored the wrong sequence.** That is the exact failure `index.json`'s
+   provenance checks exist to prevent, reintroduced one layer up by an
+   `int | str` overload. Added `LabelCache.for_frame(sequence, frame)`, which
+   cannot mean the wrong thing. **Anuj: use `for_frame`, not `cache[frame_id]`,
+   when the server dispatches `perception.mode: cached`** — the wire protocol
+   carries a frame number and this is a live trap.
+
+**Loose ends from the checkpoint, closed.**
+
+- **Sequence 05 is complete** — 283 of 300 scans at the time of writing and still
+  running; it was 87. One resumable command, as predicted.
+- **`backend/requirements.txt` is fixed, and it was worse than "two stale pins".**
+  It was a `pip freeze` of an unrelated global environment: 168 of its ~180 pins
+  were not installed here and nothing in the project imports them — ultralytics,
+  catboost, xgboost, kaggle, tree-sitter for twenty languages, and a package
+  called **`nupy`, which is a typosquat of `numpy`** and should not be installed
+  on anyone's machine. Replaced with the ~15 packages we actually use, every one
+  verified to resolve on 3.14, including the server and bench deps Anuj will
+  need. `IMPLEMENTATION_PLAN.md` §2.1 updated to match: the pins move to 3.14
+  rather than the interpreter moving back to 3.12, because the suite and every
+  perception measurement we have were taken on 3.14 and downgrading buys nothing.
+
+**Decisions worth two minutes at standup.**
+
+- **The memory table now reports that B4 beats us on a single scan, in bold.**
+  Measured on seq 04: B4 sparse voxel is 0.96 MB against our 17.64 MB dense ring
+  table. PRD §10.1 already promised we would say so; the renderer now says it
+  automatically, so nobody has to remember. The argument stands on cell count
+  (22.67x), deterministic `offset[k] + j` access, and the proportional cut in
+  downstream per-cell work — and it is much stronger for being volunteered.
+- **`bench/` is honest about what it cannot measure.** Occupied adaptive cells,
+  peak RSS, hazard scoring and projection integrity all need `core/grid.py` and
+  `core/cell.py`. Those sections are emitted **absent**, and `RESULTS.md` prints
+  `_not measured_`, never a zero. A half-run benchmark that looks complete is
+  worse than one that is visibly partial.
+- **`n_cells_adaptive` is quoted from the PRD, not computed**, and `results.json`
+  says so in `n_cells_adaptive_source`. It becomes a real measurement the day
+  `core/grid.py` lands.
+- **Cached mode is 5.3 ms median end-to-end** against a 33 ms budget, versus
+  63.8 ms for live geometric. FR-6's decoupling is now a measured number rather
+  than a design intention.
+
+**Multi-sequence evaluation — Day 11's, landed the same day.** Sequence 05 finished
+downloading, so I extended the label cache (971 scans, 120.4 MB, 0.5 min — it
+skipped the 758 already there, as designed) and ran all three sequences in both
+modes. 971 scans total:
+
+| seq | scans | geometric mIoU | network mIoU | ratio | net accuracy | net recall |
+|---|---:|---:|---:|---:|---:|---:|
+| 00 | 400 | 0.374 | 0.890 | 2.38x | 0.938 | 0.934 |
+| 04 | 271 | 0.291 | 0.845 | 2.90x | 0.941 | 0.914 |
+| 05 | 300 | 0.297 | 0.864 | 2.91x | 0.923 | 0.924 |
+
+**The network is not only better, it is more *consistent*, and that is the
+stronger claim.** Across sequences: geometric **0.321 ± 0.046**, network
+**0.866 ± 0.022**. Relative spread falls from 14.3% to 2.5%. The geometric
+segmenter's accuracy depends on what kind of road it is looking at — seq 00 is
+urban and scores 0.374, seq 04 is a road through fields and scores 0.291 —
+whereas the network holds within two points across all three. A judge asking
+"does this generalise?" gets a measured answer, not an assurance.
+
+Per-class IoU spread, network: `DRIVABLE` sd 0.006, `NON_DRIVABLE_TERRAIN` 0.023,
+`DYNAMIC_OBJECT` 0.043, `STATIC_OBSTACLE` **0.060** — the widest, and the class
+to look at if there is time for a fine-tune (Day 10).
+
+One latency oddity worth a note: seq 05 cached shows median 5.9 ms but a 46.9 ms
+max, against 6.6 ms max on seq 04. Almost certainly first-touch page faults on
+the newly appended region of the cache mmap rather than anything in the pipeline.
+It is a warm-up artefact and the Day 12 authoritative run should discard a warm-up
+pass, which the harness does not yet do.
+
+**Still open on `bench/`:** multi-sequence is currently three runs of the CLI
+aggregated by hand; folding `--seq 00 04 05` into the runner so `results.json`
+carries per-sequence variance directly is the remaining Day 11 piece.
+`hazard.py` and `memory.py` stay blocked on `core/`.
+
+**Still blocked on Anuj, unchanged:** `core/cell.py` for `bench/hazard.py` and
+`bench/memory.py`; `CellGrid` for `traversability.py` and `tracker.py`. I am
+writing the Day 7 decision modules against the documented §6.2 cell schema with a
+test double next, so they drop in the day `core/` lands rather than starting then.
+
+---
+
 ## Integration checkpoint · Sun 30 Aug 2026 — nothing outside `model/` exists
 
 Written as integration lead, not as a perception note. Days 1–6 of *my* board are

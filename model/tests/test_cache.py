@@ -173,3 +173,49 @@ def test_build_reports_progress_when_asked(scans, tmp_path, capsys):
     build_cache(scans, StubSegmenter(), tmp_path / "cache", verbose=True)
     out = capsys.readouterr().out
     assert "3" in out
+
+
+def _build_two_sequence_cache(tmp_path):
+    """A cache spanning sequences 00 and 04, both starting at frame 000000 —
+    the collision ``frame_id_for`` exists to prevent."""
+    rng = np.random.default_rng(31)
+    paths = []
+    for seq, n in (("00", 90), ("04", 140)):
+        d = tmp_path / "sequences" / seq / "velodyne"
+        d.mkdir(parents=True)
+        xyz = rng.normal(0.0, 20.0, (n, 3)).astype(np.float32)
+        p = d / "000000.bin"
+        write_velodyne(p, xyz, rng.random(n).astype(np.float32))
+        paths.append(p)
+    out = tmp_path / "cache"
+    build_cache(paths, StubSegmenter(), out, verbose=False)
+    return out
+
+# --- sequence-qualified lookup (added Day 7 after a real mis-read) ---------
+
+def test_for_frame_builds_the_sequence_qualified_key(tmp_path):
+    """``cache[8]`` means the *ninth cached scan*, not frame 000008 — and for a
+    multi-sequence cache those are different scans in different sequences.  A
+    caller holding a frame number needs a lookup that cannot mean the wrong
+    thing, because the failure is silent whenever the point counts happen to
+    agree.
+    """
+    cache_dir = _build_two_sequence_cache(tmp_path)
+    cache = LabelCache(cache_dir)
+
+    np.testing.assert_array_equal(cache.for_frame("04", 0), cache["04/000000"])
+    np.testing.assert_array_equal(cache.for_frame("00", 0), cache["00/000000"])
+    assert not np.array_equal(cache.for_frame("04", 0), cache.for_frame("00", 0))
+
+
+def test_for_frame_accepts_a_preformatted_frame_string(tmp_path):
+    cache = LabelCache(_build_two_sequence_cache(tmp_path))
+    np.testing.assert_array_equal(
+        cache.for_frame("04", "000000"), cache["04/000000"]
+    )
+
+
+def test_for_frame_names_the_sequence_when_it_misses(tmp_path):
+    cache = LabelCache(_build_two_sequence_cache(tmp_path))
+    with pytest.raises(KeyError, match="04/000999"):
+        cache.for_frame("04", 999)

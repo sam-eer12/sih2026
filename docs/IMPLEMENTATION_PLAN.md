@@ -36,21 +36,35 @@ yourself waiting, you are doing it wrong — go read §5.
 
 ### 2.1 Dependencies
 
-Pinned. Do not upgrade during the sprint.
+Pinned. Do not upgrade during the sprint. The authoritative copy is
+[`backend/requirements.txt`](../backend/requirements.txt); this table is a summary.
 
 ```
-python        >= 3.10, < 3.13
-numpy         == 1.26.4
-scipy         == 1.13.1        # KD-tree for k-NN label reprojection, RANSAC helpers
-onnxruntime   == 1.18.0        # CPU execution provider only
-fastapi       == 0.111.0
-uvicorn       == 0.30.1
-websockets    == 12.0
-pyyaml        == 6.0.1
-pytest        == 8.2.2
-psutil        == 5.9.8         # RSS measurement for the memory benchmark
-numba         == 0.59.1        # OPTIONAL, behind a flag (NFR-3)
+python        == 3.14          # revised Day 7 — see below
+numpy         == 2.5.2
+scipy         == 1.18.1        # cKDTree for k-NN label reprojection, RANSAC helpers
+onnx          == 1.22.0
+onnxruntime   == 1.29.0        # CPU execution provider only
+fastapi       == 0.141.1
+uvicorn       == 0.52.4
+websockets    == 17.1
+pymongo       == 4.17.0        # official driver, no ODM
+pyyaml        == 6.0.3
+pytest        == 9.1.1
+psutil        == 7.2.2         # RSS measurement for the memory benchmark
+certifi       == 2026.7.22     # tools/fetch_kitti.py needs a CA bundle that exists
+torch         == 2.13.0        # tools/export_onnx.py ONLY — install on demand
+numba                          # OPTIONAL, behind a flag (NFR-3); not currently used
 ```
+
+**Revised from `python >= 3.10, < 3.13` / `numpy == 1.26.4` / `scipy == 1.13.1`.**
+Those three do not hold together: neither pinned version builds on 3.14, which is
+the interpreter the work has been done on since Day 1. Raised at the Day 3
+checkpoint and settled in favour of refreshing the pins rather than pinning the
+interpreter back to 3.12 — the suite is green on 3.14 with the versions above,
+and every perception measurement in `docs/progress/sameer.md` was taken on them.
+Downgrading would mean re-verifying the ONNX export, the k-NN reprojection and
+the 758-scan label cache to buy nothing.
 
 Frontend (`webapp/`, Next.js):
 
