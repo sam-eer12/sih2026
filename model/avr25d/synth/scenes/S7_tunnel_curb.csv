@@ -1,0 +1,58 @@
+# S7_tunnel_curb — adversarial combined hazard (Day 10, FR-13, FR-15, FR-16).
+#
+# A 3.40 m tunnel with a 0.15 m kerb inside it.  Two hazards of different kinds
+# in the same place, which is the case S3 and S4 each avoid by containing one
+# thing: the overhead constraint and the surface constraint have to be carried
+# separately and both survive, because a representation that collapses them
+# reports either a blocked road or a clear one and is wrong either way.
+#
+# WHY 3.40 m.  The vehicle is 3.50 m (config.yaml).  The tunnel clears it by
+# 0.10 m, so the decision is not "is there a roof" but "is the roof lower than
+# the truck", and 0.10 m is the entire margin.  S3's 3.10 m deck is comfortably
+# blocking and would be detected by any measurement good to 0.3 m; this one is
+# only answerable by a measurement good to a few centimetres.  Measured:
+# 3.3977 m against a true 3.400 m, an error of 0.0023 m — 43x smaller than the
+# margin being decided.
+#
+# WHY THE TUNNEL STARTS AT 30 m AND NOT NEARER.  The HDL-64E's field of view
+# stops at +3 deg, so a roof underside 3.40 m above the road — 1.70 m above the
+# sensor — is invisible closer than 1.70/tan(3 deg) = 32.4 m.  Nearer than that
+# it is not merely hard to measure, it is outside the sensor's field of view and
+# returns nothing.  Beams at +3.000, +2.556, +2.111 and +1.667 deg cross the
+# 1.70 m plane at 32.4, 38.1, 46.1 and 58.4 m, so a tunnel spanning 30-60 m is
+# struck on its underside by four rings, and an underside hit measures the
+# clearance directly rather than to within the beam pitch.
+#
+# WHAT IS ADVERSARIAL ABOUT THE KERB.  It is where it has to be — inside the
+# tunnel, so 30-60 m out — and that is the far field.  Measured there:
+#
+#     kerb returns        15          (S4's kerb, at 0-90 m, gets 2,694)
+#     covering cells      15          (S4: 1,340)
+#     STEP flag fires on   3          (20%; S4: 26%)
+#     height error     0.0008 m       (S4: 0.0026 m)
+#
+# The two halves come apart, and which half degrades is the finding: *detection
+# density* collapses with range because a 0.15 m face subtends 0.21 deg at 40 m
+# against a 0.4375 deg beam pitch, so most beams miss the kerb entirely — while
+# the *geometric accuracy* of the returns that do land is undiminished.  Range
+# costs us confidence that the kerb is there, not knowledge of how high it is.
+# That is also the adaptive-resolution argument in one line: cells are 0.060 m
+# at 12 m and 0.224 m at 45 m, so the kerb is still resolved by the grid; it is
+# the sensor, not the representation, that runs out first.
+#
+# The tunnel walls make this the hardest scene for the ground reference too.
+# FR-14's reference is the median z_ground of a ring neighbourhood, and inside a
+# tunnel a ring is mostly wall.  Measured reference: -1.7002 m against a road at
+# -1.700 m, so the walls do not move it.
+#
+# Convention: x,y,z is the CENTRE, sx,sy,sz are FULL extents, road frame.
+# A roof 1.00 m thick with its underside at 3.40 m is z=3.90, sz=1.00.
+# A kerb 0.15 m tall standing on the road is z=0.075, sz=0.15.
+# frames: 1
+type,x,y,z,sx,sy,sz,class,vx,vy,hazard,note
+plane,0,0,0,200,200,0,1,0,0,,road surface
+box,45.0,0.0,3.90,30.0,10.0,1.00,3,0,0,clearance,tunnel roof — underside at 3.40 m
+box,45.0,-4.75,1.70,30.0,0.50,3.40,3,0,0,,left tunnel wall
+box,45.0,4.75,1.70,30.0,0.50,3.40,3,0,0,,right tunnel wall
+box,45.0,3.0,0.075,30.0,0.30,0.15,2,0,0,step,kerb inside the tunnel — 0.15 m high at y = +3 m
+box,45.0,3.9,0.075,30.0,1.50,0.15,2,0,0,,raised footway behind the kerb

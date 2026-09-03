@@ -31,11 +31,13 @@ NOISE_TOL = 0.05     # m — T-H1/T-H2 tolerance; 2.5x the 0.02 m range sigma
 # Loading and ground truth
 # --------------------------------------------------------------------------
 
-def test_all_five_scenes_are_present():
+def test_all_seven_scenes_are_present():
+    """The five of PRD §9.3 plus the two adversarial ones from Days 9 and 10."""
     names = {p.stem for p in list_scenes()}
     assert names == {
         "S1_flat_road", "S2_pothole", "S3_overhang",
         "S4_curb", "S5_crossing_truck",
+        "S6_occluded_pothole", "S7_tunnel_curb",
     }
 
 
