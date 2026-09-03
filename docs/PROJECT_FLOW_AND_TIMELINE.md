@@ -634,4 +634,4 @@ the whole team.
 | **Shubham** | Makes the 3D viewer and the A/B wipe — the things judges actually look at |
 | **Navya** | Builds the Next.js app, Firebase auth, MongoDB storage, and the HUD |
 | **Khanak** | Designs and simulates the drone LiDAR sensor in MATLAB |
-| **Veda** | Owns the deck, the video, the Q&A bank, and hits submit |
+| **Veda** | Co-designs the drone LiDAR system, owns the deck, video, Q&A bank, and hits submit |
