@@ -122,77 +122,190 @@ class TestTraversability:
 # ---------------------------------------------------------------------------
 
 class TestTracker:
+    """T-D2, in the two halves the board asks for: a *stable id across all 40
+    frames*, and *speed within 0.5 m/s of 8.0 m/s*.
 
-    def test_stable_id_across_frames(self, grid, sensor, cfg):
-        """T-D2: truck track born within 3 frames and holds ID for 10 frames."""
+    Both halves used to be unmeasurable.  Clustering in (ring, bin) space split
+    the truck into ~19 fragments per frame, so ``tracks[0]`` was a different
+    fragment each frame and the id changed four times; the speed assertion was
+    written at +/- 5.0 m/s and guarded by ``if speed_readings:``, so it also
+    passed when nothing was tracked at all.
+    """
+
+    #: Frames of warm-up allowed before the speed is scored.  The filter is
+    #: born with a zero-velocity prior, so this is 1.0 s of observation at
+    #: 10 Hz, not a number chosen to make an assertion pass — the estimate is
+    #: already inside tolerance from frame 8.
+    WARMUP = 10
+
+    @staticmethod
+    def _run(grid, sensor, cfg, n_frames):
+        """Drive the full 40-frame scene.  -> list of (frame, Track | None)."""
         scene = load_scene("S5_crossing_truck")
-        trk   = tracker_mod.Tracker()
+        trk   = tracker_mod.Tracker(cfg)
         cells = CellGrid(grid)
-        born_id = None
-        born_frame = None
-
-        for frame in range(15):
+        out   = []
+        for frame in range(n_frames):
             xyzi, packed = raycast(scene, sensor, t_scene=frame * 0.1)
             sem, _ = labelmap.split_label(packed)
-            avr    = labelmap.raw_to_avr(sem)
-            moving = labelmap.raw_is_moving(sem)
-
             cells.reset()
-            cells.accumulate(xyzi[:, :3], xyzi[:, 3], avr, moving)
+            cells.accumulate(
+                xyzi[:, :3], xyzi[:, 3],
+                labelmap.raw_to_avr(sem), labelmap.raw_is_moving(sem),
+            )
             cells.analyse(cfg)
-
             tracks = trk.update(cells, grid, dt=0.1)
-            if tracks and born_id is None:
-                born_id = tracks[0].id
-                born_frame = frame
+            out.append((frame, tracks[0] if tracks else None))
+        return out
 
-        assert born_id is not None, "no track born in first 15 frames of S5"
+    def test_one_cluster_per_frame(self, grid, sensor, cfg):
+        """The truck is one object, so it must cluster as one detection.
 
-    def test_truck_speed_estimate(self, grid, sensor, cfg):
-        """T-D2: tracked speed within 3.0 m/s of true 8.0 m/s after warmup."""
-        scene  = load_scene("S5_crossing_truck")
-        trk    = tracker_mod.Tracker()
-        cells  = CellGrid(grid)
-        speed_readings = []
-
-        for frame in range(20):
+        This is the assertion that would have caught the ring-space bug on the
+        day it was written: 19 detections for a scene containing one moving
+        primitive is wrong however good the downstream filter is.
+        """
+        scene = load_scene("S5_crossing_truck")
+        cells = CellGrid(grid)
+        t     = cfg.decision.tracker
+        for frame in range(40):
             xyzi, packed = raycast(scene, sensor, t_scene=frame * 0.1)
             sem, _ = labelmap.split_label(packed)
-            avr    = labelmap.raw_to_avr(sem)
-            moving = labelmap.raw_is_moving(sem)
-
             cells.reset()
-            cells.accumulate(xyzi[:, :3], xyzi[:, 3], avr, moving)
+            cells.accumulate(
+                xyzi[:, :3], xyzi[:, 3],
+                labelmap.raw_to_avr(sem), labelmap.raw_is_moving(sem),
+            )
             cells.analyse(cfg)
-            tracks = trk.update(cells, grid, dt=0.1)
-
-            if frame >= 5 and tracks:   # skip warmup
-                speed_readings.append(tracks[0].speed)
-
-        if speed_readings:
-            median_speed = float(np.median(speed_readings))
-            # true speed is 8.0 m/s; allow generous tolerance for geometric labels
-            assert abs(median_speed - 8.0) <= 5.0, (
-                f"tracked speed {median_speed:.2f} m/s, true 8.0 m/s"
+            dets = tracker_mod.cluster_centroids(
+                cells, grid,
+                link_m=float(t.link_m), min_cells=int(t.min_cells),
+            )
+            assert len(dets) == 1, (
+                f"frame {frame}: {len(dets)} dynamic clusters, expected 1 "
+                "(the scene contains exactly one moving primitive)"
             )
 
-    def test_tracker_reset_clears_tracks(self, grid, sensor, cfg):
-        scene  = load_scene("S5_crossing_truck")
-        trk    = tracker_mod.Tracker()
-        cells  = CellGrid(grid)
+    def test_stable_id_across_all_40_frames(self, grid, sensor, cfg):
+        """T-D2 half one: one id, held for every frame the truck is visible."""
+        runs = self._run(grid, sensor, cfg, 40)
+        alive = [(f, t) for f, t in runs if t is not None]
+        assert alive, "no track born in 40 frames of S5"
+
+        born_frame = alive[0][0]
+        assert born_frame <= 2, f"track born only at frame {born_frame}"
+
+        ids = {t.id for _, t in alive}
+        assert len(ids) == 1, f"track id changed during the sequence: {sorted(ids)}"
+
+        # No gaps: the truck never leaves the field of view, so a frame without
+        # a track is a dropped track, not an absent object.
+        frames = [f for f, _ in alive]
+        assert frames == list(range(born_frame, 40)), (
+            f"track dropped on frames "
+            f"{sorted(set(range(born_frame, 40)) - set(frames))}"
+        )
+
+    def test_truck_speed_within_half_a_metre_per_second(self, grid, sensor, cfg):
+        """T-D2 half two: median speed within 0.5 m/s of the true 8.0 m/s."""
+        runs = self._run(grid, sensor, cfg, 40)
+        speeds = [t.speed for f, t in runs if t is not None and f >= self.WARMUP]
+        assert len(speeds) >= 25, f"only {len(speeds)} scored frames"
+
+        median = float(np.median(speeds))
+        assert abs(median - 8.0) <= 0.5, (
+            f"tracked speed {median:.3f} m/s, true 8.0 m/s"
+        )
+
+    def test_speed_is_at_the_parallax_limit(self, grid, sensor, cfg):
+        """The residual error is the measurement's, not the filter's.
+
+        The tracker sees the centroid of the *visible* cells.  Over the
+        crossing that centroid slides from the near face of the truck to the
+        far one, so its total displacement is short of the truck's by about
+        1.6 m — a fixed -0.42 m/s on a 3.9 s crossing that no filter tuning can
+        recover.  This test pins the claim: the filter's own contribution to
+        the error is small next to that floor, so if the speed assertion above
+        ever fails, the cause is the estimator and not the scene.
+        """
+        scene = load_scene("S5_crossing_truck")
+        cells = CellGrid(grid)
+        t     = cfg.decision.tracker
+        first = last = None
+        for frame in range(40):
+            xyzi, packed = raycast(scene, sensor, t_scene=frame * 0.1)
+            sem, _ = labelmap.split_label(packed)
+            cells.reset()
+            cells.accumulate(
+                xyzi[:, :3], xyzi[:, 3],
+                labelmap.raw_to_avr(sem), labelmap.raw_is_moving(sem),
+            )
+            cells.analyse(cfg)
+            cx, cy, _, _ = tracker_mod.cluster_centroids(
+                cells, grid,
+                link_m=float(t.link_m), min_cells=int(t.min_cells),
+            )[0]
+            if frame == 0:
+                first = (cx, cy)
+            last = (cx, cy)
+
+        # Best possible speed from these centroids: the finite difference over
+        # the whole 39-frame span, which no causal filter can beat.
+        ceiling = math.hypot(last[0] - first[0], last[1] - first[1]) / (39 * 0.1)
+        assert 7.4 <= ceiling <= 7.7, f"centroid ceiling moved to {ceiling:.3f} m/s"
+
+        runs   = self._run(grid, sensor, cfg, 40)
+        speeds = [t.speed for f, t in runs if t is not None and f >= self.WARMUP]
+        filter_error = abs(float(np.median(speeds)) - ceiling)
+        assert filter_error <= 0.10, (
+            f"filter adds {filter_error:.3f} m/s on top of the {abs(ceiling - 8.0):.3f} "
+            "m/s parallax floor"
+        )
+
+    def test_static_poles_never_become_tracks(self, grid, sensor, cfg):
+        """The two roadside poles are STATIC_OBSTACLE and must be ignored.
+
+        A tracker that adopts them passes a one-object test and fails a real
+        scene — which is why the scene has them.
+        """
+        runs = self._run(grid, sensor, cfg, 40)
+        for frame, track in runs:
+            if track is None:
+                continue
+            assert track.class_id == labelmap.DYNAMIC_OBJECT, (
+                f"frame {frame}: tracked a class-{track.class_id} object"
+            )
+
+    def test_tracker_reset_clears_tracks_and_ids(self, grid, sensor, cfg):
+        scene = load_scene("S5_crossing_truck")
+        trk   = tracker_mod.Tracker(cfg)
+        cells = CellGrid(grid)
 
         for frame in range(5):
             xyzi, packed = raycast(scene, sensor, t_scene=frame * 0.1)
             sem, _ = labelmap.split_label(packed)
-            avr    = labelmap.raw_to_avr(sem)
-            moving = labelmap.raw_is_moving(sem)
             cells.reset()
-            cells.accumulate(xyzi[:, :3], xyzi[:, 3], avr, moving)
+            cells.accumulate(
+                xyzi[:, :3], xyzi[:, 3],
+                labelmap.raw_to_avr(sem), labelmap.raw_is_moving(sem),
+            )
             cells.analyse(cfg)
             trk.update(cells, grid, dt=0.1)
 
         trk.reset()
         assert len(trk._tracks) == 0, "tracks not cleared after reset()"
+        assert trk._next_id == 1, "ids not restarted after reset()"
+
+    def test_ids_are_per_instance(self, grid, sensor, cfg):
+        """Two Trackers both start at 1.
+
+        The counter used to be a module global, so a test's ids depended on how
+        many tracks every earlier test had created — which is why the old
+        stable-id test could only assert that *some* id existed.
+        """
+        a = tracker_mod.Tracker(cfg)
+        b = tracker_mod.Tracker(cfg)
+        assert a._new_id() == b._new_id() == 1
 
 
 # ---------------------------------------------------------------------------
