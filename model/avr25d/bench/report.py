@@ -80,6 +80,8 @@ def render_memory(results: dict) -> str:
     )
 
     note = ""
+    if mem.get("peak_rss_scope"):
+        note += f"\nPeak RSS is the {mem['peak_rss_scope']}.\n"
     if mem.get("b4_smaller_than_avr_dense"):
         note = (
             "\n**B4 is smaller than our dense ring table on this scan, and we say "
@@ -124,6 +126,19 @@ def render_latency(results: dict) -> str:
             f"\n**Over {n:,} scans — does NOT satisfy FR-32**, which requires ≥200. "
             "These numbers are indicative and must not be presented as the "
             "authoritative latency result.\n"
+        )
+
+    dropped = lat.get("n_warmup_discarded")
+    if dropped:
+        windows = lat.get("n_warmup_windows") or 1
+        note += (
+            f"\n{dropped} warm-up scans were discarded before timing"
+            + (f", across {windows} sequence boundaries" if windows > 1 else "")
+            + ". The first read of a region of the label-cache mmap pays "
+            "first-touch page faults — 46.9 ms against a 5.9 ms median on "
+            "sequence 05 — which is a property of reading a file for the "
+            "first time, not of the pipeline. The count is stated here rather "
+            "than the frames being quietly dropped.\n"
         )
     return head + "\n" + "\n".join(rows) + "\n" + note
 
@@ -192,6 +207,70 @@ def render_accuracy(results: dict) -> str:
     return head + "\n" + "\n".join(rows) + "\n" + note
 
 
+def render_variance(results: dict) -> str:
+    """§11.3.1 — does the headline hold from one sequence to the next?"""
+    head = "### 11.3.1 Per-sequence variance\n"
+    per = _get(results, "per_sequence")
+    var = _get(results, "variance")
+    if per is None or var is None:
+        return head + (
+            f"\n{NOT_MEASURED} — run `make bench` with more than one "
+            "`--seq`.\n"
+        )
+    if len(per) < 2:
+        only = next(iter(per))
+        return head + (
+            f"\nOne sequence only ({only}). Spread across sequences is the "
+            "measurement that answers *does this generalise?*, and it needs at "
+            "least two: run `--seq 00 04 05`.\n"
+        )
+
+    rows = [
+        "| Sequence | Scans | mIoU | Point accuracy | Object recall | "
+        "Median (ms) |",
+        "|---|---:|---:|---:|---:|---:|",
+    ]
+    for name in sorted(per):
+        b = per[name]
+        acc = (b.get("accuracy") or {}).get("overall") or {}
+        rec = (b.get("object_recall") or {}).get("overall") or {}
+        lat = (b.get("latency") or {}).get("end_to_end") or {}
+        rows.append(
+            f"| {name} | {_int(b.get('n_scans'))} | {fmt(acc.get('miou'))} | "
+            f"{fmt(acc.get('accuracy'))} | {fmt(rec.get('recall'))} | "
+            f"{fmt(lat.get('median_ms'), 1)} |"
+        )
+
+    spread = [
+        "",
+        "| Metric | Mean | SD | Min | Max | Relative spread |",
+        "|---|---:|---:|---:|---:|---:|",
+    ]
+    for key, label in (
+        ("miou", "mIoU"),
+        ("point_accuracy", "Point accuracy"),
+        ("object_recall", "Object recall"),
+        ("median_ms", "Median latency (ms)"),
+    ):
+        v = var.get(key)
+        if not v:
+            continue
+        pct = v.get("spread_pct")
+        spread.append(
+            f"| {label} | {fmt(v.get('mean'))} | {fmt(v.get('sd'))} | "
+            f"{fmt(v.get('min'))} | {fmt(v.get('max'))} | "
+            f"{EMPTY if pct is None else f'{pct:.1f} %'} |"
+        )
+
+    return (
+        head + "\n" + "\n".join(rows) + "\n" + "\n".join(spread) + "\n"
+        + "\nThe headline mIoU above is pooled over every scan — one confusion "
+        "matrix, not a mean of per-sequence means, so a long sequence is not "
+        "given the same weight as a short one. This table is what says whether "
+        "that headline survives a change of scene.\n"
+    )
+
+
 # --- §11.4 --------------------------------------------------------------
 
 def render_hazards(results: dict) -> str:
@@ -200,20 +279,65 @@ def render_hazards(results: dict) -> str:
     if haz is None:
         return head + (
             f"\n{NOT_MEASURED} — `bench/hazard.py` scores the synthetic scenes "
-            "against their exact ground truth and needs `core/cell.py`'s flags.\n"
+            "against their exact ground truth.\n"
         )
 
     rows = [
-        "| Scene | Hazard | True value | Measured | Error | Detection rate |",
-        "|---|---|---:|---:|---:|---:|",
+        "| Scene | Hazard | True | Measured | Error | Cells flagged | "
+        "Detection | 2D grid |",
+        "|---|---|---:|---:|---:|---:|---:|---|",
     ]
+    notes: list[str] = []
     for scene in haz.get("scenes", []):
+        cf = scene.get("counterfactual_2d") or {}
+        representable = cf.get("hazard_representable")
+        verdict = (
+            "not representable" if representable is False
+            else (EMPTY if representable is None else "representable")
+        )
+        cells = (
+            f"{_int(scene.get('cells_flagged'))} / "
+            f"{_int(scene.get('cells_covering'))}"
+            if scene.get("cells_covering") is not None else EMPTY
+        )
         rows.append(
             f"| {scene.get('scene', EMPTY)} | {scene.get('hazard', EMPTY)} | "
             f"{fmt(scene.get('true_value'), 2)} | {fmt(scene.get('measured'), 4)} | "
-            f"{fmt(scene.get('error'), 4)} | {fmt(scene.get('detection_rate'))} |"
+            f"{fmt(scene.get('error'), 4)} | {cells} | "
+            f"{fmt(scene.get('detection_rate'))} | {verdict} |"
         )
-    return head + "\n" + "\n".join(rows) + "\n"
+        if scene.get("note"):
+            notes.append(f"- **{scene.get('scene')}** — {scene['note']}.")
+        if cf.get("verdict") and representable is False:
+            frac = cf.get("blocked_fraction")
+            tail = "" if frac is None else (
+                f" ({fmt(frac, 3)} of its cells blocked)"
+            )
+            notes.append(
+                f"- **{scene.get('scene')} in 2D** — {cf['verdict']}{tail}."
+            )
+
+    body = head + "\n" + "\n".join(rows) + "\n"
+
+    fp = haz.get("false_positives")
+    if fp is not None:
+        body += (
+            f"\n**False positives across every control scene: {int(fp)}.** "
+            "S1_flat_road is the test most likely to fail first when a "
+            "threshold is tuned too aggressively, so a zero here is what makes "
+            "the detection rates above worth quoting.\n"
+        )
+    if haz.get("max_error_m") is not None:
+        body += (
+            f"\nLargest geometric error over every scored hazard: "
+            f"**{fmt(haz['max_error_m'], 4)}**"
+            " (metres, or m/s for the tracked speed).\n"
+        )
+    if haz.get("counterfactual_note"):
+        body += f"\n{haz['counterfactual_note']}.\n"
+    if notes:
+        body += "\n" + "\n".join(notes) + "\n"
+    return body
 
 
 # --- §11.5 --------------------------------------------------------------
@@ -260,7 +384,7 @@ def render(results: dict) -> str:
         "",
     ]
     for section in (
-        render_memory, render_latency, render_accuracy,
+        render_memory, render_latency, render_accuracy, render_variance,
         render_hazards, render_projection,
     ):
         lines.append(section(results))

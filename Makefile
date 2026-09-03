@@ -5,23 +5,26 @@
 # results.json comes from here.
 
 PY      ?= backend/.venv/bin/python
-SEQ     ?= 04
+SEQ     ?= 00 04 05     # several sequences pool into one result (§11.3.1)
 MODE    ?= geometric
 LIMIT   ?=
 CACHE   ?= data/cache/network
 
 LIMIT_ARG := $(if $(LIMIT),--limit $(LIMIT),)
 
-.PHONY: help test bench bench-network bench-cached scenes clean-bench
+.PHONY: help test bench bench-network bench-cached bench-authoritative \
+	scenes finetune clean-bench
 
 help:
 	@echo "make test           — the whole pytest suite"
 	@echo "make bench          — results.json + docs/RESULTS.md (geometric)"
 	@echo "make bench-network  — same, live ONNX inference"
 	@echo "make bench-cached   — same, from the prebuilt label cache"
-	@echo "make scenes         — regenerate the synthetic scenes S1-S5"
+	@echo "make bench-authoritative — the Day 12 run: all sequences, cached"
+	@echo "make scenes         — regenerate the synthetic scenes S1-S7"
+	@echo "make finetune       — Q-1 probe, 5-class split, fine-tune, before/after"
 	@echo ""
-	@echo "  SEQ=04  MODE=geometric  LIMIT=  (override any of these)"
+	@echo "  SEQ='00 04 05'  MODE=geometric  LIMIT=  (override any of these)"
 
 test:
 	cd model && ../$(PY) -m pytest -q
@@ -36,8 +39,22 @@ bench-cached:
 	cd model && ../$(PY) -m avr25d.bench --seq $(SEQ) --mode cached \
 		--cache $(CACHE) $(LIMIT_ARG)
 
+# The Day 12 run: every sequence, cached mode, hazards included.  This is the
+# command whose results.json is handed to Veda and stored in MongoDB.
+bench-authoritative:
+	cd model && ../$(PY) -m avr25d.bench --seq 00 04 05 --mode cached \
+		--cache $(CACHE)
+
 scenes:
 	cd model && ../$(PY) -m avr25d.synth
+
+# Days 9-10.  `probe` answers Q-1, `split` writes the 5-class manifest,
+# `train` fine-tunes the decoder and head, `evaluate` produces the before/after.
+finetune:
+	$(PY) tools/finetune.py probe
+	$(PY) tools/finetune.py split
+	$(PY) tools/finetune.py train --epochs 3
+	$(PY) tools/finetune.py evaluate
 
 clean-bench:
 	rm -f model/results.json docs/RESULTS.md

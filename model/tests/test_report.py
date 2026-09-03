@@ -195,3 +195,104 @@ def test_latency_values_render_to_one_decimal_with_units_in_the_header():
 ])
 def test_number_formatting_is_explicit_about_none(value, expected):
     assert rp.fmt(value, 3) == expected
+
+
+# ---------------------------------------------------------------------------
+# §11.3.1 — per-sequence variance (Day 11)
+# ---------------------------------------------------------------------------
+
+def _seq_block(miou, acc, rec, ms, n=100):
+    return {
+        "n_scans": n,
+        "accuracy": {"overall": {"miou": miou, "accuracy": acc}},
+        "object_recall": {"overall": {"recall": rec}},
+        "latency": {"end_to_end": {"median_ms": ms}},
+    }
+
+
+class TestVarianceSection:
+
+    def test_absent_when_not_measured(self):
+        out = rp.render_variance({})
+        assert rp.NOT_MEASURED in out
+
+    def test_one_sequence_says_so_rather_than_printing_a_zero_spread(self):
+        """A single sequence has zero spread and that is not a result.
+
+        Printing 0.0 % here would read as perfect generalisation from one
+        sequence, which is the exact opposite of what one sequence shows.
+        """
+        out = rp.render_variance({
+            "per_sequence": {"04": _seq_block(0.8, 0.9, 0.9, 5.0)},
+            "variance": {"sequences": ["04"], "miou": None},
+        })
+        assert "0.0 %" not in out
+        assert "at least two" in out
+
+    def test_renders_a_row_per_sequence_and_the_spread(self):
+        results = {
+            "per_sequence": {
+                "00": _seq_block(0.890, 0.938, 0.934, 5.1, n=400),
+                "04": _seq_block(0.845, 0.941, 0.914, 5.3, n=271),
+                "05": _seq_block(0.864, 0.923, 0.924, 5.9, n=300),
+            },
+            "variance": {
+                "sequences": ["00", "04", "05"],
+                "miou": {"n": 3, "mean": 0.8663, "sd": 0.0226,
+                         "min": 0.845, "max": 0.890, "spread_pct": 2.61},
+            },
+        }
+        out = rp.render_variance(results)
+        for name in ("00", "04", "05"):
+            assert f"| {name} |" in out
+        assert "0.866" in out and "0.023" in out
+        assert "2.6 %" in out
+
+    def test_sequence_rows_are_sorted_not_hash_ordered(self):
+        """T-B5: the report must render identically run to run."""
+        results = {
+            "per_sequence": {
+                "05": _seq_block(0.864, 0.923, 0.924, 5.9),
+                "00": _seq_block(0.890, 0.938, 0.934, 5.1),
+                "04": _seq_block(0.845, 0.941, 0.914, 5.3),
+            },
+            "variance": {"sequences": ["05", "00", "04"], "miou": None},
+        }
+        out = rp.render_variance(results)
+        assert out.index("| 00 |") < out.index("| 04 |") < out.index("| 05 |")
+
+
+# ---------------------------------------------------------------------------
+# §11.4 — hazards
+# ---------------------------------------------------------------------------
+
+class TestHazardSection:
+
+    def test_absent_when_not_measured(self):
+        out = rp.render_hazards({"hazards": None})
+        assert rp.NOT_MEASURED in out
+
+    def test_renders_error_detection_and_the_2d_counterfactual(self):
+        out = rp.render_hazards({"hazards": {
+            "scenes": [{
+                "scene": "S2_pothole", "hazard": "pothole depth",
+                "true_value": 0.22, "measured": 0.2092, "error": 0.0108,
+                "cells_covering": 27, "cells_flagged": 21,
+                "detection_rate": 0.7778,
+                "counterfactual_2d": {
+                    "blocked_fraction": 0.0, "hazard_representable": False,
+                    "verdict": "free space",
+                },
+            }],
+            "max_error_m": 0.0108, "false_positives": 0,
+        }})
+        assert "0.2092" in out and "0.0108" in out
+        assert "21 / 27" in out
+        assert "not representable" in out
+        assert "False positives" in out
+
+    def test_a_false_positive_count_is_not_hidden(self):
+        out = rp.render_hazards({"hazards": {
+            "scenes": [], "max_error_m": None, "false_positives": 7,
+        }})
+        assert "7" in out

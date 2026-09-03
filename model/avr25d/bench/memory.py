@@ -36,6 +36,25 @@ from ..core.cell import CellGrid
 from ..core.grid import RingGrid
 
 
+def peak_rss_mb() -> float:
+    """The process's high-water RSS in MB, from the OS rather than a sample.
+
+    ``psutil``'s ``memory_info().rss`` is the RSS *now*, so sampling it after a
+    loop reports the peak only if the peak happened to be at the end.  The
+    kernel already keeps the high-water mark, and ``getrusage`` returns it.
+
+    ``ru_maxrss`` is bytes on Darwin and BSD, kibibytes on Linux — a units bug
+    that silently reports a 1024x wrong number rather than failing, so the
+    platform is checked rather than assumed.
+    """
+    import resource
+    import sys
+
+    raw = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+    scale = 1 if sys.platform == "darwin" else 1024   # -> bytes
+    return raw * scale / (1024 ** 2)
+
+
 def _rss_mb() -> float:
     """Current process RSS in megabytes."""
     proc = psutil.Process(os.getpid())
@@ -137,7 +156,7 @@ def measure(
 
     gc.collect()
     rss_after = _rss_mb()
-    peak_rss_mb = rss_after   # conservative: actual peak is ≥ after
+    peak = peak_rss_mb()      # the kernel's high-water mark, not a sample
 
     if not n_pts_list:
         return {"error": "no scans measured"}
@@ -155,7 +174,7 @@ def measure(
         n_occ_adaptive   = mean_occ_a,
     )
 
-    comparison["peak_rss_mb"]      = round(peak_rss_mb, 2)
+    comparison["peak_rss_mb"]      = round(peak, 2)
     comparison["rss_before_mb"]    = round(rss_before, 2)
     comparison["n_scans_sampled"]  = scans_done
     comparison["n_occ_adaptive_measured"] = True
