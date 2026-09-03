@@ -521,8 +521,8 @@ from memory:
 | **Anuj (you)** | Grid engine (`core/`), FastAPI server, decision planner |
 | **Shubham** | Three.js 3D viewer — everything inside the canvas |
 | **Navya** | Next.js platform — auth (Firebase), database (MongoDB), HUD |
-| **Khanak** | Drone LiDAR payload hardware design (MATLAB) |
-| **Veda** | Deck, video, submission, payload documentation |
+| **Khanak** | Drone LiDAR payload hardware design & modeling (MATLAB) |
+| **Veda** | Drone LiDAR payload co-design & documentation, deck, video, submission |
 
 ---
 

@@ -20,7 +20,7 @@
 | **Shubham** | Frontend / web | Three.js viewer — all rendering | `webapp/components/viewer/`, `lib/palette.ts` |
 | **Navya** | Frontend / web | Next.js platform — auth, persistence, HUD | `webapp/app/`, `lib/`, `components/hud/`, `components/decision/` |
 | **Khanak** | Non-tech | Drone LiDAR payload — design and model | `hardware/matlab/`, `hardware/simulink/` |
-| **Veda** | Non-tech | Payload documentation + evidence and submission | `hardware/docs/`, deck, script, Q&A, submission |
+| **Veda** | Non-tech | Drone LiDAR payload system & documentation + evidence and submission | `hardware/docs/`, deck, script, Q&A, submission |
 
 Six people, six non-overlapping directories. Two people never edit the same file on the same
 day, which is what makes daily merges to `main` cheap.
@@ -358,9 +358,9 @@ follows with `results.json`, and for the same reason.
 **If you get stuck for more than two hours**, say so at standup. Sameer and Anuj can both seed
 a script skeleton in under an hour; grinding silently is what costs days.
 
-### 6.2 Veda — payload documentation, evidence, and submission
+### 6.2 Veda — drone LiDAR payload system, documentation, evidence, and submission
 
-**Owns:** `hardware/docs/`, the deck, the video script, the Q&A bank, and the submission.
+**Owns:** Drone LiDAR system co-design (with Khanak) and `hardware/docs/`, the deck, the video script, the Q&A bank, and the submission.
 
 **The rule that matters most:** *no number reaches a slide except from `results.json`, or from
 a payload script that produced it.* Sameer generates the software numbers, Khanak generates the

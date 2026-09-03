@@ -12,7 +12,7 @@ integration checkpoint short.
 | [`shubham.md`](./shubham.md) | Shubham | Three.js viewer |
 | [`navya.md`](./navya.md) | Navya | Next.js platform, auth, persistence, HUD |
 | [`khanak.md`](./khanak.md) | Khanak | Drone LiDAR payload — models and analysis |
-| [`veda.md`](./veda.md) | Veda | Payload documentation, evidence, submission |
+| [`veda.md`](./veda.md) | Veda | Drone LiDAR payload co-design, documentation, evidence, submission |
 
 ## Entry format
 

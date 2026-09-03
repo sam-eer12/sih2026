@@ -1,4 +1,4 @@
-# Veda — payload documentation, evidence, submission
+# Veda — drone LiDAR payload co-design, documentation, evidence, submission
 
 Newest entry at the top. Format and rules: [`README.md`](./README.md).
 
