@@ -21,6 +21,25 @@ hazards:
   tau_step: 0.08     # m   — z_ground jump to a 4-neighbour -> STEP
   tau_conf: 96       # 0-255 — below this -> LOW_CONFIDENCE
 
+  # FR-14's reference is the median of a cell's ring *neighbourhood*, and the
+  # neighbourhood is what these two keys define.  A single ring is not a usable
+  # reference: ground returns land at discrete ranges (beam spacing on the road
+  # is r²·δ/h, 0.65 m at 12 m), so most rings between two beam hits are empty,
+  # and the rings a pit *does* populate are the ones its far wall reaches —
+  # which are otherwise empty.  Measured on S2: ring 248 held 15 occupied cells
+  # out of 1257 bins and all 15 were inside the pothole, so the pothole was its
+  # own reference and the drop came out at 0.005 m against a 0.22 m hole.
+  ref_ring_min_fill: 0.02  # a ring is a usable reference only if this fraction
+                           #   of its bins is occupied.  S2's ring 248 fills
+                           #   1.2%; the beam-lit ring beside it fills 34.6%,
+                           #   so the two are an order of magnitude apart and
+                           #   the threshold is not balanced on a knife edge.
+  ref_rings: 9             # usable rings pooled into the reference median.
+                           #   Odd, so the median is an element; wide enough to
+                           #   span several beam hits at hazard ranges, narrow
+                           #   enough that a real road's grade does not walk the
+                           #   reference away from the cell being tested.
+
 refine:
   enabled: true
   max_cells: 4096    # FR-18 — bounds worst-case latency and memory
@@ -47,6 +66,39 @@ decision:
                              #   envelope, not the surface — the ground stays drivable.
     low_confidence_pull: 0.5 # LOW_CONFIDENCE cells are pulled toward 0.5: unknown is
                              #   neither traversable nor blocked.
+
+  # FR-20 tracker (IMPLEMENTATION_PLAN.md §6.9).  A dynamic object is clustered
+  # in the metric XY plane, not in (ring, bin) index space: a vehicle at 25 m
+  # spans a *diagonal* swath of the ring table, so 4-connectivity in index
+  # space shears it into one fragment per ring.  Measured on S5: 74 truck cells
+  # across 42 rings became 19 clusters, and the track id changed four times in
+  # forty frames.  Metres do not have that failure mode.
+  tracker:
+    link_m: 1.50        # m — two dynamic cells join one cluster within this
+                        #   distance.  Above the 0.50 m far-field cell size so
+                        #   a sparsely-sampled face stays connected, well below
+                        #   a realistic vehicle gap so two cars stay separate.
+    min_cells: 4        # clusters smaller than this are sensor noise, not an
+                        #   object.  Mirrors geometric.min_cluster_points in
+                        #   intent, in cells rather than points.
+    v_max: 30.0         # m/s — association gate is v_max * dt + gate_extra_m
+    gate_extra_m: 1.00  # m — slack for centroid jitter on the gate radius
+    birth_hits: 2       # consecutive associations before a track is emitted
+    death_misses: 3     # consecutive misses before a track is dropped
+    horizon_s: 4.0      # s — length of the emitted trajectory prediction
+    predict_steps: 5    # samples along that prediction
+    q_pos: 0.05         # process noise, position (m²/s)
+    q_vel: 0.50         # process noise, velocity (m²/s³) — the dominant term:
+                        #   a crossing vehicle changes speed, our measurement
+                        #   is a visible-surface centroid, and under-trusting
+                        #   the constant-velocity model converges faster than
+                        #   over-trusting it.
+    r_meas: 0.50        # measurement noise on the centroid (m²)
+    p0_pos: 1.00        # initial position variance (m²)
+    p0_vel: 9.00        # initial velocity variance (m²/s²) — 3 m/s of prior
+                        #   uncertainty, so the first two updates dominate the
+                        #   zero-velocity birth state instead of being damped
+                        #   by it.
 
 perception:
   mode: cached       # live | cached | geometric

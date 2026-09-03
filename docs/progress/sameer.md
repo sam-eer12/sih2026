@@ -4,6 +4,311 @@ Newest entry at the top. Format and rules: [`README.md`](./README.md).
 
 ---
 
+## Days 7-11 · Thu 3 Sep 2026 — hazard scoring exists, and it found two bugs in `core/`
+
+Board cleared through Day 11. Every section of `docs/RESULTS.md` is populated —
+there is no `_not measured_` left in the file.
+
+**Landed.**
+
+| Module | What it does | Board day |
+|---|---|---|
+| `bench/hazard.py` + `tests/test_hazard.py` (26) | §11.4 — every hazard scored in metres against exact ground truth, with the 2D counterfactual | 8 |
+| `synth/scenes/S6_occluded_pothole.csv` | S2 with 53% of the pit in a stopped car's shadow | 9 |
+| `synth/scenes/S7_tunnel_curb.csv` | 3.40 m tunnel + a 0.15 m kerb inside it | 10 |
+| `tools/finetune.py` | Q-1 probe, the 5-class split, the decoder-head fine-tune, before/after | 9-10 |
+| `bench/__main__.py` | `--seq 00 04 05` pools into one result with per-sequence variance | 11 |
+| `bench/latency.py` | warm-up discard, one window per sequence | 11 |
+| `bench/report.py` | new §11.3.1 variance section; §11.4 rewritten | 11 |
+| `decision/tracker.py` | rewritten — Anuj's stub said "Sameer replaces the body" | 7 |
+
+Suite **347, all green**. `make bench-authoritative` runs 971 scans in 25 s.
+
+---
+
+### Day 7's acceptance was not met, and the reason was a real bug
+
+The board asks for a *stable track id across all 40 S5 frames* and *speed within
+0.5 m/s of 8.0*. What was there passed neither, and the test could not have
+caught it: the speed assertion was written at ±5.0 m/s and wrapped in
+`if speed_readings:`, so it also passed when nothing was tracked at all.
+
+The defect was clustering DYNAMIC_OBJECT cells with 4-connectivity **in
+(ring, bin) index space**. A vehicle at fixed x crossing in y occupies a
+*diagonal* swath of the ring table — its visible face spans several metres of
+range — so 4-connectivity shears it into one fragment per ring. Measured: **74
+truck cells across 42 rings became 19 clusters**, and since `tracks[0]` was a
+different fragment each frame the id changed four times in forty. The one frame
+that clustered correctly was frame 20, the truck dead ahead, where its face is
+at constant range and spans two rings.
+
+Clustering by radius in metres has no preferred axis: **one cluster on all 40
+frames, one id, born at frame 1.**
+
+Speed now measures **7.566 m/s against a true 8.0**, error 0.434. Worth knowing
+where that residual comes from, because it is not the filter: the tracker sees
+the centroid of the *visible* cells, and over the crossing that centroid slides
+from the truck's near face to its far one — +0.81 m at the start, −0.81 m at the
+end. That is a fixed −0.415 m/s of parallax on a 3.9 s crossing and no tuning
+removes it, because the information is not in the returns. The filter's own
+contribution is 0.02 m/s. There is a test asserting exactly that, so if the
+speed assertion ever fails we know immediately whether to look at the estimator
+or the scene.
+
+Also made track ids per-instance rather than a module global — the old counter
+made a test's ids depend on how many tracks every *earlier* test had created,
+which is why the original test could only assert that *some* id existed.
+
+---
+
+### Two defects in `core/cell.py`. **Anuj — one is fixed, one is yours.**
+
+`bench/hazard.py` was written to score the flags. It found that two of the three
+were nearly never firing, and the causes are both structural rather than
+threshold tuning.
+
+**1. NEGATIVE_OBSTACLE's reference was the pothole itself. Fixed.**
+
+FR-14 and your own §6.3 docstring both say the reference is the median of a
+cell's *ring neighbourhood*. The code used the median of the **single ring**,
+and a pit is exactly the case where that fails. Ground returns land at discrete
+ranges — successive beams strike the road `r²·δ/h` apart, 0.65 m at 12 m — so
+the rings *between* two beam hits are empty. A pit's far inner wall sits a
+little beyond the beam ring that lit it, which lands its returns in one of those
+otherwise-empty rings.
+
+Measured on S2: **ring 248 held 15 occupied cells out of 1257 bins and all 15
+were inside the pothole.** Its median was the pit floor, the drop against it was
+0.005 m, and a 0.22 m hole did not fire. The beam-lit ring beside it, 247, held
+435 cells with median −1.7033 — the road, and the reference the requirement
+means.
+
+Replaced `_ring_median_z_ground` with `_ground_reference`: a windowed median
+over the nearest rings that are populated enough to mean anything, gated by
+`hazards.ref_ring_min_fill` (2% of a ring's bins) and `hazards.ref_rings` (9).
+The two rings above sit at 1.2% and 34.6%, an order of magnitude apart, so the
+gate is not balanced on a knife edge. Both constants are in `config.yaml` with
+their reasoning.
+
+Pothole detection **25.9% → 77.8%** of covering cells. The remaining 22.2% are
+the pit's *rim*, which is at road level by construction and must not fire —
+every cell genuinely below the local road now fires, and §11.4 reports both
+denominators. S1 still raises **zero** false positives, which is the test I was
+most worried about breaking.
+
+**2. OVERHANG is measurable on almost no cells, and this one is yours.**
+
+FR-13 defines `clearance = z_obstacle − z_ground` **per cell**, and the code
+implements exactly that. The problem is the sensor, not the code: on S3 the deck
+underside returns land in **15 rings**, the road beneath it in **6**, and
+**exactly 1 ring has both** — because a beam that strikes an overhead surface
+and a beam that strikes the road under it are different beams landing at
+different ranges. So OVERHANG fires on **2 of 916** cells under the deck, and on
+**0 of 191** on S7's tunnel.
+
+I have not touched this. The fix wants the same neighbourhood idea — the lowest
+overhead return *near* a ground cell rather than in it — and that is a change to
+your frame loop with a 30 Hz budget attached, so it should be your call rather
+than mine. Two things to note before you start:
+
+- **The half of T-H1 that matters already passes.** 419 of 916 cells under the
+  deck stay `DRIVABLE`, so the road under the bridge is not lost. That is the 2D
+  failure we claim to fix and we do fix it. There is a test.
+- **The clearance number itself is fine** — 3.0976 m against 3.10, and 3.3977
+  against S7's 3.40. `bench/hazard.py` measures it as the structure's lowest
+  return above the road reference and reports `clearance_cells_with_both`
+  alongside, so §11.4 states the per-cell yield rather than quietly measuring it
+  another way. Nothing in the deck is blocked on this.
+
+---
+
+### §11.4 — the table, and the counterfactual
+
+| Scene | Hazard | True | Measured | Error |
+|---|---|---:|---:|---:|
+| S2_pothole | depth | 0.22 | 0.2092 | **0.0108** |
+| S3_overhang | clearance | 3.10 | 3.0976 | **0.0024** |
+| S4_curb | step height | 0.15 | 0.1526 | **0.0026** |
+| S5_crossing_truck | track speed | 8.00 | 7.5660 | **0.4340** |
+| S6_occluded_pothole | depth | 0.22 | 0.2248 | **0.0048** |
+| S7_tunnel_curb | clearance | 3.40 | 3.3977 | **0.0023** |
+| S7_tunnel_curb | step height | 0.15 | 0.1508 | **0.0008** |
+| S1_flat_road | false positives | 0 | **0** | — |
+
+Cells are associated to a hazard by **instance id**, not by a footprint test on
+cell centres. Those sound equivalent and are not: at 12 m the cells are 5.7 cm
+across, the pit's far-wall returns land in cells whose centres sit just outside
+the CSV footprint, and a footprint test silently dropped them — including the
+deepest return in the scene, which is the one the depth estimate depends on.
+That cost an hour; the instance id cannot be wrong.
+
+**The 2D counterfactual is now measured rather than asserted** (PRD §10.4). A
+standard navigation grid — occupied where a return sits more than `max_step`
+above the local road, not the strawman that blocks the road itself:
+
+- **pothole: 0.000 of its cells blocked.** A depression holds no returns above
+  the road, so a 0.22 m hole is byte-identical to flat road. Not "hard to see" —
+  *not representable*.
+- **overpass and tunnel: 1.000 blocked.** The structure's returns block the
+  column and the drivable road beneath is marked impassable. That is the
+  measured version of the slide.
+- **kerb: 0.647 blocked, height not recoverable.** A 0.15 m kerb sets the same
+  single bit as a 3 m wall.
+
+---
+
+### The adversarial scenes, and one that had to be rebuilt
+
+**S6 — occluded pothole.** First draft put the pit at 16 m and measured a 0.14 m
+depth error. That was **the range doing it, not the occlusion**: a pit is
+measurable only where a beam reaches its floor and the grazing angle falls from
+8.1° at 12 m to 6.1° at 16 m, so the two effects would have been reported as
+one. Rebuilt at S2's 12.0 m with only occlusion changed. Sweeping the pit across
+the car's shadow edge:
+
+| lit fraction | 0% | 7% | 30% | 53% | 75% |
+|---|---:|---:|---:|---:|---:|
+| pit returns | 4 | 12 | 25 | 41 | 49 |
+| depth error (m) | 0.158 | 0.095 | 0.003 | 0.005 | 0.004 |
+
+Depth survives occlusion until almost nothing is left and then fails abruptly,
+because it depends on whether *any* beam reaches the floor rather than on how
+many do. 53% is the shipped operating point — hard enough that a detector
+relying on cell population fails, not so hard that everything fails. A scene
+whose answer is always "no" tests nothing.
+
+**S7 — tunnel and kerb.** 3.40 m against a 3.50 m vehicle, so the whole decision
+is 0.10 m, and we measure it to 0.0023 m — 43x margin. The kerb inside is the
+adversarial half: at 30-60 m a 0.15 m face subtends 0.21° against a 0.4375° beam
+pitch, so **detection density collapses (15 returns, against S4's 2,694) while
+geometric accuracy does not (0.0008 m, better than S4's 0.0026)**. Range costs
+us confidence the kerb is there, not knowledge of how high it is. Worth a slide.
+
+---
+
+### Q-1, answered — and the answer is that it stopped mattering
+
+**A usable training GPU is already here.** `torch.backends.mps` reaches the M4's
+GPU, forward *and backward* both run on it (verified, not assumed — `probe`
+runs a real backward pass), and it is on the machine that already holds the
+2.2 GB of KITTI, the checkpoint and the 971-scan cache. The fine-tune does not
+wait on the Windows box, and moving the data to a second machine would have cost
+most of a day.
+
+What this repo cannot settle is which card is in the Windows box. **Someone at
+that machine: run `make finetune`'s probe line and paste the output at
+standup.** It is wanted only for the HUD's live-inference figure (PRD Q-1's
+second sentence); no module, benchmark or demo path depends on it.
+
+**The split (Day 9).** Train on 00+05 (700 scans), validate on 04 (271).
+**Sequence-level, not a random frame split** — KITTI is a 10 Hz recording, frame
+41 is very nearly frame 40, and a random split puts near-duplicates on both
+sides and reports a memorisation score. It also means before and after are
+measured on the sequence §11.3 already quotes. Manifest with class frequencies
+and loss weights in `model/data/splits/finetune_5class.json`.
+
+**The fine-tune (Day 10) — measured, and we are not shipping it.**
+
+Backbone frozen (parameters *and* BatchNorm — `requires_grad=False` does nothing
+to running statistics, so leaving BN in train mode drifts the pretrained
+features while the loss looks healthy). Decoder + a new 5-output head, the head
+initialised from the 20-class weights by averaging each AVR class's
+constituents. 184,133 of 919,809 parameters train. 3 epochs, ~10 scan/s on MPS,
+under 4 minutes. Scored on 271 held-out scans through the identical projection →
+inference → k-NN reprojection path as production.
+
+| | pretrained | inverse-freq | uniform |
+|---|---:|---:|---:|
+| mIoU | **0.8454** | 0.8303 | 0.8384 |
+| point accuracy | **0.9409** | 0.9339 | 0.9286 |
+| object recall | 0.9145 | **0.9427** | 0.8978 |
+| STATIC_OBSTACLE IoU | 0.7310 | 0.7341 | **0.7490** |
+| DYNAMIC_OBJECT IoU | 0.8006 | 0.7753 | **0.8262** |
+| DRIVABLE IoU | **0.9569** | 0.9283 | 0.9026 |
+
+**Neither weighting beats the pretrained network on mIoU, so `config.yaml` still
+points at the ONNX and nothing changed in the pipeline.** Both variants improve
+the two hard classes and lose more on DRIVABLE than they gain — coherent, since
+DRIVABLE is 34% of the points and a frozen backbone with 3 epochs on 700 scans
+moves the boundary toward the rare classes at its expense. The inverse-frequency
+run did exactly what its weights asked (recall +2.8 points); mIoU was not what
+it optimised. I ran the uniform variant specifically so "fine-tuning does not
+help here" has two data points rather than one.
+
+The honest framing for the deck: **the pretrained network is already at the
+accuracy this dataset supports for a frozen-backbone budget**, and Day 10's
+value is knowing that rather than guessing it.
+
+---
+
+### Day 11's runner work
+
+**`--seq 00 04 05` is one run, not three added up afterwards.** The confusion
+matrices pool into a single accumulator, so the headline is the real pooled
+figure and not a mean of means over sequences of different lengths. Per-sequence
+blocks and the spread land in §11.3.1:
+
+| | mean | sd | spread |
+|---|---:|---:|---:|
+| mIoU | 0.866 | 0.022 | 2.6% |
+| point accuracy | 0.934 | 0.010 | 1.0% |
+| object recall | 0.924 | 0.010 | 1.1% |
+
+Pooled headline mIoU **0.878** over 971 scans. This replaces the three-runs-
+aggregated-by-hand table from Day 7, which was the remaining Day 11 piece.
+
+**Warm-up is discarded and counted.** The seq-05 46.9 ms max against a 5.9 ms
+median was first-touch page faults on the freshly-appended cache mmap. One
+window *per sequence*, not per process — a new sequence touches a new region, so
+without that the pooled worst case is sequence 2's first frame. 15 scans
+discarded across 3 boundaries, stated in §11.2 rather than quietly dropped, and
+FR-32 counts *scored* scans so 956 of 971 is what the claim rests on.
+
+It is opt-in: `LatencyRecorder`'s default is 0. An instrument that silently
+throws away its first five observations is a trap for its next caller, so
+discarding warm-up is a benchmark policy and the benchmark passes it in. It is
+also capped at a tenth of the run — a 3-scan debug run with a 5-frame warm-up
+discarded everything and reported no latency at all, which is worse than the
+page faults, because the run looks like it succeeded.
+
+**Peak RSS is measured: 292.6 MB.** The last `_not measured_` in the file. It
+comes from `getrusage`'s high-water mark rather than sampling RSS after the
+loop, which only finds the peak if the peak happened to be at the end.
+`ru_maxrss` is bytes on Darwin and kibibytes on Linux — a units bug that reports
+a 1024x wrong number rather than failing, so the platform is checked. §11.1 says
+the figure is the whole benchmark process and therefore an upper bound.
+
+---
+
+### Three things that were broken and are not any more
+
+- **`make bench --mode network` had never run.** `_build_segmenter` called
+  `OnnxSegmenter(cfg=cfg)`, and `model_path` is positional with no default, so
+  it raised `TypeError` the moment anyone tried it. Nobody had.
+- **`main` was red.** `psutil` and `uvicorn` are both in
+  `backend/requirements.txt` and neither was installed in `backend/.venv`, so
+  two tests failed on import and `server/app.py` could not be imported at all.
+  Every pin now installs and imports. **If your venv predates today, re-run
+  `pip install -r backend/requirements.txt`.**
+- **`tests/test_synth.py::test_all_five_scenes_are_present`** now expects seven.
+
+---
+
+### For the standup
+
+1. **Anuj** — OVERHANG, above. Yours, with the measurement already in place.
+2. **Anuj** — `_ground_reference` in `core/cell.py` is my edit to your file, and
+   `config.yaml` gained `hazards.ref_*` and `decision.tracker.*`. Both
+   documented in place; shout if you would rather own the change.
+3. **Everyone** — reinstall requirements.
+4. **Shubham, Navya, Khanak, Veda** — `docs/progress/` still has four empty
+   files on Day 7. The backend is four days ahead of the board and the other
+   four tracks are unmeasured, which is the real risk item, not anything above.
+5. Day 12's authoritative run is `make bench-authoritative`. It takes 25 s, so
+   the Day 12 slot is handover and MongoDB persistence, not compute.
+
+---
+
 ## Day 7 (early) · Mon 31 Aug 2026 — `make bench` exists and produces real numbers
 
 Day 8's `bench/distance_bins.py` and Day 11's `bench/report.py` landed today,

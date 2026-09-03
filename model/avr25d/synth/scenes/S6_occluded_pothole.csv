@@ -1,0 +1,49 @@
+# S6_occluded_pothole — adversarial negative obstacle (Day 9, FR-14, FR-16).
+#
+# S2 asks whether the representation can measure a pothole.  S6 asks whether it
+# can measure the half of a pothole it is allowed to see, which is the case that
+# occurs on a real road: potholes sit near stopped traffic, and stopped traffic
+# casts a hard shadow across the lane behind it.
+#
+# ONE VARIABLE.  This is S2 with occlusion added and nothing else changed —
+# same 1.4 m x 1.0 m pit, same 0.22 m depth, same flush rim, same
+# NON_DRIVABLE_TERRAIN floor, and deliberately **the same 12.0 m range**.  The
+# range matters more than it looks: a pit is measurable only where a beam can
+# reach its floor, and the grazing angle falls as atan(h/r), from 8.1 deg at
+# 12 m to 6.1 deg at 16 m.  A first draft of this scene put the pit at 16 m and
+# measured a depth error of 0.14 m — but that was the range doing it, not the
+# occlusion, and the two would have been reported as one effect.  Holding r
+# fixed is what makes S2 vs S6 a controlled comparison.
+#
+# WHERE THE SHADOW EDGE FALLS.  The car occupies y in [0, 1.8] over x in
+# [5.75, 10.25].  Its silhouette from the sensor runs to the azimuth of its far
+# corner, atan(1.8/5.75) = 17.4 deg, and everything inside that wedge is dark:
+# a ray reaching the road at 12 m passes z = -1.13 m at the car's range while
+# the car's roof is at -0.20 m, so the ray is under the roof and stops there.
+# At r = 12 the wedge edge is at y = 3.59 m.  The pit is centred at
+# (11.38, 3.80) so that the edge cuts through it, leaving the near half in
+# shadow and the far half lit.
+#
+# MEASURED, over a sweep of pit positions across the wedge edge:
+#
+#     lit fraction   0%      7%      30%     53%     75%
+#     pit returns    4       12      25      41      49
+#     depth error    0.158   0.095   0.003   0.005   0.004
+#
+# So depth survives occlusion until almost nothing is left, and then fails
+# abruptly — because depth depends on whether *any* beam reaches the floor, not
+# on how many do.  53% is chosen as the operating point: hard enough that a
+# detector relying on cell population fails it, not so hard that every possible
+# implementation fails it.  A scene whose answer is always "no" tests nothing.
+#
+# The car is DYNAMIC_OBJECT with zero velocity — a stopped vehicle, not street
+# furniture — so the tracker is offered a candidate it must not adopt as a
+# moving track.
+#
+# Convention: x,y,z is the CENTRE, sx,sy,sz are FULL extents, road frame.
+# A pit spanning z in [-0.22, 0] — rim flush with the road — is z=-0.11, sz=0.22.
+# frames: 1
+type,x,y,z,sx,sy,sz,class,vx,vy,hazard,note
+plane,0,0,0,200,200,0,1,0,0,,road surface
+box,8.0,0.9,0.75,4.5,1.8,1.50,4,0,0,,stopped car — the occluder; its silhouette edge cuts the pit in half
+pit,11.38,3.80,-0.11,1.4,1.0,0.22,2,0,0,pothole,pothole — 0.22 m deep at 12.0 m, 53% of it in shadow

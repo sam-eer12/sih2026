@@ -1,1 +1,6 @@
 .DS_Store
+
+# tools/ has no package of its own; importing export_onnx from finetune.py
+# leaves a __pycache__ beside it.
+__pycache__/
+*.py[cod]

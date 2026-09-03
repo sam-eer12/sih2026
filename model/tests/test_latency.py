@@ -183,3 +183,111 @@ def test_default_clock_measures_real_elapsed_time():
     out = rec.summary()
     assert out["stages"]["work"]["mean_ms"] > 0.0
     assert out["end_to_end"]["mean_ms"] >= out["stages"]["work"]["mean_ms"]
+
+
+# ---------------------------------------------------------------------------
+# Warm-up discard (Day 11 — the seq-05 46.9 ms page-fault artefact)
+# ---------------------------------------------------------------------------
+
+class TestWarmup:
+    """The recorder must not discard anything unless it is asked to.
+
+    An instrument that silently drops its first five observations is a trap for
+    whoever picks it up next, so the default is zero and the benchmark opts in.
+    """
+
+    @staticmethod
+    def _clock_over(durations_s):
+        """A clock that makes frame i take durations_s[i]."""
+        t = [0.0]
+        seq = iter(durations_s)
+
+        def clock():
+            # Called twice per frame: entry, then exit.
+            clock.calls += 1
+            if clock.calls % 2 == 0:
+                t[0] += next(seq)
+            return t[0]
+        clock.calls = 0
+        return clock
+
+    def test_default_discards_nothing(self):
+        rec = lat.LatencyRecorder(clock=self._clock_over([0.010]))
+        with rec.frame():
+            pass
+        out = rec.summary()
+        assert out["n_frames"] == 1
+        assert out["n_warmup_discarded"] == 0
+
+    def test_warmup_frames_are_excluded_from_the_statistics(self):
+        # One 100 ms cold frame, then four 10 ms ones.
+        rec = lat.LatencyRecorder(
+            clock=self._clock_over([0.100, 0.010, 0.010, 0.010, 0.010]),
+            warmup_frames=1,
+        )
+        for _ in range(5):
+            with rec.frame():
+                pass
+        out = rec.summary()
+        assert out["n_frames"] == 4
+        assert out["n_warmup_discarded"] == 1
+        assert out["end_to_end"]["max_ms"] == pytest.approx(10.0, abs=1e-6), (
+            "the cold frame is still in the worst case"
+        )
+
+    def test_warmup_frames_stages_are_excluded_too(self):
+        """Otherwise the stage medians and end_to_end measure different sets."""
+        rec = lat.LatencyRecorder(warmup_frames=2)
+        for _ in range(5):
+            with rec.frame():
+                with rec.stage("work"):
+                    pass
+        out = rec.summary()
+        assert out["stages"]["work"]["n"] == out["end_to_end"]["n"] == 3
+
+    def test_restart_warmup_opens_another_window(self):
+        """A multi-sequence run pays the page-fault cost once per sequence."""
+        rec = lat.LatencyRecorder(warmup_frames=2)
+        for _ in range(2):          # "sequence" one
+            for _ in range(5):
+                with rec.frame():
+                    pass
+            rec.restart_warmup()
+        out = rec.summary()
+        assert out["n_warmup_windows"] == 2
+        assert out["n_warmup_discarded"] == 4
+        assert out["n_frames"] == 6
+
+    def test_fr32_counts_scored_scans_not_raw_ones(self):
+        """200 scans of which 5 are warm-up is 195 scored scans, not 200."""
+        rec = lat.LatencyRecorder(warmup_frames=5)
+        for _ in range(lat.MIN_SCANS_FR32):
+            with rec.frame():
+                pass
+        out = rec.summary()
+        assert out["n_frames"] == lat.MIN_SCANS_FR32 - 5
+        assert out["meets_fr32"] is False
+
+    def test_warmup_is_capped_at_a_tenth_of_the_run(self):
+        """A 3-scan debug run must not discard all three.
+
+        Discarding everything leaves an empty latency section on a run that
+        otherwise looks successful, which is a worse failure than the page
+        faults the warm-up exists to exclude.
+        """
+        assert lat.warmup_for(3) == 0
+        assert lat.warmup_for(40) == 4
+        assert lat.warmup_for(271) == lat.BENCH_WARMUP_FRAMES
+        assert lat.warmup_for(0) == 0
+
+    def test_restart_warmup_can_resize_the_window(self):
+        rec = lat.LatencyRecorder(warmup_frames=0)
+        with rec.frame():
+            pass
+        rec.restart_warmup(2)
+        for _ in range(4):
+            with rec.frame():
+                pass
+        out = rec.summary()
+        assert out["n_frames"] == 3          # 1 before + 2 after the 2 discarded
+        assert out["n_warmup_discarded"] == 2

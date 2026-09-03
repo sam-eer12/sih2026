@@ -463,7 +463,11 @@ class CellGrid:
         # neighbourhood (all bins in the same ring).
         # A cell is a negative obstacle if its z_ground is more than
         # tau_pothole below the ring median.
-        ring_median_z = self._ring_median_z_ground(z_gnd_safe, occ, grid)
+        ring_median_z = self._ground_reference(
+            z_gnd_safe, occ, grid,
+            min_fill=float(cfg.hazards.ref_ring_min_fill),
+            n_ref_rings=int(cfg.hazards.ref_rings),
+        )
         neg_obs_mask = (
             occ
             & np.isfinite(z_gnd)
@@ -490,33 +494,77 @@ class CellGrid:
         )
         self.flags[overhang_mask] |= FLAG_OVERHANG
 
-    # ── ring-median helper ─────────────────────────────────────────────────
+    # ── ground-reference helper ────────────────────────────────────────────
 
-    def _ring_median_z_ground(
+    def _ground_reference(
         self,
         z_gnd_safe: np.ndarray,
         occ:        np.ndarray,
         grid:       RingGrid,
+        min_fill:   float,
+        n_ref_rings: int,
     ) -> np.ndarray:
-        """Compute the median z_ground of all occupied cells in each ring.
+        """Local road level for every cell, for the FR-14 pothole test.
 
-        Returns a float64 array of shape (n_cells,) where each cell carries
-        the median of its ring.  Unoccupied rings get 0.
+        Returns float64[n_cells]: each cell carries the median ``z_ground`` of
+        the *ring neighbourhood* around it — the median of the per-ring medians
+        of the ``n_ref_rings`` nearest rings that are populated enough to mean
+        anything.
+
+        Why not the cell's own ring, which is what this used to be
+        ----------------------------------------------------------
+        Because a pit populates rings that nothing else does.  Ground returns
+        land at discrete ranges — successive beams strike the road r²·δ/h apart,
+        0.65 m at 12 m — so the rings between two beam hits are empty.  A pit's
+        far inner wall sits a little further out than the beam ring that lit it,
+        which puts its returns in exactly one of those otherwise-empty rings.
+        The ring's median is then the pit floor, the drop against it is zero,
+        and NEGATIVE_OBSTACLE never fires on the deepest cells in the scene.
+
+        Measured on ``S2_pothole`` before this change: ring 248 held 15 occupied
+        cells out of 1257 bins, all 15 inside the pothole, median -1.8125 m.
+        The 0.22 m hole read as a 0.005 m dip.  The neighbouring beam-lit ring
+        247 held 435 cells with median -1.7033 m, which is the road, and is the
+        reference the requirement means.
+
+        The population gate is what separates the two: a ring qualifies as a
+        reference only if ``min_fill`` of its bins are occupied.
         """
-        n = grid.n_cells
-        ring_median = np.zeros(n, dtype=np.float64)
+        n_rings = grid.n_rings
+        med   = np.zeros(n_rings, dtype=np.float64)
+        n_occ = np.zeros(n_rings, dtype=np.int64)
 
-        for k in range(grid.n_rings):
-            lo  = int(grid.offset[k])
-            hi  = int(grid.offset[k + 1])
-            occ_in_ring = occ[lo:hi]
-            if not occ_in_ring.any():
-                continue
-            z_in_ring = z_gnd_safe[lo:hi][occ_in_ring]
-            med = float(np.median(z_in_ring))
-            ring_median[lo:hi] = med
+        for k in range(n_rings):
+            lo, hi = int(grid.offset[k]), int(grid.offset[k + 1])
+            m = occ[lo:hi]
+            c = int(m.sum())
+            n_occ[k] = c
+            if c:
+                med[k] = float(np.median(z_gnd_safe[lo:hi][m]))
 
-        return ring_median
+        need = np.maximum(1, np.ceil(min_fill * grid.n_bins)).astype(np.int64)
+        usable = np.flatnonzero(n_occ >= need)
+
+        ref_of_ring = med.copy()          # fallback: the ring's own median
+        if usable.size:
+            w = min(n_ref_rings, usable.size)
+            if w == usable.size:
+                ref_of_ring[:] = float(np.median(med[usable]))
+            else:
+                # Windowed median over the usable rings, then each ring takes
+                # the window centred on its nearest usable neighbour.
+                windows = np.lib.stride_tricks.sliding_window_view(
+                    med[usable], w
+                )
+                win_med = np.median(windows, axis=1)      # len usable.size-w+1
+                pos = np.searchsorted(usable, np.arange(n_rings))
+                start = np.clip(pos - w // 2, 0, win_med.size - 1)
+                ref_of_ring = win_med[start]
+
+        out = np.zeros(grid.n_cells, dtype=np.float64)
+        for k in range(n_rings):
+            out[int(grid.offset[k]):int(grid.offset[k + 1])] = ref_of_ring[k]
+        return out
 
     # ── convenience ───────────────────────────────────────────────────────
 
