@@ -1,0 +1,345 @@
+{
+  "created": "2026-09-03T16:06:24+00:00",
+  "val_sequence": "04",
+  "train_sequences": [
+    "00",
+    "05"
+  ],
+  "n_val_scans": 271,
+  "before": {
+    "n_scans": 271,
+    "accuracy": {
+      "bin_edges_m": [
+        0.0,
+        10.0,
+        30.0,
+        60.0,
+        100.0
+      ],
+      "excluded_classes": [
+        "VOID"
+      ],
+      "n_points_outside_envelope": 0,
+      "overall": {
+        "n_points": 34069557,
+        "n_points_scored": 33369685,
+        "miou": 0.845409,
+        "accuracy": 0.940883,
+        "iou": {
+          "VOID": null,
+          "DRIVABLE": 0.956892,
+          "NON_DRIVABLE_TERRAIN": 0.893166,
+          "STATIC_OBSTACLE": 0.730954,
+          "DYNAMIC_OBJECT": 0.800623
+        },
+        "truth_share": {
+          "VOID": 0.020542,
+          "DRIVABLE": 0.3392,
+          "NON_DRIVABLE_TERRAIN": 0.501366,
+          "STATIC_OBSTACLE": 0.126009,
+          "DYNAMIC_OBJECT": 0.012883
+        }
+      },
+      "bins": {
+        "0-10m": {
+          "n_points": 17540281,
+          "n_points_scored": 17528774,
+          "miou": 0.877314,
+          "accuracy": 0.971712,
+          "iou": {
+            "VOID": null,
+            "DRIVABLE": 0.970746,
+            "NON_DRIVABLE_TERRAIN": 0.945371,
+            "STATIC_OBSTACLE": 0.684798,
+            "DYNAMIC_OBJECT": 0.90834
+          },
+          "truth_share": {
+            "VOID": 0.000656,
+            "DRIVABLE": 0.464115,
+            "NON_DRIVABLE_TERRAIN": 0.492015,
+            "STATIC_OBSTACLE": 0.037462,
+            "DYNAMIC_OBJECT": 0.005751
+          }
+        },
+        "10-30m": {
+          "n_points": 13827415,
+          "n_points_scored": 13825889,
+          "miou": 0.846319,
+          "accuracy": 0.91971,
+          "iou": {
+            "VOID": null,
+            "DRIVABLE": 0.933874,
+            "NON_DRIVABLE_TERRAIN": 0.858476,
+            "STATIC_OBSTACLE": 0.770001,
+            "DYNAMIC_OBJECT": 0.822925
+          },
+          "truth_share": {
+            "VOID": 0.00011,
+            "DRIVABLE": 0.229243,
+            "NON_DRIVABLE_TERRAIN": 0.520778,
+            "STATIC_OBSTACLE": 0.228835,
+            "DYNAMIC_OBJECT": 0.021033
+          }
+        },
+        "30-60m": {
+          "n_points": 2390366,
+          "n_points_scored": 2015022,
+          "miou": 0.662856,
+          "accuracy": 0.817979,
+          "iou": {
+            "VOID": null,
+            "DRIVABLE": 0.806459,
+            "NON_DRIVABLE_TERRAIN": 0.741538,
+            "STATIC_OBSTACLE": 0.572127,
+            "DYNAMIC_OBJECT": 0.531301
+          },
+          "truth_share": {
+            "VOID": 0.157024,
+            "DRIVABLE": 0.102847,
+            "NON_DRIVABLE_TERRAIN": 0.523018,
+            "STATIC_OBSTACLE": 0.197358,
+            "DYNAMIC_OBJECT": 0.019754
+          }
+        },
+        "60-100m": {
+          "n_points": 311495,
+          "n_points_scored": 0,
+          "miou": null,
+          "accuracy": null,
+          "iou": {
+            "VOID": null,
+            "DRIVABLE": null,
+            "NON_DRIVABLE_TERRAIN": null,
+            "STATIC_OBSTACLE": null,
+            "DYNAMIC_OBJECT": null
+          },
+          "truth_share": {
+            "VOID": 1.0,
+            "DRIVABLE": 0.0,
+            "NON_DRIVABLE_TERRAIN": 0.0,
+            "STATIC_OBSTACLE": 0.0,
+            "DYNAMIC_OBJECT": 0.0
+          }
+        }
+      }
+    },
+    "object_recall": {
+      "min_points": 5,
+      "hit_fraction": 0.5,
+      "n_objects_below_min_points": 55,
+      "overall": {
+        "n_objects": 1204,
+        "n_recalled": 1101,
+        "recall": 0.914452
+      },
+      "bins": {
+        "0-10m": {
+          "n_objects": 46,
+          "n_recalled": 46,
+          "recall": 1.0
+        },
+        "10-30m": {
+          "n_objects": 780,
+          "n_recalled": 770,
+          "recall": 0.987179
+        },
+        "30-60m": {
+          "n_objects": 378,
+          "n_recalled": 285,
+          "recall": 0.753968
+        },
+        "60-100m": {
+          "n_objects": 0,
+          "n_recalled": 0,
+          "recall": null
+        }
+      },
+      "classes": {
+        "STATIC_OBSTACLE": {
+          "n_objects": 0,
+          "n_recalled": 0,
+          "recall": null
+        },
+        "DYNAMIC_OBJECT": {
+          "n_objects": 1204,
+          "n_recalled": 1101,
+          "recall": 0.914452
+        }
+      }
+    }
+  },
+  "after": {
+    "n_scans": 271,
+    "accuracy": {
+      "bin_edges_m": [
+        0.0,
+        10.0,
+        30.0,
+        60.0,
+        100.0
+      ],
+      "excluded_classes": [
+        "VOID"
+      ],
+      "n_points_outside_envelope": 0,
+      "overall": {
+        "n_points": 34069557,
+        "n_points_scored": 33369685,
+        "miou": 0.838397,
+        "accuracy": 0.92862,
+        "iou": {
+          "VOID": null,
+          "DRIVABLE": 0.902647,
+          "NON_DRIVABLE_TERRAIN": 0.875828,
+          "STATIC_OBSTACLE": 0.748962,
+          "DYNAMIC_OBJECT": 0.826152
+        },
+        "truth_share": {
+          "VOID": 0.020542,
+          "DRIVABLE": 0.3392,
+          "NON_DRIVABLE_TERRAIN": 0.501366,
+          "STATIC_OBSTACLE": 0.126009,
+          "DYNAMIC_OBJECT": 0.012883
+        }
+      },
+      "bins": {
+        "0-10m": {
+          "n_points": 17540281,
+          "n_points_scored": 17528774,
+          "miou": 0.869555,
+          "accuracy": 0.954315,
+          "iou": {
+            "VOID": null,
+            "DRIVABLE": 0.928357,
+            "NON_DRIVABLE_TERRAIN": 0.914284,
+            "STATIC_OBSTACLE": 0.711765,
+            "DYNAMIC_OBJECT": 0.923814
+          },
+          "truth_share": {
+            "VOID": 0.000656,
+            "DRIVABLE": 0.464115,
+            "NON_DRIVABLE_TERRAIN": 0.492015,
+            "STATIC_OBSTACLE": 0.037462,
+            "DYNAMIC_OBJECT": 0.005751
+          }
+        },
+        "10-30m": {
+          "n_points": 13827415,
+          "n_points_scored": 13825889,
+          "miou": 0.838227,
+          "accuracy": 0.912954,
+          "iou": {
+            "VOID": null,
+            "DRIVABLE": 0.855865,
+            "NON_DRIVABLE_TERRAIN": 0.852981,
+            "STATIC_OBSTACLE": 0.79482,
+            "DYNAMIC_OBJECT": 0.849241
+          },
+          "truth_share": {
+            "VOID": 0.00011,
+            "DRIVABLE": 0.229243,
+            "NON_DRIVABLE_TERRAIN": 0.520778,
+            "STATIC_OBSTACLE": 0.228835,
+            "DYNAMIC_OBJECT": 0.021033
+          }
+        },
+        "30-60m": {
+          "n_points": 2390366,
+          "n_points_scored": 2015022,
+          "miou": 0.626774,
+          "accuracy": 0.812584,
+          "iou": {
+            "VOID": null,
+            "DRIVABLE": 0.671403,
+            "NON_DRIVABLE_TERRAIN": 0.757755,
+            "STATIC_OBSTACLE": 0.518183,
+            "DYNAMIC_OBJECT": 0.559756
+          },
+          "truth_share": {
+            "VOID": 0.157024,
+            "DRIVABLE": 0.102847,
+            "NON_DRIVABLE_TERRAIN": 0.523018,
+            "STATIC_OBSTACLE": 0.197358,
+            "DYNAMIC_OBJECT": 0.019754
+          }
+        },
+        "60-100m": {
+          "n_points": 311495,
+          "n_points_scored": 0,
+          "miou": null,
+          "accuracy": null,
+          "iou": {
+            "VOID": null,
+            "DRIVABLE": null,
+            "NON_DRIVABLE_TERRAIN": null,
+            "STATIC_OBSTACLE": null,
+            "DYNAMIC_OBJECT": null
+          },
+          "truth_share": {
+            "VOID": 1.0,
+            "DRIVABLE": 0.0,
+            "NON_DRIVABLE_TERRAIN": 0.0,
+            "STATIC_OBSTACLE": 0.0,
+            "DYNAMIC_OBJECT": 0.0
+          }
+        }
+      }
+    },
+    "object_recall": {
+      "min_points": 5,
+      "hit_fraction": 0.5,
+      "n_objects_below_min_points": 55,
+      "overall": {
+        "n_objects": 1204,
+        "n_recalled": 1081,
+        "recall": 0.897841
+      },
+      "bins": {
+        "0-10m": {
+          "n_objects": 46,
+          "n_recalled": 46,
+          "recall": 1.0
+        },
+        "10-30m": {
+          "n_objects": 780,
+          "n_recalled": 773,
+          "recall": 0.991026
+        },
+        "30-60m": {
+          "n_objects": 378,
+          "n_recalled": 262,
+          "recall": 0.693122
+        },
+        "60-100m": {
+          "n_objects": 0,
+          "n_recalled": 0,
+          "recall": null
+        }
+      },
+      "classes": {
+        "STATIC_OBSTACLE": {
+          "n_objects": 0,
+          "n_recalled": 0,
+          "recall": null
+        },
+        "DYNAMIC_OBJECT": {
+          "n_objects": 1204,
+          "n_recalled": 1081,
+          "recall": 0.897841
+        }
+      }
+    }
+  },
+  "delta": {
+    "miou": -0.007012,
+    "point_accuracy": -0.012263,
+    "object_recall": -0.016611
+  },
+  "training": {
+    "epochs": 3,
+    "lr": 0.001,
+    "seed": 20260906,
+    "weighting": "uniform"
+  },
+  "note": "before is the pretrained 20-class network merged to 5 by labelmap; after is the same backbone with a fine-tuned decoder and a 5-output head. Both are scored on sequence 04, which neither was trained on, through the identical projection, inference and k-NN reprojection path."
+}

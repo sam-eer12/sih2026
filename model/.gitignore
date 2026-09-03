@@ -14,6 +14,24 @@ data/models/*
 !data/models/*.onnx
 !data/models/NOTICE.md
 
+# ...and the Day 10 fine-tuned weights, 3.6 MB each. They are committed as
+# *evidence*, not as something the pipeline loads: neither beats the pretrained
+# network on mIoU, config.yaml still points at the ONNX, and the point of
+# keeping them is that "we tried and it did not help" is a claim someone can
+# check rather than take on trust. Reproducing them costs a 4-minute train and
+# a 6-minute eval, which is cheap but not free, and the result is seed-
+# dependent.
+!data/models/*.pt
+
+# The split manifest and the evaluations that judged those weights. A few kB,
+# and without them the .pt files are unexplained binaries: the manifest says
+# which sequences trained and which validated, the reports say what the answer
+# was. Same rule as the models — provenance travels with the artefact.
+!data/splits/
+data/splits/*
+!data/splits/*.json
+!data/finetune_report*.json
+
 __pycache__/
 *.py[cod]
 *.egg-info/
