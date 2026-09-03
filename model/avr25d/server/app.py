@@ -58,6 +58,11 @@ from ..bench.baselines import (
     BYTES_PER_CELL,
     b1_dense_uniform_25d,
 )
+from ..decision.traversability import score as _trav_score
+from ..decision.tracker import Tracker as _Tracker
+from ..decision.costmap import build_costmap as _build_costmap
+from ..decision.planner import plan as _plan
+from ..decision.explain import make_context as _make_context, explain as _explain
 from ..core.grid import RingGrid
 from ..core.cell import CellGrid
 from ..perception.labelmap import raw_is_moving, raw_to_avr, split_label
@@ -256,6 +261,7 @@ class PipelineWorker:
         # ── frame loop ────────────────────────────────────────────────────
         target_dt = 1.0 / float(cfg.runtime.target_fps)
         frame_idx = 0
+        tracker   = _Tracker()   # persists across frames for stable track IDs
 
         try:
             while not self._stop_event.is_set():
@@ -291,10 +297,42 @@ class PipelineWorker:
                 # ── build wire arrays ──────────────────────────────────────
                 t3 = time.perf_counter()
                 cell_arrays = _build_cell_arrays(cells, grid)
-                t_refine  = 0.0   # core/refine.py — Day 9 work
-                t_decision = 0.0  # decision layer — Day 7–8 work
-                decision   = _placeholder_decision()
-                tracks: list[Track] = []
+
+                # ── refinement (core/refine.py) ───────────────────────────
+                # Imported lazily — server starts even if refine.py is absent.
+                t_refine_start = time.perf_counter()
+                refined_arrays = RefinedArrays.empty()
+                try:
+                    from ..core.refine import refine as _refine
+                    overlay = _refine(cells, grid, cfg)
+                    if overlay is not None and overlay.n > 0:
+                        refined_arrays = overlay.to_refined_arrays()
+                except ImportError:
+                    pass   # refine.py not wired yet — silent fallback
+                t_refine = (time.perf_counter() - t_refine_start) * 1000.0
+
+                # ── decision layer ────────────────────────────────────────
+                t_dec_start = time.perf_counter()
+                try:
+                    trav         = _trav_score(cells, cfg)
+                    tracks       = tracker.update(cells, grid, dt=target_dt)
+                    cm           = _build_costmap(cells, trav, tracks, grid, cfg)
+                    primary, alt = _plan(cm, None, cfg)
+                    ctx          = _make_context(primary, alt, tracks, cfg)
+                    reason       = _explain(ctx)
+                    decision     = Decision(
+                        route       = primary.waypoints,
+                        alternative = alt.waypoints,
+                        selected    = ctx.selected,
+                        risk        = ctx.risk,
+                        eta_s       = round(primary.length_m / max(8.0, 0.1), 1),
+                        reason      = reason,
+                    )
+                except Exception as exc:
+                    logger.debug("decision layer error: %s", exc)
+                    decision = _placeholder_decision()
+                    tracks   = []
+                t_decision = (time.perf_counter() - t_dec_start) * 1000.0
 
                 # ── serialise ─────────────────────────────────────────────
                 t4 = time.perf_counter()
@@ -327,7 +365,7 @@ class PipelineWorker:
                     t_sec    = round(frame_idx * target_dt, 4),
                     mode     = mode,
                     cells    = cell_arrays,
-                    refined  = RefinedArrays.empty(),
+                    refined  = refined_arrays,
                     tracks   = tracks,
                     decision = decision,
                     stats    = frame_stats,
