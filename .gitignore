@@ -4,3 +4,7 @@
 # leaves a __pycache__ beside it.
 __pycache__/
 *.py[cod]
+
+# Python virtualenvs — created per-developer, never committed.
+.venv/
+venv/
