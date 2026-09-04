@@ -34,6 +34,11 @@ Running: **43,946 cells/frame at 30 Hz**, 2 React renders, zero console
 errors. Keyboard: `1` raw, `3` adaptive, `E` elevation shading. `tsc --noEmit`
 and `eslint` both clean.
 
+Also corrected `HOW_TO_PROCEED_SHUBHAM.md` itself — its code skeletons did not
+match the shipping wire format or API (`564695f`). Details in §1 and §5 below.
+
+Commits: `ce55fba` (viewer), `564695f` (guide corrections).
+
 ---
 
 ### Acceptance
@@ -70,11 +75,19 @@ embed it now.
 
 ### Decisions and surprises
 
-**1. `HOW_TO_PROCEED_SHUBHAM.md`'s skeletons do not match the wire format.**
-The `instancedCells.ts` skeleton reads `cells.cx/cy/dx/dy`. Those fields do
+**1. `HOW_TO_PROCEED_SHUBHAM.md`'s skeletons did not match the wire format.
+— FIXED in `564695f`.**
+The `instancedCells.ts` skeleton read `cells.cx/cy/dx/dy`. Those fields do
 not exist. `protocol.py` sends `ring` and `bin`; centres and extents must be
-derived client-side. This is why `ringGeometry.ts` exists. **The document
-should be corrected before anyone else follows it.**
+derived client-side. This is why `ringGeometry.ts` exists.
+
+The guide now carries a **Module 2.5** documenting the derivation, which grid
+to port, and how to verify it. Also corrected there: the header pointed at
+`frontend/app/components/viewer/` (real path is `frontend/components/viewer/`),
+the ring-overlay section told me to hardcode ring radii or wait on Anuj
+(`RING_INNER_RADIUS` already has all 662), and the stream facts were wrong —
+it is ~42,000 cells and ~1.1 MB per frame, and `frame_id` does not start at 0
+because the generator free-runs whether or not anyone is connected.
 
 **2. `fixtures.py` and `core/grid.py` compute different grids.** This one
 matters and is for Anuj.
@@ -100,7 +113,7 @@ equivalent at demo zoom and it is the documented R-4 fallback — but if a judge
 asks for genuinely raw points, **Anuj has to add a points array to the
 protocol**, and `protocol.py` is frozen after Day 1. Raise at checkpoint.
 
-**5. Three bugs in the skeleton code, worth not rediscovering:**
+**5. Three bugs in the skeleton code — all now fixed in the guide too:**
 - `useThreeScene` returned `handleRef.current`, which is `null` during the
   only render the component ever does — so the handle was permanently
   unreachable. Now returns the ref object.
@@ -115,11 +128,23 @@ protocol**, and `protocol.py` is frozen after Day 1. Raise at checkpoint.
 the CPU and the bounding sphere is never recomputed, so Three culls the entire
 mesh the moment the camera moves.
 
-**7. The document's T-W7 render-counter snippet fails lint.** React 19's
-`react-hooks/refs` rejects writing a ref during render. Counting inside a
-`useEffect` with no dependency array measures the same thing and passes.
+**7. The document's T-W7 render-counter snippet fails lint. — FIXED.** React
+19's `react-hooks/refs` rejects writing a ref during render, and `next lint`
+fails the build on it. Counting inside a `useEffect` with no dependency array
+measures the same thing and passes. Expect **2** in dev — StrictMode renders
+twice on mount — so the "< 10" budget has less headroom than it looks.
 
 **8. `backend/.venv/` was not gitignored.** Added to root `.gitignore` before
 someone committed a few hundred MB.
+
+**9. What I did NOT verify: anything visual.** Every claim above comes from
+`tsc`, `eslint`, and the dev-server console — compiles clean, stream running,
+zero errors. Nobody has actually looked at the canvas yet. First thing
+tomorrow, before building on top of it.
+
+**10. Frame rate is unmeasured.** "30 Hz" throughout is the *push* rate of the
+synthetic generator, not a rendered FPS. T-V6 (≥30 FPS at 100k instances) is
+untested. `devFrames.ts` takes a density knob — `0.5` yields ~109,000 cells,
+which is the T-V6 target, so the stress test is one constant away.
 
 ---

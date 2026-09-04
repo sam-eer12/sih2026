@@ -653,32 +653,46 @@ growing by factor 1.005.
 
 ## Build Checklist — Tick These Off In Order
 
+`[x]` done · `[~]` partial, reason in brackets · `[ ]` not started
+
+**Last updated: Day 8, Fri 4 Sep 2026.**
+
 ```
-[ ] 1.  npm install + npm install three @types/three
-[ ] 2.  npm run dev  →  default page loads at localhost:3000
-[ ] 3.  Backend venv created + activated
-[ ] 4.  pip install -r backend/requirements.txt && pip install -e model/
+[x] 1.  npm install + npm install three @types/three
+[x] 2.  npm run dev  →  default page loads at localhost:3000
+[x] 3.  Backend venv created + activated
+[x] 4.  pip install -r backend/requirements.txt && pip install -e model/
 
-[ ] 5.  Create lib/palette.ts (class colours, single source of truth)
-[ ] 6.  mkdir components/viewer/
-[ ] 7.  Write useThreeScene.ts (renderer, scene, camera, orbit controls)
-[ ] 8.  Write Viewer.tsx (canvas ref component)
-[ ] 9.  Create app/dashboard/page.tsx importing <Viewer />
-[ ] 10. Verify: dark scene with grid helper and orbit controls in browser
+[x] 5.  Create lib/palette.ts (class colours, single source of truth)
+[x] 6.  mkdir components/viewer/
+[x] 7.  Write useThreeScene.ts (renderer, scene, camera, orbit controls)
+[x] 8.  Write Viewer.tsx (canvas ref component)
+[x] 9.  Create app/dashboard/page.tsx importing <Viewer />
+[~] 10. Verify: dark scene with grid helper and orbit controls in browser
+        [compiles clean, stream running, zero console errors — but nobody
+         has actually LOOKED at the canvas yet. Do this first tomorrow.]
 
-[ ] 11. Write ringGeometry.ts — verify 662 rings / 705,771 cells / 100.166046
-[ ] 11b. Write instancedCells.ts
-[ ] 12. Render ~42,000 fixture cells as one InstancedMesh
+[x] 11. Write ringGeometry.ts — verify 662 rings / 705,771 cells / 100.166046
+        [all three match RingGrid exactly]
+[x] 11b. Write instancedCells.ts
+[~] 12. Render ~42,000 fixture cells as one InstancedMesh
+        [43,946 cells/frame rendering; frame rate NOT measured]
         → EXIT CRITERION DAY 1: fixture cells render at interactive frame rate
+          [cells render; "interactive frame rate" unproven until FPS measured]
 
-[ ] 13. Class colouring from palette.ts
-[ ] 14. Per-instance sizing from ring extents (radial × tangential)
-[ ] 15. Elevation-shading toggle
-        → EXIT CRITERION DAY 2: cells correctly sized at every range
+[x] 13. Class colouring from palette.ts
+[x] 14. Per-instance sizing from ring extents (radial × tangential)
+[x] 15. Elevation-shading toggle              [press E; plasma ramp]
+        → EXIT CRITERION DAY 2: cells correctly sized at every range  ✓ MET
 
-[ ] 16. View 1 (raw point cloud) on real streamed frames
-[ ] 17. View 3 (adaptive grid) on real streamed frames
+[~] 16. View 1 (raw point cloud) on real streamed frames
+[~] 17. View 3 (adaptive grid) on real streamed frames
+        [both render, but on SYNTHETIC frames from __dev__/devFrames.ts.
+         Real frames need Navya's lib/protocol.ts to decode the binary payload.]
         → EXIT CRITERION DAY 3: views render real frames, class-coloured
+          [NOT MET — "real frames" is the missing half]
+
+        ─────────────── ↓ START HERE TOMORROW ↓ ───────────────
 
 [ ] 18. View 2 (uniform 5 cm grid)
         → EXIT CRITERION DAY 4: uniform view renders the same scan as View 3
