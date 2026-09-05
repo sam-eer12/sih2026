@@ -24,13 +24,35 @@ export interface FrameStats {
   [key: string]: number | string;
 }
 
+export interface Track {
+  id: number;
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  class_id: number;
+  age: number;
+  speed: number;
+  /** Future positions, [[x, y], ...] — the tracker's forward projection. */
+  predicted: number[][];
+}
+
+export interface Decision {
+  route: number[][];
+  alternative: number[][];
+  selected: 'primary' | 'alternative' | string;
+  risk: 'LOW' | 'MEDIUM' | 'HIGH' | string;
+  eta_s: number;
+  reason: string;
+}
+
 export interface FrameMessage {
   frame_id: number;
   t_sec: number;
   mode: string;
   cells: CellArrays;
   refined?: unknown;
-  tracks?: unknown[];
-  decision?: unknown;
+  tracks?: Track[];
+  decision?: Decision;
   stats?: FrameStats;
 }

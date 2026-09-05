@@ -3,9 +3,10 @@
 // React renders this component exactly ONCE.
 'use client';
 
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, useState } from 'react';
 import { useThreeScene, type SceneHandle, type ViewMode } from './useThreeScene';
 import { startDevStream } from './__dev__/devFrames';
+import WipeOverlay from './WipeOverlay';
 
 export interface ViewerProps {
   /**
@@ -35,10 +36,10 @@ const KEY_TO_VIEW: Record<string, ViewMode> = {
   '4': 'decision',
 };
 
-// Views 2 and 4 are scheduled for Days 4 and 7-8. Until then, say so out
-// loud rather than silently falling back to the adaptive grid — a view
-// that quietly shows the wrong thing is worse than one that refuses.
-const NOT_BUILT: ReadonlySet<ViewMode> = new Set<ViewMode>(['uniform', 'decision']);
+// Every view is built. Kept as a set so a future view cannot silently fall
+// back to the adaptive grid — a view that quietly shows the wrong thing is
+// worse than one that refuses.
+const NOT_BUILT: ReadonlySet<ViewMode> = new Set<ViewMode>();
 
 export default function Viewer({
   onReady,
@@ -48,6 +49,20 @@ export default function Viewer({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const handleRef = useThreeScene(canvasRef, onReady);
 
+  // wipeOn is the only React state here, and it changes on a keypress —
+  // never on a streamed frame, and never during a drag (FR-42).
+  const [wipeOn, setWipeOn] = useState(false);
+  const lineRef = useRef<HTMLDivElement>(null);
+  const knobRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    handleRef.current?.onDividerChange((x) => {
+      const pct = `${(x * 100).toFixed(3)}%`;
+      if (lineRef.current) lineRef.current.style.left = pct;
+      if (knobRef.current) knobRef.current.style.left = pct;
+    });
+  }, [handleRef, wipeOn]);
+
   // T-W7: over 300 streamed frames this must stay below 10.
   // Counted in an effect with no dependency array — that runs after every
   // render, which is exactly the thing being measured, and keeps the ref
@@ -55,10 +70,26 @@ export default function Viewer({
   const renderCount = useRef(0);
   useEffect(() => {
     renderCount.current += 1;
-    if (process.env.NODE_ENV === 'development') {
-      console.log('React renders:', renderCount.current);
-    }
   });
+
+  // T-W7 verdict, reported once 300 frames have actually streamed. Polling on
+  // a timer rather than in the render path, so measuring cannot perturb the
+  // thing being measured.
+  useEffect(() => {
+    if (process.env.NODE_ENV !== 'development') return;
+    let reported = false;
+    const timer = window.setInterval(() => {
+      const frames = handleRef.current?.getFrameCount() ?? 0;
+      if (reported || frames < 300) return;
+      reported = true;
+      const renders = renderCount.current;
+      console.log(
+        `[t-w7] ${frames} frames streamed → ${renders} React renders — ` +
+        `${renders < 10 ? 'PASS' : 'FAIL'} (limit 10)`
+      );
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [handleRef]);
 
   // TEMPORARY — delete once Navya's lib/ws.ts lands.
   useEffect(() => {
@@ -88,6 +119,24 @@ export default function Viewer({
         const next = handle.getColourMode() === 'class' ? 'elevation' : 'class';
         handle.setColourMode(next);
         console.log(`[viewer] colour → ${next}`);
+        return;
+      }
+
+      if (e.key === 'w' || e.key === 'W') {
+        const next = !handle.getWipe();
+        handle.setWipe(next);
+        setWipeOn(next);
+        console.log(`[viewer] wipe → ${next ? 'on' : 'off'}`);
+        return;
+      }
+
+      if (e.key === 'g' || e.key === 'G') {
+        const next = !handle.getGridOverlay();
+        handle.setGridOverlay(next);
+        console.log(
+          `[viewer] grid overlay → ${next ? 'on' : 'off'} ` +
+          `(${handle.getGridCapacity().toLocaleString()} cells)`
+        );
       }
     }
 
@@ -96,13 +145,16 @@ export default function Viewer({
   }, [enableKeyboard, handleRef]);
 
   return (
-    <canvas
-      ref={canvasRef}
-      style={{
-        width: '100%',
-        height: '100%',
-        display: 'block',
-      }}
-    />
+    <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+      <canvas
+        ref={canvasRef}
+        style={{
+          width: '100%',
+          height: '100%',
+          display: 'block',
+        }}
+      />
+      {wipeOn && <WipeOverlay lineRef={lineRef} knobRef={knobRef} initialDivider={0.5} />}
+    </div>
   );
 }
