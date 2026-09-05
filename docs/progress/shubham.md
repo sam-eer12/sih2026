@@ -116,10 +116,23 @@ change to `useThreeScene.ts` needs a hard reload. The drag report now prints
 its own skip count so a stale build is visible in the measurement itself.
 
 **8. `frontend/AGENTS.md` says this Next.js has breaking changes and to read
-`node_modules/next/dist/docs/` first.** I did not read it before writing
-today's code. Nearly all of it is framework-agnostic Three.js and GLSL and it
-demonstrably runs, but the instruction was skipped and should be honoured
-before the next Next-specific work.
+`node_modules/next/dist/docs/` first.** That was skipped before writing
+today's code, then done afterwards. Outcome: **no code changes needed.**
+
+The rule that could have bitten: `ssr: false` throws inside a Server
+Component and is valid only in Client Components. `app/dashboard/page.tsx`
+already carries `'use client'` above its `dynamic()` call, so it was correct.
+Checked and ruled out: async Request APIs, `middleware`→`proxy`, the caching
+APIs, `next/image` changes, parallel-route `default.js`, ESLint flat config,
+the scroll-behavior override, and the removed `experimental.dynamicIO` /
+`useCache` flags. `next build` (Turbopack, 16.3.3) is clean — no warnings, no
+deprecations, all five routes static.
+
+The reason the risk was low is worth recording: the entire frontend uses four
+Next APIs — `next/dynamic`, `next/image`, `Metadata`, `next/font/google` —
+and three of those sit in starter files nobody has touched. The viewer is
+framework-agnostic Three.js and GLSL. A process failure rather than a defect,
+but the check now exists and `next build` should be run before each commit.
 
 ---
 
