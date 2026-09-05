@@ -46,6 +46,14 @@ for (let r = 0.0; r < R_MAX; ) {
 
 export const N_RINGS = _rInner.length;   // 662
 
+/**
+ * Where ring_of switches formula. RingGrid defines this as a constant,
+ * `int(round(r_knee / s_min))` = 200 — NOT the number of rings whose inner
+ * edge falls at or inside the knee, which is 201. Using the latter shifts
+ * every outer ring by one. Verified against RingGrid.ring_of.
+ */
+const N_INNER = Math.round(R_KNEE / S_MIN);   // 200
+
 /** Inner boundary radius per ring — this is what the ring overlay draws (FR-27). */
 export const RING_INNER_RADIUS = new Float32Array(N_RINGS);
 /** Ring-centre radius per ring. */
@@ -107,4 +115,44 @@ export function ringOfCellId(cellId: number): number {
     else hi = mid - 1;
   }
   return lo;
+}
+
+// ── Inverse mapping: world position → cell ─────────────────────────
+// Ports RingGrid.ring_of / cell_of. Needed by the uniform-grid view, which
+// resamples the same scan onto a 5 cm lattice and has to ask "which adaptive
+// cell covers this point?" for every lattice site.
+
+const RATIO = 1.0 + S_MIN / R_KNEE;   // 1.005 for the §3 parameters
+const LOG_RATIO = Math.log(RATIO);
+
+/** Closed-form ring index for a radius. Returns -1 outside the envelope. */
+export function ringOfRadius(r: number): number {
+  if (!(r >= 0) || r > R_MAX) return -1;
+  const k =
+    r <= R_KNEE
+      ? Math.floor(r / S_MIN)
+      : N_INNER + Math.floor(Math.log(r / R_KNEE) / LOG_RATIO);
+  return Math.min(Math.max(k, 0), N_RINGS - 1);
+}
+
+/**
+ * Flat cell id covering world point (x, y), or -1 outside the envelope.
+ * theta is normalised to [0, 2π) and the bin clamped to N_k - 1 — without
+ * that clamp a point whose angle rounds to exactly 2π lands one past the
+ * last bin, which is the conservation bug called out in grid.py's docstring.
+ */
+export function cellIdOfPoint(x: number, y: number): number {
+  const r = Math.hypot(x, y);
+  const k = ringOfRadius(r);
+  if (k < 0) return -1;
+
+  let theta = Math.atan2(y, x);
+  if (theta < 0) theta += 2 * Math.PI;
+
+  const nBins = RING_BINS[k];
+  let j = Math.floor((theta / (2 * Math.PI)) * nBins);
+  if (j < 0) j = 0;
+  else if (j >= nBins) j = nBins - 1;
+
+  return RING_OFFSET[k] + j;
 }

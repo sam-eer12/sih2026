@@ -77,3 +77,29 @@ export function elevationRampRGB(t: number): [number, number, number] {
 
 /** Elevation range, in metres, that the ramp spans. */
 export const ELEVATION_RANGE = { min: -2.0, max: 6.0 };
+
+// ── Decision layer (View 4, FR-25) ─────────────────────────────────
+// Risk is a three-state verdict from the planner, not a continuum.
+// Distinct in greyscale as well as hue: LOW is lightest, HIGH darkest.
+
+export const RISK_COLOURS = {
+  LOW:    0x69F0AE,   // green
+  MEDIUM: 0xFFC400,   // amber
+  HIGH:   0xFF5252,   // red
+} as const;
+
+export type RiskLevel = keyof typeof RISK_COLOURS;
+
+export function riskColour(risk: string): number {
+  return RISK_COLOURS[risk as RiskLevel] ?? RISK_COLOURS.MEDIUM;
+}
+
+/** Route styling. The selected route reads as the decision; the other is context. */
+export const ROUTE_COLOURS = {
+  PRIMARY:     0x40C4FF,   // blue — the default path
+  ALTERNATIVE: 0xB388FF,   // violet — the reroute
+  UNSELECTED:  0x546E7A,   // slate — drawn, but visibly not chosen
+} as const;
+
+/** Predicted trajectory of a tracked object. */
+export const TRACK_PREDICTION_COLOUR = 0xFF80AB;
