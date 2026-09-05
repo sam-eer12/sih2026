@@ -134,9 +134,15 @@ was reused rather than recreated. Branches live less than a day.
 - **`mode` reads `"geometric"` in fixtures mode**, not `"fixtures"`. The FR-6 perception-mode
   badge must not imply live inference when the server is on `--fixtures`; decide how to
   present that honestly in Step 3.
-- **`tracks` can be empty and `decision.selected` can be `"primary"`.** The fixture truck
-  crosses periodically, so a frame sampled at random may have no tracks and no reroute. The
-  decision panel must render an empty track list without breaking (Step 4).
+- **`tracks` can be empty and `decision.selected` can be `"primary"`.** The decision panel must
+  render an empty track list without breaking (Step 4).
+  *Correction, Day 9:* this note originally said the fixture truck "crosses periodically". It
+  did not — `_truck_position` was monotonic, so the truck crossed once in the first 8 s of
+  server uptime and then drove away for good (26 km out by frame 100,000). That is why a live
+  dashboard showed no track, no reroute and a frozen reason string. **Fixed** in
+  `server/fixtures.py`: the trajectory now repeats on a 10 s cycle with a 1.9 s off-scene gap,
+  so the run-book's "track appears" and reroute beats are rehearsable and the empty-`tracks`
+  path still gets exercised. Anuj's file — tell him.
 
 ---
 
@@ -381,7 +387,9 @@ readable from three metres.
       keyboard and buttons stay in sync
 - [ ] **Browser: the A/B wipe button shows the draggable divider** (see the constraint below)
 - [ ] **Browser: run-book beats 58–82 s** — track appears, reroute fires, reason legible from
-      three metres
+      three metres. *First attempt showed nothing: the fixture truck crossed once in the first
+      8 s of server uptime and never returned. That was a fixture bug, not a panel bug — fixed
+      Day 9 (§7). Re-check: a track and a reroute should now recur every 10 s.*
 
 **One integration constraint, and it is Shubham's to close.** `setWipe()` on `SceneHandle`
 drives the scissor-rect render, but the draggable divider is a React overlay inside
@@ -462,6 +470,49 @@ zero console errors.
 ---
 
 ## 7. Progress log
+
+### Day 9 · Saturday 5 Sep 2026 (session 5) — the fixture truck drove away and never came back
+
+**Landed.** `model/avr25d/server/fixtures.py` — the truck trajectory is periodic. One
+expression, plus the comment explaining why. No protocol change, no frontend change.
+
+**Acceptance.** The symptom Navya reported — only the ETA moving, no track, no reroute, a
+frozen reason string — is gone. Suite still **347 passed, 0 failed**.
+
+**Decisions and surprises.**
+
+1. **`_truck_position` was monotonic, not periodic.** `y = -30 + 8t` grows without bound, so
+   the truck crossed once during the first 8.1 s of server uptime and left for good: 50 m out
+   at frame 300, **26 km at frame 100,000**. Measured against the generator, not inferred —
+   tracks existed only in frames 0–243 and the reroute only in frames 94–206, out of an
+   unbounded stream.
+2. **The frontend was innocent, and its own dev stream is what hid this.** Shubham's
+   `__dev__/devFrames.ts` loops its truck with `(t * 8) % 60`, so View 4 was built and verified
+   against a stream where the crossing repeats every 7.5 s. The server never looped. The viewer
+   looked right in development and empty against the real stream, and nothing in either
+   codebase was wrong on its own terms.
+3. **My Day 8 note asserted the fixture truck "crosses periodically".** I never checked it. It
+   was wrong then and it is the reason this took a report from Navya to surface rather than
+   being caught when I first probed the stream. §3 now carries the correction rather than a
+   quiet edit.
+4. **Chose an 80 m cycle over devFrames' 60 m.** A 60 m cycle keeps the truck inside the
+   ±35 m visibility window at all times, so a dynamic object would be permanently parked in
+   view: the run-book's "track appears" beat would never happen and the empty-`tracks` path
+   would stop being exercised. 80 m gives a 10 s cycle with a 1.9 s off-scene gap, which
+   reproduces the original crossing exactly and then repeats it.
+5. **Verified the way the bug was found, not the way that is convenient.** Connecting to the
+   generator offline proves the maths; the failure was about *when a browser connects*. So the
+   live check waits 40 s after server start — long past the original single crossing — and then
+   watches for 25 s: **3 separate track appearances, 3 separate reroutes, both reason
+   strings.**
+6. **Second edit to Anuj's module this session** (`app.py`, now `fixtures.py`). Both were
+   demo-critical and both were done on Navya's explicit instruction, but two files of his have
+   now changed without him in the loop. **That needs to be one conversation at standup, not a
+   surprise in a diff.**
+
+**Next step.** Navya re-runs browser check 3 from §5 Step 4.
+
+---
 
 ### Day 9 · Saturday 5 Sep 2026 (session 4) — Step 4: controls and the decision panel
 
