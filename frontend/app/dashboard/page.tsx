@@ -3,9 +3,10 @@
 // Navya will add the HUD and decision panel around this.
 'use client';
 import dynamic from 'next/dynamic';
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { connectFrames, DEFAULT_STREAM_URL } from '../../lib/ws';
 import type { SceneHandle } from '../../components/viewer/useThreeScene';
+import StreamStatus, { type StatusSink } from '../../components/hud/StreamStatus';
 
 // Dynamic import with SSR disabled — Three.js requires the browser's WebGL context
 const Viewer = dynamic(() => import('../../components/viewer/Viewer'), {
@@ -29,6 +30,7 @@ const Viewer = dynamic(() => import('../../components/viewer/Viewer'), {
 
 export default function DashboardPage() {
   const disconnectRef = useRef<(() => void) | null>(null);
+  const statusSinkRef = useRef<StatusSink | null>(null);
 
   // Fires once, from inside the viewer's mount effect. It must not set React
   // state — the frame path stays outside reconciliation entirely (FR-42), so
@@ -36,11 +38,26 @@ export default function DashboardPage() {
   const handleReady = useCallback((handle: SceneHandle) => {
     disconnectRef.current?.();
     disconnectRef.current = connectFrames(DEFAULT_STREAM_URL, handle.pushFrame, {
-      onStatus: (status, detail) =>
-        console.log(`[stream] ${status}${detail ? ` — ${detail}` : ''}`),
+      onStatus: (status, detail) => {
+        console.log(`[stream] ${status}${detail ? ` — ${detail}` : ''}`);
+        statusSinkRef.current?.(status, detail);
+      },
       onDecodeError: (err) => console.error('[stream] decode failed:', err.message),
     });
   }, []);
+
+  const handleStatusMount = useCallback((sink: StatusSink) => {
+    statusSinkRef.current = sink;
+  }, []);
+
+  // The viewer element is built once and never rebuilt. Anything else on this
+  // page can re-render without touching the canvas subtree, which is what
+  // keeps T-W7 (fewer than 10 React renders across 300 frames) safe as the
+  // HUD grows in Step 3.
+  const viewer = useMemo(
+    () => <Viewer onReady={handleReady} enableKeyboard />,
+    [handleReady]
+  );
 
   useEffect(() => {
     return () => {
@@ -50,11 +67,12 @@ export default function DashboardPage() {
   }, []);
 
   return (
-    <main style={{ width: '100vw', height: '100vh', overflow: 'hidden' }}>
+    <main style={{ position: 'relative', width: '100vw', height: '100vh', overflow: 'hidden' }}>
       {/* Live frames from the FastAPI server — browser to backend, no Next.js
           in the path (FR-41). `devStream` is deliberately not passed; the
           synthetic generator stays in the tree as Shubham's offline fallback. */}
-      <Viewer onReady={handleReady} enableKeyboard />
+      {viewer}
+      <StreamStatus onMount={handleStatusMount} />
     </main>
   );
 }

@@ -49,6 +49,17 @@ export interface StreamOptions {
   maxBackoffMs?: number;
   /** Silence before a stall is reported. Default 3000 ms. 0 disables. */
   stallMs?: number;
+  /**
+   * How long to wait for the socket to open before giving up and retrying.
+   * Default 5000 ms.
+   *
+   * This is not theoretical. A server whose event loop is blocked still
+   * accepts the TCP connection, so the browser sits in CONNECTING forever
+   * and no `close` event ever fires — which means no reconnect, no error,
+   * and a canvas that stays blank with nothing in the console but
+   * "connecting". That is exactly what a blocked pipeline server did.
+   */
+  connectTimeoutMs?: number;
 }
 
 /**
@@ -97,6 +108,7 @@ export function connectFrames(
     initialBackoffMs = 250,
     maxBackoffMs = 8000,
     stallMs = 3000,
+    connectTimeoutMs = 5000,
   } = options;
 
   const health: StreamHealth = {
@@ -112,6 +124,7 @@ export function connectFrames(
   let stopped = false;
   let backoff = initialBackoffMs;
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  let connectTimer: ReturnType<typeof setTimeout> | null = null;
   let rafId = 0;
 
   // The one-slot mailbox. A newer frame replaces an older unprocessed one.
@@ -178,8 +191,31 @@ export function connectFrames(
     ws.binaryType = 'arraybuffer';
     socket = ws;
 
+    // A socket that never opens fires no close event, so nothing else here
+    // would ever retry. Give up on our own schedule instead.
+    if (connectTimeoutMs > 0) {
+      connectTimer = setTimeout(() => {
+        connectTimer = null;
+        if (stopped || ws.readyState === WebSocket.OPEN) return;
+        ws.onopen = null;
+        ws.onmessage = null;
+        ws.onerror = null;
+        ws.onclose = null;
+        try {
+          ws.close();
+        } catch {
+          /* already dead */
+        }
+        if (socket === ws) socket = null;
+        scheduleReconnect(
+          `no handshake within ${connectTimeoutMs} ms — is the server's event loop blocked?`
+        );
+      }, connectTimeoutMs);
+    }
+
     ws.onopen = () => {
       if (stopped) return;
+      clearConnectTimer();
       health.connects += 1;
       backoff = initialBackoffMs; // a good connection resets the penalty
       lastFrameAt = performance.now();
@@ -206,9 +242,17 @@ export function connectFrames(
 
     ws.onclose = (ev: CloseEvent) => {
       if (stopped) return;
+      clearConnectTimer();
       socket = null;
       scheduleReconnect(`socket closed (${ev.code})`);
     };
+  }
+
+  function clearConnectTimer() {
+    if (connectTimer !== null) {
+      clearTimeout(connectTimer);
+      connectTimer = null;
+    }
   }
 
   function scheduleReconnect(detail: string) {
@@ -235,6 +279,7 @@ export function connectFrames(
       clearTimeout(reconnectTimer);
       reconnectTimer = null;
     }
+    clearConnectTimer();
     cancelAnimationFrame(rafId);
     pending = null;
     if (socket) {
