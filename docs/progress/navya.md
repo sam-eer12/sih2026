@@ -48,7 +48,7 @@ View 4.
 | Area | State |
 |---|---|
 | `lib/protocol.ts` | **Done** Day 8 — decoder verified against Anuj's encoder, 118 assertions |
-| `lib/ws.ts` | Missing — **Shubham is still blocked on this one** |
+| `lib/ws.ts` | **Done** Day 9 — reconnect, drop-not-queue and keepalives verified |
 | `components/hud/*`, `components/decision/*` | Missing |
 | `lib/firebase/{client,admin}.ts`, `lib/mongo.ts` | Missing |
 | `app/(auth)/login`, `/dashboard` gate, `app/api/{runs,decisions,scenes}` | Missing |
@@ -236,10 +236,11 @@ the spec.
       33 ms budget, 252× headroom**. Settles the "zero copies" question empirically: the one
       contiguous copy is free at this scale.
 
-### Step 2 — `lib/ws.ts` and stream cut-over `[ ]`
+### Step 2 — `lib/ws.ts` and stream cut-over `[~]`
 
 **Objective.** Real frames on screen; **Shubham unblocked**.
-**Files.** `frontend/lib/ws.ts`, `frontend/app/dashboard/page.tsx`.
+**Files.** `frontend/lib/ws.ts` (new), `frontend/app/dashboard/page.tsx` (cut-over). No file of
+Shubham's touched.
 **Tasks.** `connectFrames(url, onFrame): () => void` — `binaryType = 'arraybuffer'`,
 exponential-backoff reconnect, skip empty messages, drop rather than queue, never awaited.
 Switch the dashboard to `<Viewer onReady={h => connectFrames(url, h.pushFrame)} />`. Retire the
@@ -247,6 +248,34 @@ Switch the dashboard to `<Viewer onReady={h => connectFrames(url, h.pushFrame)} 
 **Verification.** T-W6 — no Next.js handler in the network trace for `/stream`, and killing
 `next dev` mid-stream does not interrupt rendering. Reconnect works after restarting the server.
 **Done when.** Views 1 and 3 render **real streamed frames** — this closes Shubham's Day 3.
+
+**Status Day 9 — code complete and verified headlessly; two browser checks outstanding.**
+
+- [x] `connectFrames(url, onFrame, opts?)` returning a disconnect function, per
+      `IMPLEMENTATION_PLAN.md §6.14`
+- [x] Dashboard cut over to the live stream; `devStream` no longer passed (Shubham's synthetic
+      generator stays in the tree as his offline fallback — his file, his call to remove)
+- [x] **Drop-not-queue proved under a slow consumer**: 100 ms/frame consumer against a 30 Hz
+      stream → delivered 34, dropped 78, and the last frame delivered was id **109 while 111
+      had been received**. Two frames behind in time, not 78. That is NFR-1 — degrade in frame
+      rate, never in latency — measured rather than asserted
+- [x] Delivered frame ids strictly increasing — a stale frame is never replayed
+- [x] Reconnect after server hangup: 2 connects, `reconnecting` → `open`, backoff reset
+- [x] Zero-length keepalives skipped, every message accounted for
+      (delivered + dropped + keepalives)
+- [x] `disconnect()` idempotent; no frames delivered after it; no reconnect scheduled
+- [x] End-to-end against the real fixture server: **108 frames, 41,990 cells each, 0 errors**,
+      ids consecutive 388 → 495
+- [x] `tsc --noEmit` and `eslint` clean
+- [ ] **T-W6 part 1** — confirm no Next.js handler appears in the network trace for `/stream`
+      (expected: a single `ws://localhost:8000/stream` entry, nothing on :3000)
+- [ ] **T-W6 part 2** — kill `next dev` mid-stream and confirm the canvas keeps rendering
+- [ ] Confirm views 1–4 render real frames in the browser — closes Shubham's Day 3
+
+**Navya: the browser checks need you** (no working browser tool this session). Open
+`http://localhost:3000/dashboard`, then DevTools → Network → WS. ⚠️ **Do not refresh the page**
+without restarting the backend afterwards — a refresh disconnects, and that wedges the server
+until `pkill -9` (§3, Anuj's bug).
 
 ### Step 3 — HUD `[ ]`
 
@@ -335,6 +364,60 @@ zero console errors.
 ---
 
 ## 7. Progress log
+
+### Day 9 · Saturday 5 Sep 2026 — Step 2: the stream is live
+
+**Landed.** `frontend/lib/ws.ts` and the cut-over in `app/dashboard/page.tsx`. Merged
+`origin/main` (Shubham's PR #2) into the branch first — see decision 1. No file of Shubham's
+touched.
+
+**Acceptance.** Step 2 is **`[~]`**: the code is complete and verified headlessly, but the two
+T-W6 checks are browser-only and I had no working browser tool this session. Not claiming them.
+Details and the exact checks for Navya are in §5 Step 2.
+
+**Blocked / blocking.** Shubham's Day 3 criterion — "views render real streamed frames" — is
+now satisfiable; it needs one look in a browser to confirm. Nothing blocks me.
+
+**Decisions and surprises.**
+
+1. **`main` had moved and the merge was not optional.** Shubham's PR #2 landed View 2, the A/B
+   wipe, View 4, T-V6 and T-W7 — and changed `types.ts`, `Viewer.tsx` and `useThreeScene.ts`,
+   the exact interfaces I integrate against. Merged before writing any Step 2 code, then re-ran
+   the compatibility proof: my decoder still satisfies his types, **including the `Track` and
+   `Decision` interfaces he added**, which my `protocol.ts` had independently declared. The
+   `onReady`/`pushFrame` seam is unchanged. Clean merge, no conflicts.
+2. **`SceneHandle` grew a lot and most of it is HUD material** — `getPerf()`, `getFrameCount()`,
+   `getUniformCounts()`, `getGridCapacity()`, `setGridOverlay()`, `setWipe()`, `setDivider()`,
+   `onDividerChange()`. Step 3 and Step 4 should read these rather than compute anything.
+3. **"Drop rather than queue" needed a real test, and my first one was wrong.** I asserted the
+   burst would be mostly dropped; it was not, because on localhost the *transfer* is the
+   bottleneck, not the consumer, so the pump kept up and there was nothing to drop. Rewrote it
+   with a deliberately slow consumer (100 ms/frame against 30 Hz). Result: delivered 34,
+   dropped 78, and the newest delivered frame was **2 behind the newest received, not 78**.
+   That is the property NFR-1 actually asks for, and the first test would have passed without
+   demonstrating it.
+4. **A stall does not trigger a reconnect, on purpose.** Given Anuj's wedge bug, a backoff loop
+   hammering a blocked server makes things worse. `ws.ts` reports `stalled` through `onStatus`
+   and reconnects only on a genuinely closed socket. Revisit once `app.py` is fixed.
+5. **Anuj's server bug reproduced a third time**, this time from `lib/ws.ts`'s own clean
+   `disconnect()`. `/health` stopped answering immediately afterwards. Still unfixed, still
+   Anuj's, still the highest-priority item on the board — **a refresh of `/dashboard` will kill
+   the backend during the demo**.
+6. **The editable install had silently stopped working.** `import avr25d` failed from any
+   directory; the `.pth` was present and correct but not executing at interpreter startup, so
+   the package resolved only when `cwd` happened to be `model/`. Every earlier command had run
+   with `cd model`, which masked it. Fixed with `pip install -e model/ --force-reinstall
+   --no-deps` and **verified from `/tmp`** rather than from the directory that hides the
+   problem. Worth knowing if anyone else sees a sudden `ModuleNotFoundError`.
+7. **Shubham had already done the Next 16 compliance check** (`bc507a0`) and recorded the
+   outcome — `ssr: false` is Client-Component-only and `dashboard/page.tsx` already carries
+   `'use client'`. Read his finding instead of repeating the audit.
+
+**Next step.** Navya runs the two browser checks above. Then Step 3 — the HUD — which should
+read `SceneHandle`'s new getters and must keep React renders under 10 (T-W7 currently passes at
+3 renders over 316 frames; the HUD is what could break it).
+
+---
 
 ### Day 8 · Friday 4 Sep 2026 (session 3) — Step 1 done; a demo-fatal server bug found
 
