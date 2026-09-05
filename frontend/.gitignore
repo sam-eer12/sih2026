@@ -32,6 +32,9 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+# ...except the template, which documents every variable and holds no secrets.
+# Real values live in .env.local, which stays ignored by the line above.
+!.env*.example
 
 # vercel
 .vercel

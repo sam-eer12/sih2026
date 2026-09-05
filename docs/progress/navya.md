@@ -432,17 +432,54 @@ local FastAPI server. The Vercel deployment exists so the submission has a link;
 stream will not work there**, by design, and the HUD will now say so in words rather than
 showing an empty canvas.
 
-### Step 6 — Auth `[ ]`
+### Step 6 — Auth `[~]`
 
 **Objective.** FR-36 / FR-37 — the gate and server-side token verification.
-**Files.** `frontend/lib/firebase/{client,admin}.ts`, `frontend/app/(auth)/login/page.tsx`,
-middleware, `frontend/.env.local.example`.
+**Files.** `frontend/lib/firebase/{client,admin}.ts`, `frontend/lib/authCookie.ts`,
+`frontend/app/(auth)/login/page.tsx`, `frontend/proxy.ts`, `frontend/.env.local.example`,
+`frontend/.gitignore`.
 **Tasks.** Create the Firebase project **first** (external lead time). Email/password + Google
 providers. Gate `/dashboard`. `requireUser(req)` in `admin.ts`. Service-account JSON goes in
 `FIREBASE_SERVICE_ACCOUNT` as a single-line env var and is **never committed**.
 **Verification.** T-W1 — unauthenticated `/dashboard` redirects to `/login`; both providers
 complete a sign-in.
 **Done when.** T-W1 passes and `.env.local.example` documents every variable.
+
+**Status Day 9 — code complete; needs a Firebase project to switch on.**
+
+- [x] `lib/firebase/client.ts` — email/password, account creation and Google, all lazy so an
+      unconfigured build never throws
+- [x] `lib/firebase/admin.ts` — `requireUser()` verifying the ID token with the Admin SDK,
+      `checkRevoked` on so a signed-out user stops working immediately rather than in an hour
+- [x] `proxy.ts` — **not `middleware.ts`**. Next 16 renamed the convention and deprecated the
+      old filename; `next build` confirms it registers as `ƒ Proxy (Middleware)`
+- [x] `app/(auth)/login/page.tsx` with both providers, readable error messages, and an
+      open-redirect guard on the `next` parameter
+- [x] `.env.local.example` documenting every variable, and a `.gitignore` negation so the
+      template is committable while `.env.local` stays ignored
+- [x] **19 assertions** on the parts that do not need a project: bearer extraction across eight
+      malformed shapes, and — the T-W2 property — `requireUser` rejecting **before any SDK or
+      database work**, asserted by checking no admin app exists afterwards
+- [x] `tsc`, `eslint`, `next build` clean; `/login` prerenders
+- [ ] **T-W1 needs a Firebase project.** Nobody has created one, and creating accounts and
+      handling credentials is Navya's to do, not mine. Once
+      `NEXT_PUBLIC_FIREBASE_API_KEY`/`AUTH_DOMAIN`/`PROJECT_ID` are in `.env.local` the gate
+      turns itself on; then check that `/dashboard` redirects to `/login` when signed out and
+      that both providers complete a sign-in
+- [ ] Verify `FIREBASE_SERVICE_ACCOUNT` end to end against a real token once the project exists
+
+**Auth is additive, deliberately.** With no Firebase config the proxy is inert and the app
+behaves exactly as it does today. The alternative — gating `/dashboard` on a project nobody has
+created — would take the working demo offline in order to enforce a login page that cannot
+work, five days before the deadline. Setting the three env vars turns the gate on with no code
+change.
+
+**The gate is UX, not security.** `proxy.ts` reads a presence-only cookie, because the Next docs
+are explicit that proxy runs on every route including prefetches and must not verify tokens or
+touch a database. Anyone can forge that cookie; all it buys is a dashboard whose API calls 401.
+The real boundary is `requireUser()` inside each write handler (FR-37, T-W2). The cookie carries
+`1`, never a token — Firebase keeps ID tokens in IndexedDB where the proxy cannot read them, and
+putting one in a readable cookie would expose it to any XSS for no benefit.
 
 ### Step 7 — Persistence `[ ]`
 
