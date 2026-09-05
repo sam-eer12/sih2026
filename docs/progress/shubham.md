@@ -4,6 +4,138 @@ Newest entry at the top. Format and rules: [`README.md`](./README.md).
 
 ---
 
+## Day 9 · Saturday 5 Sep 2026 — View 2, the A/B wipe, View 4; T-V6 and T-W7 pass
+
+Viewer track went from Day 2 to **Day 6 complete** in one session. Calendar is
+Day 9, so still three days behind, down from seven.
+
+---
+
+### Landed
+
+| File | |
+|---|---|
+| `perfMeter.ts` | **new** — FPS, 1%-low and push cost measured separately |
+| `uniformGrid.ts` | **new** — View 2, the uniform 5 cm grid |
+| `gridShader.ts` | **new** — procedural grid boundaries, both grids |
+| `wipe.ts` | **new** — scissor-rect A/B wipe, draggable divider |
+| `WipeOverlay.tsx` | **new** — divider, grab knob, capacity labels |
+| `decisionLayer.ts` | **new** — View 4: tracks, predictions, routes, risk |
+| `ringGeometry.ts` | + inverse mapping, world point → cell id |
+| `views.ts`, `useThreeScene.ts`, `Viewer.tsx`, `types.ts`, `palette.ts` | wiring |
+
+Keys: `1` raw · `2` uniform · `3` adaptive · `4` decision · `E` elevation ·
+`G` grid overlay · `W` wipe.
+
+---
+
+### Acceptance — measured, not asserted
+
+**T-V6 (item 26) — PASS, five days early.**
+```
+109,404 instances → 60.0 FPS (1% low 56.7) · push 12.9 ms avg / 18.7 ms max
+```
+Requirement is >= 30 FPS at 100,000. Two times headroom.
+
+**Item 21, no frame drops while dragging the divider — PASS.**
+```
+before: 57.8 FPS (1% low 29.9) · push 22.3 ms avg
+after:  60.0 FPS (1% low 57.5) · push 0.0 ms · pushes skipped: 119
+```
+
+**T-W7 (item 27) — PASS.**
+```
+316 frames streamed -> 3 React renders (limit 10)
+```
+
+**Items 18, 19, 20, 22, 23, 24 done.** Day 5 exit criterion — "divider shows
+16,000,000 vs 705,771" — met. Day 6 — "smooth wipe, no frame drops" — met.
+
+Still on synthetic frames (`__dev__/devFrames.ts`), so items 16-17 remain
+partial and the Day 3 criterion is still unmet. Unchanged from yesterday: it
+needs Navya's `lib/protocol.ts`.
+
+---
+
+### Blocked / blocking
+
+**Waiting on Navya:** `lib/protocol.ts`, `lib/ws.ts`. Swap is one call —
+`<Viewer onReady={h => connectStream(h.pushFrame)} />`.
+
+**No longer blocking Sameer:** View 4 renders tracks and predicted
+trajectories from the `FrameMessage`. It works against fixtures today; his
+real tracker output needs no viewer change.
+
+---
+
+### Decisions and surprises
+
+**1. The 22.67x is a grid-CAPACITY ratio, and that changed the wipe's design.**
+A scan occupies only **6%** of either grid (41,996 of 705,771 in the real
+stream). Uniform 5 cm binning of the same returns yields a similar occupied
+count, so a wipe contrasting coloured cells cannot show the ratio — both sides
+would show ~40,000 boxes while the labels claimed 16,000,000 vs 705,771, and
+the first sharp judge would ask why. The wipe therefore contrasts **grid
+structure**: the cell boundaries themselves.
+
+**2. The grid had to be a shader, not instances.** 16,000,000 quads will not
+render, and sampling them down to a drawable budget makes the uniform side
+look *sparser* than the adaptive side — arguing the exact opposite of the
+truth. `gridShader.ts` draws every boundary procedurally in one draw call.
+Where cells fall below a pixel the lines filter to a wash, which is the honest
+appearance of 16 million cells rather than an artifact.
+
+**3. Two rendering bugs found only by looking at the screen.** Both compiled,
+linted and ran clean:
+- The first shader filtered on raw world distance, producing **moire** — a
+  false ~2 m lattice that made a 5 cm grid and a 50 cm grid look identical.
+  Fixed by computing coverage in cell-index space normalised by `fwidth`.
+- `setScissor` / `setViewport` take **CSS pixels**; Three multiplies by
+  `pixelRatio` internally. Passing `domElement.width` (already buffer pixels)
+  put the wipe seam at **twice** the divider's position on a 2x display.
+  Shubham caught this from the gap between the white line and the colour seam.
+
+**4. `RingGrid._n_inner` is the constant `round(r_knee/s_min)` = 200,** not the
+number of rings whose inner edge is at or inside the knee, which is 201. Using
+the latter shifts every outer ring by one. The inverse mapping was verified
+against `RingGrid.cell_of` over 4,008 points including the knee and envelope
+edges: **zero mismatches**.
+
+**5. Removed the skeleton's `THREE.GridHelper(200, 200)`.** It drew a 1 m
+reference lattice, indistinguishable from a real grid and directly misleading
+in a view whose entire subject is cell size. It is very likely what one
+confusing screenshot was actually showing.
+
+**6. WebGL ignores `LineBasicMaterial.linewidth` on every platform.** The
+selected route is an extruded ribbon instead, so risk reads by width as well
+as colour — colour alone will not survive a bad projector.
+
+**7. Fast Refresh does not re-run an effect keyed on `[]`.** A measurement was
+taken against a stale closure and silently reported the pre-fix numbers. Any
+change to `useThreeScene.ts` needs a hard reload. The drag report now prints
+its own skip count so a stale build is visible in the measurement itself.
+
+**8. `frontend/AGENTS.md` says this Next.js has breaking changes and to read
+`node_modules/next/dist/docs/` first.** That was skipped before writing
+today's code, then done afterwards. Outcome: **no code changes needed.**
+
+The rule that could have bitten: `ssr: false` throws inside a Server
+Component and is valid only in Client Components. `app/dashboard/page.tsx`
+already carries `'use client'` above its `dynamic()` call, so it was correct.
+Checked and ruled out: async Request APIs, `middleware`→`proxy`, the caching
+APIs, `next/image` changes, parallel-route `default.js`, ESLint flat config,
+the scroll-behavior override, and the removed `experimental.dynamicIO` /
+`useCache` flags. `next build` (Turbopack, 16.3.3) is clean — no warnings, no
+deprecations, all five routes static.
+
+The reason the risk was low is worth recording: the entire frontend uses four
+Next APIs — `next/dynamic`, `next/image`, `Metadata`, `next/font/google` —
+and three of those sit in starter files nobody has touched. The viewer is
+framework-agnostic Three.js and GLSL. A process failure rather than a defect,
+but the check now exists and `next build` should be run before each commit.
+
+---
+
 ## Day 8 · Friday 4 Sep 2026 — viewer track opened; cells on screen
 
 First entry. The viewer track started today, which puts it **7 days behind**

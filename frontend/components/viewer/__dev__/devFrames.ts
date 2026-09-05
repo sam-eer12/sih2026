@@ -15,7 +15,7 @@ import {
   RING_DTHETA,
   RING_OFFSET,
 } from '../ringGeometry';
-import type { CellArrays, FrameMessage } from '../types';
+import type { CellArrays, Decision, FrameMessage, Track } from '../types';
 
 const DRIVE = 1, TERRAIN = 2, STATIC = 3, DYNAMIC = 4;
 
@@ -76,9 +76,19 @@ function buildStaticScene(density: number) {
   };
 }
 
-const SCENE = buildStaticScene(
-  Number(process.env.NEXT_PUBLIC_DEV_DENSITY) || DEFAULT_DENSITY
-);
+/**
+ * Density comes from `?density=` so the T-V6 stress test is a URL, not a
+ * rebuild:  /dashboard?density=0.5  →  ~109,000 cells.
+ */
+function resolveDensity(): number {
+  if (typeof window !== 'undefined') {
+    const q = Number(new URLSearchParams(window.location.search).get('density'));
+    if (Number.isFinite(q) && q > 0) return q;
+  }
+  return Number(process.env.NEXT_PUBLIC_DEV_DENSITY) || DEFAULT_DENSITY;
+}
+
+const SCENE = buildStaticScene(resolveDensity());
 
 function classify(x: number, y: number, truckY: number): [number, number] {
   // Dynamic object: a truck-sized box crossing the road.
@@ -135,7 +145,61 @@ function makeFrame(frameId: number, t: number): FrameMessage {
     t_sec: t,
     mode: 'dev',
     cells: _cells,
+    tracks: makeTracks(truckY),
+    decision: makeDecision(truckY),
     stats: { n_cells: N, fps: 30 },
+  };
+}
+
+// ── Tracks and decision, mirroring fixtures.py's scene ───────────────
+// The truck crosses the road; once it is close enough to the primary route
+// the planner reroutes around it. That switch is the thing View 4 has to
+// make legible.
+
+const TRUCK_X = 25.0;
+const TRUCK_SPEED = 8.0;
+const PREDICT_HORIZON_S = 3.0;
+const PREDICT_STEPS = 6;
+
+function makeTracks(truckY: number): Track[] {
+  const predicted: number[][] = [];
+  for (let i = 1; i <= PREDICT_STEPS; i++) {
+    const dt = (i / PREDICT_STEPS) * PREDICT_HORIZON_S;
+    predicted.push([TRUCK_X, truckY + TRUCK_SPEED * dt]);
+  }
+  return [
+    {
+      id: 7,
+      x: TRUCK_X,
+      y: truckY,
+      vx: 0,
+      vy: TRUCK_SPEED,
+      class_id: DYNAMIC,
+      age: 42,
+      speed: TRUCK_SPEED,
+      predicted,
+    },
+  ];
+}
+
+const ROUTE_PRIMARY = [[0, 0], [10, 0], [25, 0], [50, 0]];
+const ROUTE_ALT = [[0, 0], [10, 3], [25, 6], [50, 3]];
+
+function makeDecision(truckY: number): Decision {
+  // Time until the truck reaches the primary route's centreline.
+  const ttc = (0 - truckY) / TRUCK_SPEED;
+  const closing = ttc > 0 && ttc < 4.0;
+
+  return {
+    route: ROUTE_PRIMARY,
+    alternative: ROUTE_ALT,
+    selected: closing ? 'alternative' : 'primary',
+    risk: closing ? (ttc < 2.0 ? 'HIGH' : 'MEDIUM') : 'LOW',
+    eta_s: 6.2,
+    reason: closing
+      ? `Rerouted: track #7 (DYNAMIC_OBJECT, ${TRUCK_SPEED.toFixed(1)} m/s) ` +
+        `predicted to intersect primary route at t+${ttc.toFixed(1)} s.`
+      : 'Primary route selected: mean traversability 0.92, max slope 1.2°.',
   };
 }
 

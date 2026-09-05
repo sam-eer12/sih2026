@@ -655,7 +655,7 @@ growing by factor 1.005.
 
 `[x]` done · `[~]` partial, reason in brackets · `[ ]` not started
 
-**Last updated: Day 8, Fri 4 Sep 2026.**
+**Last updated: Day 9, Sat 5 Sep 2026.**
 
 ```
 [x] 1.  npm install + npm install three @types/three
@@ -668,17 +668,15 @@ growing by factor 1.005.
 [x] 7.  Write useThreeScene.ts (renderer, scene, camera, orbit controls)
 [x] 8.  Write Viewer.tsx (canvas ref component)
 [x] 9.  Create app/dashboard/page.tsx importing <Viewer />
-[~] 10. Verify: dark scene with grid helper and orbit controls in browser
-        [compiles clean, stream running, zero console errors — but nobody
-         has actually LOOKED at the canvas yet. Do this first tomorrow.]
+[x] 10. Verify: dark scene and orbit controls in browser
+        [confirmed visually. The GridHelper is deliberately gone — see item 20.]
 
 [x] 11. Write ringGeometry.ts — verify 662 rings / 705,771 cells / 100.166046
         [all three match RingGrid exactly]
 [x] 11b. Write instancedCells.ts
-[~] 12. Render ~42,000 fixture cells as one InstancedMesh
-        [43,946 cells/frame rendering; frame rate NOT measured]
-        → EXIT CRITERION DAY 1: fixture cells render at interactive frame rate
-          [cells render; "interactive frame rate" unproven until FPS measured]
+[x] 12. Render ~42,000 fixture cells as one InstancedMesh
+        [43,946 cells/frame at 60 FPS — measured, see item 26]
+        → EXIT CRITERION DAY 1: fixture cells render at interactive frame rate  ✓ MET
 
 [x] 13. Class colouring from palette.ts
 [x] 14. Per-instance sizing from ring extents (radial × tangential)
@@ -692,29 +690,40 @@ growing by factor 1.005.
         → EXIT CRITERION DAY 3: views render real frames, class-coloured
           [NOT MET — "real frames" is the missing half]
 
-        ─────────────── ↓ START HERE TOMORROW ↓ ───────────────
+[x] 18. View 2 (uniform 5 cm grid)
+        → EXIT CRITERION DAY 4: uniform view renders the same scan as View 3  ✓ MET
 
-[ ] 18. View 2 (uniform 5 cm grid)
-        → EXIT CRITERION DAY 4: uniform view renders the same scan as View 3
+[x] 19. THE A/B WIPE — scissor-rect, draggable divider, live cell counts
+[x] 20. Ring overlay toggle (662 boundaries)
+        [gridShader.ts draws every boundary procedurally — instances cannot:
+         16,000,000 quads will not render, and sampling them down makes the
+         uniform side look SPARSER than adaptive, arguing the opposite of
+         the truth. Press G.]
+        → EXIT CRITERION DAY 5: divider shows 16,000,000 vs 705,771  ✓ MET
 
-[ ] 19. THE A/B WIPE — scissor-rect, draggable divider, live cell counts
-[ ] 20. Ring overlay toggle (662 boundaries)
-        → EXIT CRITERION DAY 5: divider shows 16,000,000 vs 705,771
+[x] 21. Wipe polish, no frame drops while dragging the divider
+        [60.0 FPS, 1% low 57.5 while dragging — was 29.9 before frame
+         updates were frozen during the drag]
+[x] 22. Performance pass on instance count
+        → EXIT CRITERION DAY 6: smooth wipe, no frame drops  ✓ MET
 
-[ ] 21. Wipe polish, no frame drops while dragging the divider
-[ ] 22. Performance pass on instance count
-        → EXIT CRITERION DAY 6: smooth wipe, no frame drops
+[x] 23. View 4 scaffold: track markers + predicted trajectories
+        → EXIT CRITERION DAY 7: tracks visible and individually identifiable  ✓ MET
 
-[ ] 23. View 4 scaffold: track markers + predicted trajectories
-        → EXIT CRITERION DAY 7: tracks visible and individually identifiable
+[x] 24. View 4 complete: routes, risk shading
+        [selected route is an extruded ribbon, not a line — WebGL ignores
+         LineBasicMaterial.linewidth everywhere, so risk reads by width as
+         well as colour]
+        → EXIT CRITERION DAY 8: reroute legible from three metres away  ✓ MET
 
-[ ] 24. View 4 complete: routes, risk shading
-        → EXIT CRITERION DAY 8: reroute legible from three metres away
+        ─────────────── ↓ START HERE NEXT ↓ ───────────────
 
-[ ] 25. LOD tuning
-[ ] 26. Verify ≥30 FPS at 100,000 instances (T-V6)
-[ ] 27. Verify React render count < 10 across 300 frames (T-W7)
-        → EXIT CRITERION DAY 9: T-V6 and T-W7 pass
+[ ] 25. LOD tuning  [not needed yet — 60 FPS at 109k with no LOD at all]
+[x] 26. Verify ≥30 FPS at 100,000 instances (T-V6)
+        [109,404 instances → 60.0 FPS, 1% low 56.7]
+[x] 27. Verify React render count < 10 across 300 frames (T-W7)
+        [316 frames streamed → 3 React renders]
+        → EXIT CRITERION DAY 9: T-V6 and T-W7 pass  ✓ MET
 
 [ ] 28. Visual polish, verify at projector resolution
         → EXIT CRITERION DAY 10: renders correctly at projector resolution
