@@ -8,6 +8,10 @@ import { connectFrames, DEFAULT_STREAM_URL } from '../../lib/ws';
 import type { SceneHandle } from '../../components/viewer/useThreeScene';
 import StreamStatus, { type StatusSink } from '../../components/hud/StreamStatus';
 import Hud from '../../components/hud/Hud';
+import ViewControls from '../../components/hud/ViewControls';
+import DecisionPanel, {
+  type DecisionSnapshot,
+} from '../../components/decision/DecisionPanel';
 import type { HudSnapshot } from '../../components/hud/types';
 import type { FrameMessage } from '../../lib/protocol';
 
@@ -79,6 +83,17 @@ export default function DashboardPage() {
     };
   }, []);
 
+  // Same discipline as the HUD: read the newest frame from the ref on the
+  // panel's own timer. `tracks` is defaulted here because fixtures legitimately
+  // send an empty array when the crossing truck is out of frame.
+  const sampleDecision = useCallback((): DecisionSnapshot | null => {
+    const msg = latestFrameRef.current;
+    if (!msg) return null;
+    return { decision: msg.decision, tracks: msg.tracks ?? [] };
+  }, []);
+
+  const getHandle = useCallback(() => sceneRef.current, []);
+
   const handleStatusMount = useCallback((sink: StatusSink) => {
     statusSinkRef.current = sink;
   }, []);
@@ -109,6 +124,8 @@ export default function DashboardPage() {
       {viewer}
       <StreamStatus onMount={handleStatusMount} />
       <Hud sample={sampleHud} />
+      <ViewControls getHandle={getHandle} />
+      <DecisionPanel sample={sampleDecision} />
     </main>
   );
 }
