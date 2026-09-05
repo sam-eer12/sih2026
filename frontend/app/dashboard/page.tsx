@@ -7,6 +7,9 @@ import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { connectFrames, DEFAULT_STREAM_URL } from '../../lib/ws';
 import type { SceneHandle } from '../../components/viewer/useThreeScene';
 import StreamStatus, { type StatusSink } from '../../components/hud/StreamStatus';
+import Hud from '../../components/hud/Hud';
+import type { HudSnapshot } from '../../components/hud/types';
+import type { FrameMessage } from '../../lib/protocol';
 
 // Dynamic import with SSR disabled — Three.js requires the browser's WebGL context
 const Viewer = dynamic(() => import('../../components/viewer/Viewer'), {
@@ -31,19 +34,49 @@ const Viewer = dynamic(() => import('../../components/viewer/Viewer'), {
 export default function DashboardPage() {
   const disconnectRef = useRef<(() => void) | null>(null);
   const statusSinkRef = useRef<StatusSink | null>(null);
+  // The newest frame and the scene handle live in refs, never in state. This
+  // is the FR-42 line: frames reach the GPU and the HUD samples them, but
+  // React is never told a frame arrived.
+  const latestFrameRef = useRef<FrameMessage | null>(null);
+  const sceneRef = useRef<SceneHandle | null>(null);
 
   // Fires once, from inside the viewer's mount effect. It must not set React
   // state — the frame path stays outside reconciliation entirely (FR-42), so
   // the socket is held in a ref and the frames go straight to pushFrame.
   const handleReady = useCallback((handle: SceneHandle) => {
     disconnectRef.current?.();
-    disconnectRef.current = connectFrames(DEFAULT_STREAM_URL, handle.pushFrame, {
-      onStatus: (status, detail) => {
-        console.log(`[stream] ${status}${detail ? ` — ${detail}` : ''}`);
-        statusSinkRef.current?.(status, detail);
+    sceneRef.current = handle;
+    disconnectRef.current = connectFrames(
+      DEFAULT_STREAM_URL,
+      (msg) => {
+        latestFrameRef.current = msg;
+        handle.pushFrame(msg);
       },
-      onDecodeError: (err) => console.error('[stream] decode failed:', err.message),
-    });
+      {
+        onStatus: (status, detail) => {
+          console.log(`[stream] ${status}${detail ? ` — ${detail}` : ''}`);
+          statusSinkRef.current?.(status, detail);
+        },
+        onDecodeError: (err) => console.error('[stream] decode failed:', err.message),
+      }
+    );
+  }, []);
+
+  // Called by the HUD on its own timer, not per frame. Everything it returns
+  // is either straight off the wire or read from the viewer's own getters —
+  // nothing about the scene is recomputed here.
+  const sampleHud = useCallback((): HudSnapshot | null => {
+    const msg = latestFrameRef.current;
+    const handle = sceneRef.current;
+    if (!msg || !handle) return null;
+    return {
+      frameId: msg.frame_id,
+      mode: msg.mode,
+      stats: msg.stats,
+      perf: handle.getPerf(),
+      uniform: handle.getUniformCounts(),
+      capacity: handle.getGridCapacity(),
+    };
   }, []);
 
   const handleStatusMount = useCallback((sink: StatusSink) => {
@@ -63,6 +96,8 @@ export default function DashboardPage() {
     return () => {
       disconnectRef.current?.();
       disconnectRef.current = null;
+      sceneRef.current = null;
+      latestFrameRef.current = null;
     };
   }, []);
 
@@ -73,6 +108,7 @@ export default function DashboardPage() {
           synthetic generator stays in the tree as Shubham's offline fallback. */}
       {viewer}
       <StreamStatus onMount={handleStatusMount} />
+      <Hud sample={sampleHud} />
     </main>
   );
 }
