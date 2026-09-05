@@ -52,10 +52,12 @@ View 4.
 | `components/hud/StreamStatus.tsx` | **Done** Day 9 — connection state on screen; the rest of the HUD is Step 3 |
 | `components/hud/*` | **Done** Day 9 — FR-28 complete; T-V4 and T-W7 pass |
 | `components/decision/*` | **Done** Day 9 — decision panel and track list; `tracks: []` handled |
-| `lib/firebase/{client,admin}.ts`, `lib/mongo.ts` | Missing |
-| `app/(auth)/login`, `/dashboard` gate, `app/api/{runs,decisions,scenes}` | Missing |
-| `app/runs`, `app/runs/[id]` | Missing |
-| `.env.local.example`, Firebase project, Atlas M0 cluster | Missing / unconfirmed |
+| `lib/firebase/{client,admin}.ts` | **Done** Day 9 — sign-in and `requireUser`; needs a project to switch on |
+| `lib/mongo.ts`, `lib/decisionLog.ts` | **Done** Day 9 — cached client, indexes, FR-39 batching; needs a cluster |
+| `app/(auth)/login`, `proxy.ts` gate, `app/api/{runs,decisions,scenes}` | **Done** Day 9 — T-W2 verified per route |
+| `app/runs`, `app/runs/[id]` | Missing — Step 8 |
+| `.env.local.example` | **Done** Day 9 — every variable documented |
+| Firebase project, Atlas M0 cluster | **Not created** — external accounts, Navya's to provision |
 | `app/page.tsx`, `app/layout.tsx` metadata | Still create-next-app boilerplate |
 | `docs/progress/navya.md` | This file — first entry Day 8 |
 
@@ -481,10 +483,11 @@ The real boundary is `requireUser()` inside each write handler (FR-37, T-W2). Th
 `1`, never a token — Firebase keeps ID tokens in IndexedDB where the proxy cannot read them, and
 putting one in a readable cookie would expose it to any XSS for no benefit.
 
-### Step 7 — Persistence `[ ]`
+### Step 7 — Persistence `[~]`
 
 **Objective.** FR-38 / FR-39 / FR-40 — runs, decisions, scenes.
-**Files.** `frontend/lib/mongo.ts`, `frontend/app/api/{runs,decisions,scenes}/route.ts`.
+**Files.** `frontend/lib/{mongo,api,decisionLog}.ts`,
+`frontend/app/api/{runs,decisions,scenes}/route.ts`.
 **Tasks.** Atlas M0, database `avr25d`, `MONGODB_URI`. Module-scoped cached client. Collections
 and indexes per `IMPLEMENTATION_PLAN.md §6.14`: `runs {uid:1, startedAt:-1}`,
 `decisions {runId:1, frameId:1}`, `scenes {name:1}` unique, `users`. `requireUser` first in
@@ -493,6 +496,39 @@ every write handler. Batched decision writes.
 byte-identically against `results.json`), T-W4 (600-frame replay with 2 reroutes → 2 change
 records + ~10 heartbeats, not 600), T-W5 (scene ground truth equals the CSV).
 **Done when.** All four tests pass.
+
+**Status Day 9 — code complete; the two data-dependent tests need an Atlas cluster.**
+
+- [x] `lib/mongo.ts` — client cached on `globalThis`, not module scope alone, so Next's dev
+      reload cannot leak one per edit. Typed documents and `ensureIndexes()` for all three
+      indexes, idempotent and lazily called so nobody has to remember a setup step
+- [x] Three routes, each calling `requireUser(req)` as its first statement
+- [x] `lib/decisionLog.ts` — FR-39 batching: write on change of route/risk/reason, plus a
+      heartbeat every 60 frames, flushed on a 2 s timer, **never awaited from the frame loop**
+- [x] **T-W2 verified two ways.** 19 assertions on bearer handling and reject-before-work
+      (Step 6), plus a structural check over every exported handler in every route file: each
+      calls `requireUser`, each does so **before its first database call**, and every `uid`
+      comes from the verified token rather than the body. Asserted per handler because the
+      requirement says a single unprotected one is the whole vulnerability
+- [x] **T-W4 passes — 13 assertions.** A 600-frame replay with two reroutes produces **13
+      records, not 600**. The arithmetic is asserted rather than assumed: 10 heartbeat-cadence
+      frames plus 5 change frames minus 2 that coincide. Also asserted — a per-frame jittering
+      ETA triggers no writes at all, and a failing endpoint reports through `onError` without
+      throwing at the caller or growing an unbounded backlog
+- [x] `tsc`, `eslint`, `next build` clean; all three routes register as dynamic
+- [ ] **T-W3 needs an Atlas cluster and a real `results.json`** — round-trip a run document and
+      compare byte-for-byte
+- [ ] **T-W5 needs scene ground truth.** The route stores and returns whatever it is given;
+      *deriving* pothole depth or gantry clearance from `synth/scenes/*.csv` is domain work that
+      belongs with the scenes, which are Sameer's. Populating the collection is a script step,
+      not this route's job
+- [ ] Create the Atlas M0 cluster and set `MONGODB_URI` — Navya's, same as Firebase
+
+**A failing database must not take the demo with it.** `flush()` never throws at the caller and
+a failed batch is dropped rather than requeued: an unreachable Atlas would otherwise grow a
+backlog in a browser tab behind a demo that is still running. That matches the run-book's
+failure path — "login or Atlas unreachable → the pipeline, viewer and HUD are entirely local and
+keep running; only run history and the audit log are affected".
 
 ### Step 8 — Run history, deploy, polish `[ ]`
 
