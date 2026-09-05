@@ -73,6 +73,23 @@ export interface StreamOptions {
 export const DEFAULT_STREAM_URL =
   process.env.NEXT_PUBLIC_WS_URL ?? 'ws://localhost:8000/stream';
 
+/**
+ * Is this page going to be blocked from opening `url` as mixed content?
+ *
+ * NFR-9. A page served over https cannot open a `ws://` socket: browsers block
+ * it as mixed content, and they do it quietly — no exception at the call site,
+ * just a socket that never opens. On the Vercel deployment that presents as a
+ * dashboard which loads perfectly and then shows nothing, which is a bad thing
+ * to be debugging on the day.
+ *
+ * Exported so a deployment banner can use the same test rather than
+ * re-deriving it.
+ */
+export function isMixedContentBlocked(url: string): boolean {
+  if (typeof window === 'undefined') return false;
+  return window.location.protocol === 'https:' && url.startsWith('ws://');
+}
+
 export interface StreamHealth {
   /** Frames delivered to onFrame. */
   delivered: number;
@@ -268,6 +285,20 @@ export function connectFrames(
   }
 
   // ── Start ───────────────────────────────────────────────────────────────
+  // Refuse rather than retry forever. This combination cannot be made to work
+  // from the page's side, so a backoff loop would just hide the reason behind
+  // a "reconnecting" spinner. NFR-9: the demo is served from
+  // http://localhost:3000; the deployment exists for the submission link.
+  if (isMixedContentBlocked(url)) {
+    const detail =
+      `an https page cannot open ${url} — browsers block mixed content. ` +
+      `Run the demo from http://localhost:3000 (NFR-9).`;
+    console.error(`[stream] ${detail}`);
+    stopped = true;
+    setStatus('closed', detail);
+    return Object.assign(() => {}, { health });
+  }
+
   setStatus('connecting');
   open();
   rafId = requestAnimationFrame(pump);

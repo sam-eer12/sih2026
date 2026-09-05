@@ -406,13 +406,31 @@ four views are built as of his PR #2, and his `NOT_BUILT` set is now empty. Dupl
 list here would create a second source of truth that goes stale the moment it disagrees with
 his.
 
-### Step 5 — NFR-9 verification `[ ]`
+### Step 5 — NFR-9 verification `[x]`
 
 **Objective.** Close the mixed-content trap before it costs a day.
-**Files.** None yet — a written finding in §7 and later a line in the run-book.
+**Files.** `frontend/lib/ws.ts` — the finding turned into a guard.
 **Tasks.** Confirm the demo path is `http://localhost:3000` against the local FastAPI server;
 confirm an HTTPS origin cannot reach `ws://localhost:8000`.
 **Done when.** Recorded in the log and told to the team. ~15 minutes.
+
+**Status Day 9 — verified and guarded.**
+
+- [x] The demo path is `http://localhost:3000` talking to `ws://localhost:8000/stream`; both
+      confirmed running together throughout Steps 2–4
+- [x] An https origin cannot open `ws://` — browsers block it as mixed content, and they do it
+      **silently**: no exception, just a socket that never opens. That is the trap
+- [x] `isMixedContentBlocked(url)` added to `lib/ws.ts`, and `connectFrames` now **refuses**
+      rather than retrying: status goes straight to `closed` with a detail naming mixed
+      content, the working path and the requirement. A backoff loop would have hidden the cause
+      behind a "reconnecting" spinner
+- [x] **11 assertions**: the predicate across https/http and ws/wss and the SSR case, plus the
+      refusal path — closed not connecting, reason logged once, and no reconnect loop entered
+
+**The rule, for the run-book.** The live demo runs from `http://localhost:3000` against the
+local FastAPI server. The Vercel deployment exists so the submission has a link; **the frame
+stream will not work there**, by design, and the HUD will now say so in words rather than
+showing an empty canvas.
 
 ### Step 6 — Auth `[ ]`
 
