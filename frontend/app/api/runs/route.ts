@@ -9,6 +9,7 @@
 // Mongo call. T-W3: config and results are stored exactly as received and
 // returned exactly as stored, so a round-trip is byte-identical.
 
+import { ObjectId } from 'mongodb';
 import { requireUser } from '../../../lib/firebase/admin';
 import { ensureIndexes, runs, type RunDoc } from '../../../lib/mongo';
 import { BadRequestError, handleRouteError, readJson } from '../../../lib/api';
@@ -59,7 +60,21 @@ export async function POST(req: Request): Promise<Response> {
 export async function GET(req: Request): Promise<Response> {
   try {
     const user = await requireUser(req);          // read path is scoped to the caller too
-    const limit = clampLimit(new URL(req.url).searchParams.get('limit'));
+    const params = new URL(req.url).searchParams;
+    const id = params.get('id');
+
+    // Single run, for the detail page. Always filtered by uid as well as _id,
+    // so a guessed id from another account returns nothing rather than
+    // somebody else's results.
+    if (id) {
+      if (!ObjectId.isValid(id)) throw new BadRequestError(`Not a run id: ${id}`);
+      await ensureIndexes();
+      const doc = await (await runs()).findOne({ _id: new ObjectId(id), uid: user.uid });
+      if (!doc) return Response.json({ error: 'Run not found' }, { status: 404 });
+      return Response.json({ run: { ...doc, _id: doc._id?.toString() } });
+    }
+
+    const limit = clampLimit(params.get('limit'));
 
     await ensureIndexes();
     const docs = await (await runs())

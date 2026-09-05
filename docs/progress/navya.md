@@ -530,37 +530,126 @@ backlog in a browser tab behind a demo that is still running. That matches the r
 failure path — "login or Atlas unreachable → the pipeline, viewer and HUD are entirely local and
 keep running; only run history and the audit log are affected".
 
-### Step 8 — Run history, deploy, polish `[ ]`
+### Step 8 — Run history, deploy, polish `[~]`
 
 **Objective.** The submission link and the last rough edges.
 **Files.** `frontend/app/runs/page.tsx`, `frontend/app/runs/[id]/page.tsx`,
-`frontend/app/page.tsx`, `frontend/app/layout.tsx`.
+`frontend/app/page.tsx`, `frontend/app/layout.tsx`, `frontend/lib/apiClient.ts`,
+`frontend/app/api/runs/route.ts`.
 **Tasks.** Run list and detail (config, results, decision log). Replace the create-next-app
 boilerplate and the "Create Next App" metadata. Deploy to Vercel for the link, keeping
 localhost as the demo path. Responsive at the demo machine's resolution.
 **Done when.** A completed run renders its config, results and decision log; Vercel is live;
 zero console errors.
 
+**Status Day 9 — pages built; the deploy needs an account.**
+
+- [x] `/runs` — run list with started time, mode, commit and platform, linking to each run
+- [x] `/runs/[id]` — config and results rendered **verbatim**, plus the decision log with each
+      record marked `change` or `heartbeat`. Provenance is the point of the page, so the
+      payloads are shown as stored rather than summarised into something prettier and less
+      checkable
+- [x] `GET /api/runs?id=` added for the detail page, filtered by `uid` as well as `_id` so a
+      guessed id returns nothing rather than another account's results
+- [x] `lib/apiClient.ts` — attaches a fresh ID token per call, never caches one, never reads
+      the gate cookie
+- [x] Landing page replaced; `layout.tsx` metadata no longer says "Create Next App"
+- [x] Both pages degrade honestly when persistence is off: a 503 renders as "persistence is
+      switched off", not a stack trace, and says the demo keeps working without it
+- [x] `tsc`, `eslint`, `next build` clean — 9 routes
+- [ ] **Vercel deploy.** Needs an account and a deploy from Navya's machine; creating accounts
+      and handling credentials is hers, not mine. `.env.local.example` lists everything the
+      deployment needs
+- [ ] **Responsive at the demo machine's resolution** — a browser check
+- [ ] Zero console errors across all pages — a browser check
+
 ---
 
 ## 6. Definition of done
 
-- [ ] T-V4 — HUD shows no `NaN` and no `undefined` field
-- [ ] T-W1 — unauthenticated `/dashboard` redirects; both providers sign in
-- [ ] T-W2 — every write route rejects a bad token with 401 before touching Mongo
-- [ ] T-W3 — a run document round-trips against `results.json`
-- [ ] T-W4 — decision writes are batched, not per frame
-- [ ] T-W5 — every scene's ground truth matches its CSV
-- [ ] T-W6 — the frame stream is browser→FastAPI direct
-- [ ] T-W7 — fewer than 10 React renders across 300 streamed frames
-- [ ] NFR-9 verified and written down
-- [ ] Every HUD number traces to `stats`; none computed in the browser
-- [ ] No hard-coded colours outside `lib/palette.ts`
-- [ ] Zero console errors on `/dashboard`; layout correct at demo resolution
+Verified headlessly, **221 assertions across 7 suites, 0 failures**:
+
+- [x] T-V4 — HUD shows no `NaN` and no `undefined`, including against degenerate stats
+- [x] T-W2 — every write route rejects a bad token with 401 before touching Mongo, asserted
+      per handler
+- [x] T-W4 — decision writes are batched, not per frame (13 records from 600 frames)
+- [x] T-W6 — the frame stream is browser→FastAPI direct
+- [x] T-W7 — 2 React renders across 304 streamed frames (limit 10)
+- [x] NFR-9 verified, written down, and turned into a guard that refuses rather than hangs
+- [x] Every HUD number traces to `stats` or a `SceneHandle` getter; none computed in the browser
+- [x] No hard-coded colours outside `lib/palette.ts` — the two exceptions (latency stages, risk
+      levels) are non-class axes and commented as such
+
+Blocked on external accounts nobody has created — **Navya's to provision**, since creating
+accounts and handling credentials is not mine to do:
+
+- [ ] T-W1 — unauthenticated `/dashboard` redirects; both providers sign in *(Firebase project)*
+- [ ] T-W3 — a run document round-trips against `results.json` *(Atlas cluster)*
+- [ ] T-W5 — every scene's ground truth matches its CSV *(Atlas + Sameer's scene export)*
+- [ ] Vercel deployment live for the submission link
+
+Browser checks, recorded as pending rather than blocking:
+
+- [ ] Step 4 — controls drive the scene, the wipe divider appears, run-book beats 58–82 s
+- [ ] Step 8 — responsive at the demo resolution; zero console errors across all pages
 
 ---
 
 ## 7. Progress log
+
+### Day 9 · Saturday 5 Sep 2026 (session 6) — Steps 5–8: the rest of the roadmap
+
+**Landed.** NFR-9 guard, the whole auth layer, the whole persistence layer, run history and a
+real landing page. **All nine roadmap steps now have code.** 221 assertions across 7 suites,
+0 failures; `tsc`, `eslint` and `next build` clean at 9 routes; backend suite still 347.
+
+**Acceptance.** Steps 0–5 are `[x]`. Steps 6, 7 and 8 are `[~]`, and every remaining item is
+either an external account nobody has created or a browser check — not unwritten code.
+
+**Blocked / blocking.** Nothing is blocked on code. Four items need accounts that only Navya
+can create: the Firebase project (T-W1), the Atlas cluster (T-W3), scene ground truth (T-W5)
+and the Vercel deploy. I do not create accounts or handle credentials, so those are hers by
+design rather than by omission.
+
+**Decisions and surprises.**
+
+1. **Auth and persistence are additive, and that was the load-bearing decision.** With no
+   Firebase config the proxy is inert; with no `MONGODB_URI` the routes answer 503 and the
+   pages say "persistence is switched off". The alternative — gating the dashboard on a project
+   nobody has created — would have taken a working demo offline five days out to enforce a
+   login page that cannot work. Setting env vars turns each feature on with no code change.
+2. **`middleware.ts` is deprecated in Next 16; the file is `proxy.ts`.** Caught by reading
+   `node_modules/next/dist/docs` as `AGENTS.md` instructs, not by guessing. `next build`
+   confirms it registers.
+3. **The gate is UX; the boundary is `requireUser()`.** The Next docs are explicit that proxy
+   runs on every route including prefetches and must not verify tokens or hit a database. So
+   the cookie carries `1`, never a token — and putting an ID token in a JS-readable cookie
+   would have exposed it to any XSS for no benefit, since every request that touches data
+   re-proves identity anyway.
+4. **T-W2 is asserted per handler, structurally.** A `withAuth()` wrapper would have been less
+   code and worse: the requirement says a single unprotected handler is the whole
+   vulnerability, and a wrapper is exactly how one gets quietly unwrapped. A check walks every
+   exported handler in every route file and confirms `requireUser` is present, precedes the
+   first database call, and that `uid` comes from the token.
+5. **My T-W4 test was wrong before the code was.** I asserted "10 heartbeats" and got 8,
+   because two change frames landed exactly on the 60-frame cadence and are attributed to the
+   change. The test now asserts the arithmetic — cadence + changes − coincident — rather than a
+   round number that only held by luck.
+6. **A failed decision batch is dropped, not requeued.** An unreachable Atlas would otherwise
+   grow an unbounded backlog in a tab behind a demo that is still running. The run-book already
+   says losing Atlas must cost the audit log and not the demo; this is that, in code.
+7. **`useSearchParams()` needs a Suspense boundary** or `next build` fails on `/login`, and
+   `.gitignore`'s blanket `.env*` needed a negation so the template is committable while
+   `.env.local` stays ignored. Both are framework facts worth knowing rather than rediscovering.
+8. **`npm audit` reports 6 moderate advisories**, all transitive through `firebase-admin` →
+   `@google-cloud/storage` → `uuid`, a path this app never touches. `audit fix --force` would
+   downgrade the SDK. Left alone and recorded rather than silently broken.
+
+**Next step.** Provision the two accounts, then the four account-dependent tests close
+themselves. Everything else outstanding is a browser check.
+
+---
+
 
 ### Day 9 · Saturday 5 Sep 2026 (session 5) — the fixture truck drove away and never came back
 
