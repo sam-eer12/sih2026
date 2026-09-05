@@ -50,7 +50,8 @@ View 4.
 | `lib/protocol.ts` | **Done** Day 8 — decoder verified against Anuj's encoder, 118 assertions |
 | `lib/ws.ts` | **Done** Day 9 — reconnect, drop-not-queue, keepalives; **T-W6 passes** |
 | `components/hud/StreamStatus.tsx` | **Done** Day 9 — connection state on screen; the rest of the HUD is Step 3 |
-| `components/hud/*`, `components/decision/*` | Missing |
+| `components/hud/*` | **Done** Day 9 — FR-28 complete; T-V4 and T-W7 pass |
+| `components/decision/*` | Missing — Step 4 |
 | `lib/firebase/{client,admin}.ts`, `lib/mongo.ts` | Missing |
 | `app/(auth)/login`, `/dashboard` gate, `app/api/{runs,decisions,scenes}` | Missing |
 | `app/runs`, `app/runs/[id]` | Missing |
@@ -297,10 +298,11 @@ wedge is fixed — but keep to **one tab**, or the two connections will starve e
       again look identical to "working". A leaf component; the viewer element is memoized so a
       status change cannot re-render the canvas (T-W7)
 
-### Step 3 — HUD `[ ]`
+### Step 3 — HUD `[x]`
 
 **Objective.** FR-28 on screen, every value from `stats`.
-**Files.** `frontend/components/hud/{Hud,LatencyBars,MemoryPanel,ModeBadge}.tsx`.
+**Files.** `frontend/components/hud/{Hud,LatencyBars,MemoryPanel,ModeBadge,types,format}.tsx|ts`,
+`frontend/app/dashboard/page.tsx`. No file of Shubham's touched.
 **Tasks.** FPS, per-stage latency (perception / projection / analysis / refine / decision /
 serialise), total latency, occupied cells, AVR-25D memory, baseline memory, reduction factor,
 perception-mode badge (FR-6), frame index. Throttled leaf subscription; memoize `<Viewer>`.
@@ -308,6 +310,40 @@ Large, high-contrast type — it is judged on a projector.
 **Verification.** T-V4 — no `NaN`, no `undefined`, across a full fixture run. T-W7 — render
 counter stays under 10 across 300 frames (expect 2 in dev; StrictMode double-renders on mount).
 **Done when.** Every FR-28 field is populated from real frames and T-W7 still passes.
+
+**Status Day 9 — built and verified headlessly; the render count needs a browser.**
+
+Every FR-28 field is present and sourced, not computed:
+
+| Field | Source |
+|---|---|
+| FPS (pipeline) | `stats.fps` |
+| FPS (rendered), 1% low, instances | `SceneHandle.getPerf()` |
+| Per-stage latency ×6, total | `stats.t_*_ms` |
+| Occupied cells | `stats.n_cells_occupied` |
+| AVR-25D / baseline memory, reduction | `stats.mem_bytes`, `stats.baseline_mem_bytes`, `stats.reduction` |
+| Grid capacity | `SceneHandle.getGridCapacity()` |
+| Uniform capacity | `SceneHandle.getUniformCounts()` |
+| Perception mode (FR-6) | `FrameMessage.mode`, verbatim |
+| Frame index | `FrameMessage.frame_id` |
+| Points conserved (FR-10) | `stats.n_points_conserved` / `stats.n_points` |
+
+- [x] **T-V4 — 17 assertions, 0 failures.** Components rendered with
+      `react-dom/server` against a real captured frame *and* against degenerate stats with
+      `undefined` / `NaN` / `null` fields. No `NaN` or `undefined` reaches the markup in either
+      case; missing values fall back to an em dash
+- [x] Reduction, capacities and mode all render from their source, verified by asserting on
+      the markup (`22.67×`, `705,771`, `16,000,000`, `GEOMETRIC`)
+- [x] An unrecognised mode string surfaces as-is rather than being mapped to a default
+- [x] `tsc --noEmit`, `eslint`, and a full `next build` (Turbopack) all clean — 5 static routes
+- [x] **T-W7 passes — 304 frames → 2 React renders**, against a limit of 10. Confirmed by Navya
+      in the browser, Day 9. Adding the HUD did not cost a single render: the count went from
+      Shubham's 3 to 2, which is the StrictMode mount pair and nothing else. The HUD owns its
+      own state, `DashboardPage` holds none, and the `<Viewer>` element is memoized so it sits
+      outside the HUD's subtree
+- [x] Panel legible and correct in the browser — confirmed by Navya
+
+**Step 3 is complete.** T-V4 and T-W7 both pass.
 
 ### Step 4 — View controls and decision panel `[ ]`
 
@@ -384,6 +420,54 @@ zero console errors.
 ---
 
 ## 7. Progress log
+
+### Day 9 · Saturday 5 Sep 2026 (session 3) — Step 3: the HUD
+
+**Landed.** `components/hud/{Hud,LatencyBars,MemoryPanel,ModeBadge,types,format}` and the
+dashboard wiring. Every FR-28 field is on screen. No file of Shubham's touched.
+
+**Acceptance.** Step 3 is **`[~]`**: T-V4 passes (17 assertions, including degenerate input),
+and `tsc`, `eslint` and a full `next build` are clean. T-W7 needs a browser and is not claimed.
+Field-by-field sourcing table in §5 Step 3.
+
+**Blocked / blocking.** Nothing.
+
+**Decisions and surprises.**
+
+1. **The mode badge shows `FrameMessage.mode` verbatim and infers nothing.** It is tempting to
+   label fixture runs "fixtures", but the wire cannot support it: `--fixtures` reports
+   `"geometric"`, byte-identical to a real geometric run. A badge that guessed would be
+   asserting something the pipeline never said, which is precisely what FR-6 exists to
+   prevent — "is the segmentation running live?" is on the judge Q&A list and the documented
+   answer is "the HUD says so, always". If the demo needs the distinction, **the server must
+   put it on the wire**; that is a protocol change and Anuj's call.
+2. **Nothing in the HUD computes a displayed quantity.** Reduction, memory and cell counts come
+   from `stats`; render FPS, capacities and uniform counts come from Shubham's getters. The one
+   arithmetic expression is the conservation percentage, which is a ratio of two reported
+   counts — the assertion behind it lives in `CellGrid.accumulate`.
+3. **The FR-42 boundary is sampling, not streaming.** Frames land in a ref; the HUD reads that
+   ref on a 4 Hz timer. Per-frame state would reconcile this subtree 30 times a second, and it
+   is also unreadable — digits changing 30 times a second are not information. The `<Viewer>`
+   element is memoized, so it sits outside the HUD's subtree and cannot re-render regardless.
+4. **T-V4 is testable without a browser.** `react-dom/server` renders the panels to markup and
+   the test greps for `NaN` and `undefined`, including a deliberately degenerate stats object.
+   That caught the class of bug T-V4 is actually about — a missing field printing as
+   `undefined` on a projector — without waiting for a browser session.
+5. **Latency bars scale against the 33 ms budget, not the largest stage.** A self-scaling chart
+   silently re-normalises whenever one stage spikes, so the picture would look identical at
+   5 ms and 50 ms. Same reasoning as the fixed elevation range in `palette.ts`.
+
+**Confirmed by Navya, same day.** **T-W7 passes: 304 frames → 2 React renders** (limit 10), and
+the panel reads correctly. Worth recording that the count *fell* from Shubham's 3 to 2 — adding
+the HUD cost nothing, because sampling into a leaf never touches the canvas subtree. Step 3 is
+**`[x]`**.
+
+**Next step.** Step 4 — view controls and the decision panel. The controls should drive
+`SceneHandle` (`setView`, `setColourMode`, `setGridOverlay`, `setWipe`, `setDivider`) and let me
+retire the temporary keyboard bindings inside `Viewer.tsx` — Shubham's file, so his call at
+standup. The decision panel must handle `tracks: []`, which fixtures do emit (§3).
+
+---
 
 ### Day 9 · Saturday 5 Sep 2026 (session 2) — blank dashboard: the server bug, fixed
 
