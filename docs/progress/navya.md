@@ -48,7 +48,8 @@ View 4.
 | Area | State |
 |---|---|
 | `lib/protocol.ts` | **Done** Day 8 — decoder verified against Anuj's encoder, 118 assertions |
-| `lib/ws.ts` | **Done** Day 9 — reconnect, drop-not-queue and keepalives verified |
+| `lib/ws.ts` | **Done** Day 9 — reconnect, drop-not-queue, keepalives; **T-W6 passes** |
+| `components/hud/StreamStatus.tsx` | **Done** Day 9 — connection state on screen; the rest of the HUD is Step 3 |
 | `components/hud/*`, `components/decision/*` | Missing |
 | `lib/firebase/{client,admin}.ts`, `lib/mongo.ts` | Missing |
 | `app/(auth)/login`, `/dashboard` gate, `app/api/{runs,decisions,scenes}` | Missing |
@@ -116,10 +117,16 @@ was reused rather than recreated. Branches live less than a day.
 - Server: `ws://localhost:8000/stream` (binary), `GET /health`, `CORS allow_origins=["*"]`,
   frames dropped rather than queued. Start it with
   `backend/.venv/bin/python -m avr25d.server.app --fixtures`.
-- ⚠️ **The server wedges when a client disconnects** — `server/app.py:487` blocks the event
-  loop. Symptom: `/health` times out and the process ignores SIGTERM; recover with
-  `pkill -9 -f avr25d.server.app` and restart. Anuj's fix, raised Day 8 (§7). Until it lands,
-  expect to restart the backend after each disconnect while developing `lib/ws.ts`.
+- ✅ **The disconnect wedge is fixed** (Day 9, `server/app.py`). It blocked the event loop with
+  a synchronous `queue.get` and never read inbound messages, so it never learned a client had
+  gone. Now polls the queue without blocking and watches for the ASGI disconnect. Verified:
+  clean close, abrupt kill, six rapid refresh cycles, SIGTERM honoured in ~1 s, idle CPU 0%,
+  throughput ~26 fps / 29 MB/s. **This is Anuj's module — tell him.**
+- ⚠️ **Two clients starve each other.** All WebSocket handlers pop from one shared
+  `worker._queue`, so each frame goes to exactly one connection. A second tab — or a forgotten
+  one — silently halves or steals the stream, and the symptom is a viewer that stutters or
+  freezes for no visible reason. Pre-existing, not introduced by the wedge fix. **Keep exactly
+  one dashboard tab open during the demo.** Proper fix is per-connection fan-out; Anuj's call.
 - **Measured frame shape** (fixtures, Day 8): 1,134,852 bytes · `cells.n = 41,990` ·
   `refined.n = 0` · 15 `stats` fields · `n_points_conserved == n_points == 121,344` ·
   `n_cells_total = 705,771`. Matches the ~42,000 cells / ~1.1 MB in Shubham's guide.
@@ -236,7 +243,7 @@ the spec.
       33 ms budget, 252× headroom**. Settles the "zero copies" question empirically: the one
       contiguous copy is free at this scale.
 
-### Step 2 — `lib/ws.ts` and stream cut-over `[~]`
+### Step 2 — `lib/ws.ts` and stream cut-over `[x]`
 
 **Objective.** Real frames on screen; **Shubham unblocked**.
 **Files.** `frontend/lib/ws.ts` (new), `frontend/app/dashboard/page.tsx` (cut-over). No file of
@@ -267,15 +274,28 @@ Switch the dashboard to `<Viewer onReady={h => connectFrames(url, h.pushFrame)} 
 - [x] End-to-end against the real fixture server: **108 frames, 41,990 cells each, 0 errors**,
       ids consecutive 388 → 495
 - [x] `tsc --noEmit` and `eslint` clean
-- [ ] **T-W6 part 1** — confirm no Next.js handler appears in the network trace for `/stream`
-      (expected: a single `ws://localhost:8000/stream` entry, nothing on :3000)
-- [ ] **T-W6 part 2** — kill `next dev` mid-stream and confirm the canvas keeps rendering
-- [ ] Confirm views 1–4 render real frames in the browser — closes Shubham's Day 3
+- [x] **T-W6 part 1** — no Next.js handler in the network trace for `/stream`; the browser
+      talks straight to `ws://localhost:8000/stream` (FR-41). Confirmed by Navya, Day 9
+- [x] **T-W6 part 2** — `next dev` killed mid-stream, canvas kept rendering. Confirmed by
+      Navya, Day 9
+- [x] Views render real streamed frames in the browser — **this closes Shubham's Day 3 exit
+      criterion**, open since Day 8
 
-**Navya: the browser checks need you** (no working browser tool this session). Open
-`http://localhost:3000/dashboard`, then DevTools → Network → WS. ⚠️ **Do not refresh the page**
-without restarting the backend afterwards — a refresh disconnects, and that wedges the server
-until `pkill -9` (§3, Anuj's bug).
+**Step 2 is complete.** T-W6 passes.
+
+**Navya: the browser checks need you** (no working browser tool in any session so far). Open
+`http://localhost:3000/dashboard`, then DevTools → Network → WS. Refreshing is now safe — the
+wedge is fixed — but keep to **one tab**, or the two connections will starve each other (§3).
+
+**Added Day 9 after the blank-dashboard incident:**
+
+- [x] `connectTimeoutMs` (default 5 s) in `ws.ts` — a socket that never completes its handshake
+      now times out and retries instead of sitting in `connecting` forever. Verified against a
+      listener that accepts and never handshakes: 4 retry attempts in 7 s, where the old code
+      made exactly 1 and then waited indefinitely
+- [x] `components/hud/StreamStatus.tsx` — connection state on screen, so "no frames" can never
+      again look identical to "working". A leaf component; the viewer element is memoized so a
+      status change cannot re-render the canvas (T-W7)
 
 ### Step 3 — HUD `[ ]`
 
@@ -365,7 +385,61 @@ zero console errors.
 
 ## 7. Progress log
 
-### Day 9 · Saturday 5 Sep 2026 — Step 2: the stream is live
+### Day 9 · Saturday 5 Sep 2026 (session 2) — blank dashboard: the server bug, fixed
+
+**Landed.** `model/avr25d/server/app.py` — the disconnect wedge is fixed. `lib/ws.ts` gains a
+connect timeout. `components/hud/StreamStatus.tsx` puts connection state on screen.
+
+**Acceptance.** The reported symptom is resolved and the underlying bug is gone, not worked
+around. Backend suite still **347 passed, 0 failed**.
+
+**Blocked / blocking.** Nothing. Step 2's two T-W6 browser checks remain open.
+
+**Decisions and surprises.**
+
+1. **The blank page was not a frontend bug.** The backend was wedged: listening, `R+` at 74%
+   CPU, `/health` timing out, handshakes never completing. With no frames the scene draws
+   *nothing* — Shubham removed the `GridHelper` deliberately — so an empty scene is a blank
+   canvas. Blank was the honest rendering of no data.
+2. **`sample` gave the proof.** The main thread sat in
+   `lock_PyThread_acquire_lock → _PyMutex_LockTimed → _PySemaphore_Wait` — the blocking
+   `queue.get` running on the event loop thread. Worth remembering: macOS ships `sample`, and
+   it turned a plausible theory into evidence in one command.
+3. **There were two bugs, not one.** The blocking `get` was half of it; the handler also never
+   called `receive()`, so ASGI's disconnect message was never read and the loop kept "sending"
+   into a dead socket forever. Fixing only the first would have left it spinning.
+4. **My first two fixes were slower than the bug.** Per-frame `asyncio.to_thread` and then a
+   long-lived drain thread both measured **~13 fps against the original's ~27** — the helper
+   thread wakes on every frame and trades the GIL with the event loop, and that handoff costs
+   more than the blocking call it replaced. A plain non-blocking poll with a 2 ms yield
+   restored **~26 fps / 29 MB/s**. Measured on an isolated port, three runs each; I would have
+   shipped a 2× throughput regression on the strength of "it no longer wedges".
+5. **A blocked server is invisible to a WebSocket client.** It still accepts TCP, so the
+   browser sits in `CONNECTING` with no error and no `close` event — no reconnect, nothing in
+   the console but "connecting". That was a real gap in my `ws.ts`, now closed with
+   `connectTimeoutMs`.
+6. **Two clients starve each other** (§3). Discovered when my test client got 0 frames while a
+   raw client got 102: Chrome had the tab open and was taking them all. Pre-existing, not
+   caused by the fix, and a demo hazard worth naming — one tab only.
+7. **I edited Anuj's module.** `server/app.py` is his under §1. Done on Navya's explicit
+   instruction because it is demo-fatal; the change is confined to the WebSocket handler, the
+   reasoning is in comments at the point of change, and the suite is green. **He needs to be
+   told, not discover it in a diff.**
+
+**Confirmed by Navya, same day.** The dashboard renders real streamed frames, and **both T-W6
+checks pass** — no Next.js handler in the trace for `/stream`, and the canvas survives killing
+`next dev`. Step 2 is **`[x]`**, and **Shubham's Day 3 exit criterion is closed** after two days
+blocked on it.
+
+**Next step.** Step 3 — the HUD (FR-28). Two things to settle before writing it: the FR-6 mode
+badge cannot distinguish `--fixtures` from a real geometric run (both report
+`mode: "geometric"`), and the HUD must read `SceneHandle`'s getters rather than compute
+anything. T-W7 currently passes at 3 renders over 316 frames; the HUD is the thing that could
+break it.
+
+---
+
+### Day 9 · Saturday 5 Sep 2026 (session 1) — Step 2: the stream is live
 
 **Landed.** `frontend/lib/ws.ts` and the cut-over in `app/dashboard/page.tsx`. Merged
 `origin/main` (Shubham's PR #2) into the branch first — see decision 1. No file of Shubham's
