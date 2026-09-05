@@ -51,7 +51,7 @@ View 4.
 | `lib/ws.ts` | **Done** Day 9 — reconnect, drop-not-queue, keepalives; **T-W6 passes** |
 | `components/hud/StreamStatus.tsx` | **Done** Day 9 — connection state on screen; the rest of the HUD is Step 3 |
 | `components/hud/*` | **Done** Day 9 — FR-28 complete; T-V4 and T-W7 pass |
-| `components/decision/*` | Missing — Step 4 |
+| `components/decision/*` | **Done** Day 9 — decision panel and track list; `tracks: []` handled |
 | `lib/firebase/{client,admin}.ts`, `lib/mongo.ts` | Missing |
 | `app/(auth)/login`, `/dashboard` gate, `app/api/{runs,decisions,scenes}` | Missing |
 | `app/runs`, `app/runs/[id]` | Missing |
@@ -345,16 +345,58 @@ Every FR-28 field is present and sourced, not computed:
 
 **Step 3 is complete.** T-V4 and T-W7 both pass.
 
-### Step 4 — View controls and decision panel `[ ]`
+### Step 4 — View controls and decision panel `[~]`
 
 **Objective.** Drive the demo from the UI; make the reroute legible.
-**Files.** `frontend/components/hud/` (controls), `frontend/components/decision/{DecisionPanel,TrackList}.tsx`.
+**Files.** `frontend/components/hud/ViewControls.tsx`,
+`frontend/components/decision/{DecisionPanel,TrackList}.tsx`,
+`frontend/app/dashboard/page.tsx`. No file of Shubham's touched.
 **Tasks.** Buttons/keys for views 1–4, elevation toggle, ring overlay, wipe — calling
 `SceneHandle`, gracefully disabled for views Shubham has not built. Decision panel: selected
 route, risk, ETA, reason string. Track list: id, class, speed.
 **Verification.** Run-book beats 58–82 s work: track appears, reroute fires, reason string
 readable from three metres.
 **Done when.** The demo can be driven without touching the keyboard bindings inside `Viewer.tsx`.
+
+**Status Day 9 — built and verified headlessly; the interactions need a browser.**
+
+- [x] Buttons for all four views, elevation, grid overlay and wipe, each showing its run-book
+      key so the presenter can use either
+- [x] Control state is **read back** from `SceneHandle` at 4 Hz, so pressing `3` on the keyboard
+      moves the button highlight too. A panel that drifted out of sync with the scene would be
+      worse than no panel
+- [x] Decision panel: selected route, risk, ETA, route/alternative point counts, and the reason
+      string verbatim — 15 px with a rule beside it, sized to read from three metres
+- [x] Track list: id, class name from `palette.ts`, speed
+- [x] **`tracks: []` handled** — and confirmed to be the *normal* case, not an error: the live
+      fixture frame used in the test genuinely carries an empty array, because the crossing
+      truck is only in frame for part of its trajectory. Renders "No dynamic objects in view"
+- [x] **24 assertions, 0 failures** on the decision components; the earlier 17 HUD assertions
+      still pass. Covers a real primary/LOW frame, a reroute frame (ALTERNATIVE/HIGH, one
+      track), a missing `decision` entirely, an out-of-range `class_id`, and a `NaN` speed. No
+      `NaN` or `undefined` reaches the markup in any of them
+- [x] `tsc`, `eslint` and `next build` clean; `/dashboard` still prerenders, which exercises the
+      controls' no-handle path
+- [ ] **Browser: the controls actually drive the scene** — each button changes the view, and
+      keyboard and buttons stay in sync
+- [ ] **Browser: the A/B wipe button shows the draggable divider** (see the constraint below)
+- [ ] **Browser: run-book beats 58–82 s** — track appears, reroute fires, reason legible from
+      three metres
+
+**One integration constraint, and it is Shubham's to close.** `setWipe()` on `SceneHandle`
+drives the scissor-rect render, but the draggable divider is a React overlay inside
+`Viewer.tsx` gated on `wipeOn`, a piece of state only that file's own key handler sets. Calling
+`setWipe()` from outside would enable the wipe with no draggable divider — worse than not
+offering the button. So the wipe control **dispatches the `W` keystroke**, driving his existing
+tested path and keeping his state and the scene in step, with a direct `setWipe()` fallback if
+the viewer was mounted without `enableKeyboard`. It works, but it is a seam, not a design: the
+clean fix is a controlled prop or an `onWipeChange` callback on `Viewer`. **His file, his call —
+raise at standup.**
+
+**Not implemented, deliberately: "gracefully disabled for views Shubham has not built."** All
+four views are built as of his PR #2, and his `NOT_BUILT` set is now empty. Duplicating that
+list here would create a second source of truth that goes stale the moment it disagrees with
+his.
 
 ### Step 5 — NFR-9 verification `[ ]`
 
@@ -420,6 +462,52 @@ zero console errors.
 ---
 
 ## 7. Progress log
+
+### Day 9 · Saturday 5 Sep 2026 (session 4) — Step 4: controls and the decision panel
+
+**Landed.** `components/hud/ViewControls.tsx`,
+`components/decision/{DecisionPanel,TrackList}.tsx`, and the dashboard wiring. The demo is
+drivable from the UI. No file of Shubham's touched.
+
+**Acceptance.** Step 4 is **`[~]`**: 24 new assertions pass alongside the existing 17, and
+`tsc`, `eslint` and `next build` are clean — but every remaining item is an interaction, and
+interactions need a browser. Checklist in §5 Step 4.
+
+**Blocked / blocking.** Not blocked. One item for Shubham at standup — the wipe seam below.
+
+**Decisions and surprises.**
+
+1. **The wipe cannot be driven cleanly through `SceneHandle`.** `setWipe()` runs the
+   scissor-rect render, but the draggable divider is a React overlay inside `Viewer.tsx` gated
+   on state only that file's key handler sets — so an external `setWipe(true)` gives a wipe with
+   no draggable divider, which is worse than no button. The control therefore **dispatches the
+   `W` keystroke** to drive his existing path, with a direct `setWipe()` fallback. It works and
+   it touches nothing of his, but it is a seam: the clean fix is a controlled prop on `Viewer`.
+   **His file, his call.**
+2. **Controls read their state back from the scene.** Shubham's key bindings are still live, so
+   the panel polls `getView` / `getColourMode` / `getGridOverlay` / `getWipe` at 4 Hz. Without
+   that, pressing `3` would move the scene and leave the buttons lying about it — and the
+   run-book has the presenter using keys.
+3. **`tracks: []` is the normal case, not an edge case.** The live fixture frame in the test
+   genuinely carries an empty array — the crossing truck is only in frame for part of its
+   trajectory. Worth stating plainly because "handle the empty case" reads like defensive
+   programming until you notice it is what the server sends most of the time.
+4. **Split the decision panel into a sampling wrapper and a pure view.** `DecisionView` is a
+   function of one snapshot, so the missing-data paths — no `decision`, unknown `class_id`,
+   `NaN` speed — are rendered and asserted rather than reasoned about. The refactor was for
+   testability but it is the better shape anyway; the timer and the markup are different jobs.
+5. **Did not implement "gracefully disabled for views Shubham has not built."** All four views
+   exist as of his PR #2 and his `NOT_BUILT` set is empty. Copying that list into my file would
+   be a second source of truth that goes stale the moment it disagrees with his.
+6. **Risk colours are deliberately not the class palette.** `palette.ts` is explicit that class
+   colour answers "what is it"; risk answers "how dangerous is it". Sharing a colour between
+   the two axes in one frame would be exactly the confusion that file exists to prevent, so the
+   three risk colours are local and commented as such.
+
+**Next step.** Navya runs the three browser checks in §5 Step 4. Then Step 5 — NFR-9, which is
+fifteen minutes — and after that auth and persistence.
+
+---
 
 ### Day 9 · Saturday 5 Sep 2026 (session 3) — Step 3: the HUD
 
