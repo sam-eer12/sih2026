@@ -598,7 +598,8 @@ zero console errors.
 
 ## 6. Definition of done
 
-Verified headlessly, **273 assertions across 9 suites, 0 failures**:
+Verified headlessly, **273 frontend assertions across 9 suites** plus **382 backend
+tests**, 0 failures:
 
 - [x] T-V4 — HUD shows no `NaN` and no `undefined`, including against degenerate stats
 - [x] T-W2 — every write route rejects a bad token with 401 before touching Mongo, asserted
@@ -629,6 +630,40 @@ Browser checks, recorded as pending rather than blocking:
 ---
 
 ## 7. Progress log
+
+### Day 9 · Saturday 5 Sep 2026 (session 11) — the fan-out now has tests in the repo
+
+**Landed.** `model/tests/test_frame_hub.py` (8 tests) and a dead constant removed from
+`server/app.py`. Backend **382 passed** (was 374), frontend **273 assertions**, `tsc`, `eslint`
+and `next build` clean.
+
+**Acceptance.** The backend integration is clean: `main` is merged, throughput is back to
+27 fps, two clients each get the full rate, and the fan-out is now covered by tests that live
+in the repo rather than in my scratchpad.
+
+**Decisions and surprises.**
+
+1. **The integration gap left was test coverage, not behaviour.** Sameer's `test_server_modes.py`
+   covers `PipelineWorker` and the queue; nothing covered `make_app`, the stream handler or
+   `FrameHub`. The piece that broke the demo twice was the only part of `server/` with no test,
+   and its only verification was manual probes in a scratchpad that vanish with the session.
+2. **The new tests have a negative control.** Reintroducing consumption semantics —
+   `latest()` clearing the value after one read — makes `test_two_readers_both_see_every_frame`
+   fail with `[None, None, None]` for the second client, which is precisely the symptom Navya
+   saw in the browser. A test that passes against the broken version would have been worthless.
+3. **`pytest-asyncio` is not a dependency and the sprint is past adding one**, so each test
+   drives its own loop with `asyncio.run`. Slightly more verbose, no new pin.
+4. **Two clients now get 27 fps *each*, not ~18.** The earlier "fair share" figure was the
+   machine being loaded by a browser and probes at once. Publish-latest means clients read the
+   same frame independently, so fan-out costs bandwidth, not frame rate.
+5. **`_POLL_INTERVAL_S` was dead** after the rewrite — the handler no longer polls — and its
+   comment described behaviour that no longer existed. Removed.
+
+**Next step.** Nothing outstanding on the backend. Still blocked only on accounts: Firebase,
+Atlas, Vercel.
+
+---
+
 
 ### Day 9 · Saturday 5 Sep 2026 (session 10) — merged Sameer's FR-40 registry
 

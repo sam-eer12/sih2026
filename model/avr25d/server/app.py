@@ -86,9 +86,7 @@ logger = logging.getLogger(__name__)
 
 _BASELINE_BYTES_CONST = b1_dense_uniform_25d().bytes   # 400 MB
 
-# WebSocket send loop: how long a client may hear nothing before it gets a
-# zero-length keepalive.
-_POLL_INTERVAL_S   = 0.002
+# How long a client may hear nothing before it gets a zero-length keepalive.
 _KEEPALIVE_AFTER_S = 2.0
 # How often the fan-out hub looks for a new frame. The source is a
 # thread-safe queue.Queue whose mutex is shared with the GIL-holding pipeline
