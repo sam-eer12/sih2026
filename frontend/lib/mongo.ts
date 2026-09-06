@@ -77,11 +77,21 @@ export interface DecisionDoc extends Document {
   changed: boolean;
 }
 
-/** FR-40 — scene ground truth, read from the same store the dashboard reads. */
+/**
+ * FR-40 — scene ground truth, read from the same store the dashboard reads.
+ *
+ * `_id` is the scene name, not an ObjectId: that is what
+ * `avr25d.synth.registry` emits, and keying on the name is what makes
+ * re-seeding idempotent. The index signature is deliberate — documents are
+ * stored whole, so `hazards`, `sensor` and the `source` sha256 survive without
+ * this file having to track every field the generator adds.
+ */
 export interface SceneDoc extends Document {
+  _id: string;
   name: string;
   primitives?: unknown;
-  groundTruth?: Record<string, number>;
+  groundTruth?: Record<string, number | null>;
+  [key: string]: unknown;
 }
 
 export interface UserDoc extends Document {

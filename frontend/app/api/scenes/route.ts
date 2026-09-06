@@ -2,54 +2,61 @@
 //
 // The point of this collection is that the hazard comparison reads truth from
 // the same place the dashboard reads everything else, rather than from a
-// constant someone typed into a slide. Registration is an upsert keyed on
-// name, so re-running it is idempotent.
+// constant someone typed into a slide.
 //
-// Populating it is not this route's job. The ground-truth values belong to the
-// synthetic scenes in avr25d/synth/scenes/*.csv, which are Sameer's, and
-// deriving pothole depth or gantry clearance from a primitive list is domain
-// work that should live with the scenes rather than be re-implemented here.
-// This endpoint accepts what that produces (T-W5 then checks the two agree).
+// Documents are stored **whole**. `avr25d.synth.registry` derives them from
+// the scene CSVs and they carry more than a `groundTruth` block: `hazards`,
+// `sensor`, `expectNoHazards`, and a `source` with the CSV's sha256 — which is
+// what lets T-W5 claim the stored truth matches the CSV rather than merely
+// resembling it. An earlier version of this route accepted only
+// `{name, primitives, groundTruth}` and would have dropped all of that.
+//
+// Seeding is therefore one POST of model/data/scenes_registry.json:
+//
+//   make scenes-registry
+//   curl -X POST localhost:3000/api/scenes -H "Authorization: Bearer $TOKEN" \
+//        -H 'Content-Type: application/json' \
+//        --data @model/data/scenes_registry.json
 
 import { requireUser } from '../../../lib/firebase/admin';
-import { ensureIndexes, scenes, type SceneDoc } from '../../../lib/mongo';
+import { ensureIndexes, scenes } from '../../../lib/mongo';
 import { BadRequestError, handleRouteError, readJson } from '../../../lib/api';
+import {
+  parseScenePayload,
+  toSceneUpdate,
+  SceneValidationError,
+} from '../../../lib/scenes';
 
 export const dynamic = 'force-dynamic';
-
-interface SceneBody {
-  name?: string;
-  primitives?: unknown;
-  groundTruth?: Record<string, number>;
-}
 
 export async function POST(req: Request): Promise<Response> {
   try {
     await requireUser(req);                        // FR-37 — before any Mongo call
-    const body = await readJson<SceneBody>(req);
+    const body = await readJson<unknown>(req);
 
-    if (!body.name || typeof body.name !== 'string') {
-      throw new BadRequestError('`name` is required');
+    let documents;
+    try {
+      documents = parseScenePayload(body);
+    } catch (err) {
+      // A malformed registry is the caller's mistake, not a server fault.
+      if (err instanceof SceneValidationError) throw new BadRequestError(err.message);
+      throw err;
     }
-    if (body.groundTruth !== undefined && typeof body.groundTruth !== 'object') {
-      throw new BadRequestError('`groundTruth` must be an object of numbers');
-    }
-
-    const doc: SceneDoc = {
-      name: body.name,
-      primitives: body.primitives,
-      groundTruth: body.groundTruth,
-    };
 
     await ensureIndexes();
-    // Upsert on the unique name index: registering the same scene twice
-    // updates it rather than failing or duplicating.
-    await (await scenes()).updateOne(
-      { name: body.name },
-      { $set: doc },
-      { upsert: true }
+    const col = await scenes();
+
+    // Upsert on the scene name, which is also the registry's own `_id`, so
+    // re-seeding updates in place rather than duplicating the collection.
+    const results = await Promise.all(
+      documents.map(async (doc) => {
+        const { id, fields } = toSceneUpdate(doc);
+        await col.updateOne({ _id: id }, { $set: fields }, { upsert: true });
+        return id;
+      })
     );
-    return Response.json({ name: body.name }, { status: 201 });
+
+    return Response.json({ scenes: results, count: results.length }, { status: 201 });
   } catch (err) {
     return handleRouteError(err);
   }
@@ -64,9 +71,7 @@ export async function GET(req: Request): Promise<Response> {
     const col = await scenes();
     const docs = await (name ? col.find({ name }) : col.find({}).sort({ name: 1 })).toArray();
 
-    return Response.json({
-      scenes: docs.map((d) => ({ ...d, _id: d._id?.toString() })),
-    });
+    return Response.json({ scenes: docs });
   } catch (err) {
     return handleRouteError(err);
   }

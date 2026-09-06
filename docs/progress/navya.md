@@ -538,10 +538,16 @@ records + ~10 heartbeats, not 600), T-W5 (scene ground truth equals the CSV).
 - [x] `tsc`, `eslint`, `next build` clean; all four routes register as dynamic
 - [ ] **T-W3 needs an Atlas cluster and a real `results.json`** — round-trip a run document and
       compare byte-for-byte
-- [ ] **T-W5 needs scene ground truth.** The route stores and returns whatever it is given;
-      *deriving* pothole depth or gantry clearance from `synth/scenes/*.csv` is domain work that
-      belongs with the scenes, which are Sameer's. Populating the collection is a script step,
-      not this route's job
+- [x] **Scene ground truth exists** — Sameer landed `avr25d/synth/registry.py` and
+      `model/data/scenes_registry.json` (FR-40) on Day 9, derived from the scene CSVs. The
+      route now accepts that file **as-is**: one document, an array, or the whole registry
+- [x] **Documents are stored whole**, which the first version got wrong. It accepted only
+      `{name, primitives, groundTruth}` and would have dropped `hazards`, `sensor`,
+      `expectNoHazards` and the `source.sha256` — the CSV hash that is precisely what lets T-W5
+      claim the stored truth *matches* the CSV rather than resembling it. **36 assertions**
+      against the real registry confirm all 7 scenes round-trip with every field intact
+- [ ] **T-W5 still needs an Atlas cluster** to seed into. Once `MONGODB_URI` is set:
+      `make scenes-registry`, then POST `model/data/scenes_registry.json` to `/api/scenes`
 - [ ] Create the Atlas M0 cluster and set `MONGODB_URI` — Navya's, same as Firebase
 
 **A failing database must not take the demo with it.** `flush()` never throws at the caller and
@@ -592,7 +598,7 @@ zero console errors.
 
 ## 6. Definition of done
 
-Verified headlessly, **237 assertions across 8 suites, 0 failures**:
+Verified headlessly, **273 assertions across 9 suites, 0 failures**:
 
 - [x] T-V4 — HUD shows no `NaN` and no `undefined`, including against degenerate stats
 - [x] T-W2 — every write route rejects a bad token with 401 before touching Mongo, asserted
@@ -610,7 +616,8 @@ accounts and handling credentials is not mine to do:
 
 - [ ] T-W1 — unauthenticated `/dashboard` redirects; both providers sign in *(Firebase project)*
 - [ ] T-W3 — a run document round-trips against `results.json` *(Atlas cluster)*
-- [ ] T-W5 — every scene's ground truth matches its CSV *(Atlas + Sameer's scene export)*
+- [ ] T-W5 — every scene's ground truth matches its CSV *(Atlas; Sameer's export has landed
+      and the route ingests it losslessly)*
 - [ ] Vercel deployment live for the submission link
 
 Browser checks, recorded as pending rather than blocking:
@@ -622,6 +629,47 @@ Browser checks, recorded as pending rather than blocking:
 ---
 
 ## 7. Progress log
+
+### Day 9 · Saturday 5 Sep 2026 (session 10) — merged Sameer's FR-40 registry
+
+**Landed.** Merged `origin/main` (Sameer's FR-40 registry, T-P6, CI, cache-path fix) and
+widened `/api/scenes` to ingest his registry losslessly. Backend **374 passed** (up from 347 —
+his 27 new tests), frontend **273 assertions across 9 suites**, `tsc`, `eslint` and
+`next build` clean.
+
+**Acceptance.** T-W5's data dependency is closed: the ground truth exists and the route accepts
+it. Only the Atlas cluster stands between here and the test passing.
+
+**Decisions and surprises.**
+
+1. **One merge conflict, and it was cosmetic.** Sameer and I both added module constants at the
+   same point in `server/app.py` — his `DEFAULT_CACHE_DIR`, my hub tuning. Kept both. His change
+   is confined to `PipelineWorker` and the cache path; mine to `make_app` and the stream
+   handler, so nothing else collided.
+2. **His new `test_server_modes.py` passes against my `FrameHub`.** That is the reassuring
+   result: 235 lines of new server tests written against the old handler still pass after the
+   fan-out rewrite, which says the rewrite preserved the contract rather than merely the
+   behaviour I happened to test.
+3. **My `/api/scenes` was quietly lossy and the registry proved it.** It accepted only
+   `{name, primitives, groundTruth}`. The real documents carry twelve fields including
+   `hazards`, `sensor`, `expectNoHazards` and a `source.sha256` of the CSV — and that hash is
+   exactly what lets T-W5 claim the stored truth *matches* the CSV rather than resembling it.
+   Storing documents whole means a field Sameer adds arrives without a frontend change.
+4. **`_id` is the scene name, not an ObjectId.** The registry keys on the name deliberately, so
+   re-seeding is idempotent. That needed a type change in `lib/mongo.ts` and care in the update:
+   Mongo rejects an update that touches `_id`, so it is the filter and never part of `$set`.
+5. **A future `schemaVersion` is refused rather than half-read.** If the generator moves ahead
+   of the frontend, storing a document the app cannot interpret is worse than a 400 that says
+   so.
+6. **Tested against the real file, not a fixture I wrote.** All 7 scenes, asserting field
+   counts, the pothole depth of 0.22 m, and the 64-character sha256 — a hand-made fixture would
+   have agreed with my own misunderstanding.
+
+**Next step.** Unchanged and unblocked only by accounts: Firebase, Atlas, Vercel. Seeding is
+`make scenes-registry` then POSTing the file to `/api/scenes`.
+
+---
+
 
 ### Day 9 · Saturday 5 Sep 2026 (session 9) — the stall was real: one client took every frame
 
