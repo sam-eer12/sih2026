@@ -13,7 +13,7 @@ CACHE   ?= data/cache/network
 LIMIT_ARG := $(if $(LIMIT),--limit $(LIMIT),)
 
 .PHONY: help test bench bench-network bench-cached bench-authoritative \
-	scenes finetune clean-bench
+	scenes scenes-registry finetune clean-bench
 
 help:
 	@echo "make test           — the whole pytest suite"
@@ -22,6 +22,7 @@ help:
 	@echo "make bench-cached   — same, from the prebuilt label cache"
 	@echo "make bench-authoritative — the Day 12 run: all sequences, cached"
 	@echo "make scenes         — regenerate the synthetic scenes S1-S7"
+	@echo "make scenes-registry — scene ground truth as MongoDB scenes documents"
 	@echo "make finetune       — Q-1 probe, 5-class split, fine-tune, before/after"
 	@echo ""
 	@echo "  SEQ='00 04 05'  MODE=geometric  LIMIT=  (override any of these)"
@@ -45,8 +46,16 @@ bench-authoritative:
 	cd model && ../$(PY) -m avr25d.bench --seq 00 04 05 --mode cached \
 		--cache $(CACHE)
 
-scenes:
+# Regenerating the scans without the registry would leave the two describing
+# different scenes, so `scenes` always writes both.
+scenes: scenes-registry
 	cd model && ../$(PY) -m avr25d.synth
+
+# FR-40. Derived from the scene CSVs alone — no ray-casting, no point clouds,
+# no dataset — so it runs in a fresh clone in milliseconds. The output seeds
+# the `scenes` collection and is what T-W5 checks.
+scenes-registry:
+	cd model && ../$(PY) -m avr25d.synth.registry
 
 # Days 9-10.  `probe` answers Q-1, `split` writes the 5-class manifest,
 # `train` fine-tunes the decoder and head, `evaluate` produces the before/after.
