@@ -32,6 +32,14 @@ data/splits/*
 !data/splits/*.json
 !data/finetune_report*.json
 
+# The FR-40 scene registry: every scene's exact ground truth in the shape the
+# `scenes` collection stores (IMPLEMENTATION_PLAN §8). 20 kB, derived from the
+# committed CSVs alone — no ray-casting and no dataset — and deterministic, so
+# regenerating it is a no-op diff. Tracked because the Next.js seed reads it
+# from a fresh clone, and because a number the dashboard shows should be in the
+# repo next to the CSV that specifies it.
+!data/scenes_registry.json
+
 __pycache__/
 *.py[cod]
 *.egg-info/

@@ -12,7 +12,7 @@
 # settled here in favour of refreshing the pins rather than pinning the
 # interpreter back to 3.12: the whole suite is green on 3.14 with the versions
 # below, and downgrading would mean re-verifying the ONNX export, the k-NN
-# reprojection and the 758-scan label cache to buy nothing.  §2.1 has been
+# reprojection and the 971-scan label cache to buy nothing.  §2.1 has been
 # updated to match.
 #
 # The pinned versions are the ones the perception work was actually measured

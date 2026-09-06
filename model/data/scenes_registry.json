@@ -1,0 +1,934 @@
+{
+  "schemaVersion": 1,
+  "collection": "scenes",
+  "generator": "avr25d.synth.registry",
+  "scenes": [
+    {
+      "_id": "S1_flat_road",
+      "name": "S1_flat_road",
+      "schemaVersion": 1,
+      "nFrames": 1,
+      "frameDtS": 0.1,
+      "frame": "road frame (z=0 at the road surface); *_sensor_m is z in the sensor frame",
+      "sensor": {
+        "heightM": 1.7,
+        "nBeams": 64,
+        "nAzimuth": 1800,
+        "fovUpDeg": 3.0,
+        "fovDownDeg": -25.0,
+        "rMaxM": 100.0,
+        "rangeSigmaM": 0.02,
+        "seed": 20260830
+      },
+      "expectNoHazards": true,
+      "nPrimitives": 1,
+      "primitives": [
+        {
+          "type": "plane",
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0,
+          "sx": 200.0,
+          "sy": 200.0,
+          "sz": 0.0,
+          "class": 1,
+          "vx": 0.0,
+          "vy": 0.0,
+          "hazard": "control",
+          "note": "road surface \u2014 flat and unobstructed"
+        }
+      ],
+      "groundTruth": {
+        "potholeDepth": null,
+        "clearance": null,
+        "curbHeight": null,
+        "truckSpeed": null
+      },
+      "hazards": [],
+      "source": {
+        "csv": "S1_flat_road.csv",
+        "sha256": "736b5a519ef0e6ecb098d9b36d691d581466545ab8eb82ed352f11fd97255667"
+      }
+    },
+    {
+      "_id": "S2_pothole",
+      "name": "S2_pothole",
+      "schemaVersion": 1,
+      "nFrames": 1,
+      "frameDtS": 0.1,
+      "frame": "road frame (z=0 at the road surface); *_sensor_m is z in the sensor frame",
+      "sensor": {
+        "heightM": 1.7,
+        "nBeams": 64,
+        "nAzimuth": 1800,
+        "fovUpDeg": 3.0,
+        "fovDownDeg": -25.0,
+        "rMaxM": 100.0,
+        "rangeSigmaM": 0.02,
+        "seed": 20260830
+      },
+      "expectNoHazards": false,
+      "nPrimitives": 2,
+      "primitives": [
+        {
+          "type": "plane",
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0,
+          "sx": 200.0,
+          "sy": 200.0,
+          "sz": 0.0,
+          "class": 1,
+          "vx": 0.0,
+          "vy": 0.0,
+          "hazard": "",
+          "note": "road surface"
+        },
+        {
+          "type": "pit",
+          "x": 12.0,
+          "y": -0.5,
+          "z": -0.11,
+          "sx": 1.4,
+          "sy": 1.0,
+          "sz": 0.22,
+          "class": 2,
+          "vx": 0.0,
+          "vy": 0.0,
+          "hazard": "pothole",
+          "note": "pothole \u2014 0.22 m deep"
+        }
+      ],
+      "groundTruth": {
+        "potholeDepth": 0.22,
+        "clearance": null,
+        "curbHeight": null,
+        "truckSpeed": null
+      },
+      "hazards": [
+        {
+          "index": 1,
+          "instanceId": 1,
+          "tag": "pothole",
+          "type": "pit",
+          "classId": 2,
+          "note": "pothole \u2014 0.22 m deep",
+          "centreXyM": [
+            12.0,
+            -0.5
+          ],
+          "rangeM": 12.010412,
+          "footprintXyM": [
+            [
+              11.3,
+              -1.0
+            ],
+            [
+              12.7,
+              0.0
+            ]
+          ],
+          "depthM": 0.22,
+          "lengthM": 1.4,
+          "widthM": 1.0,
+          "floorZRoadM": -0.22,
+          "rimZRoadM": 0.0,
+          "floorZSensorM": -1.92,
+          "rimZSensorM": -1.7
+        }
+      ],
+      "source": {
+        "csv": "S2_pothole.csv",
+        "sha256": "4cd8f4bc83283d274d6a64f7ac4763ce890d08ace550c9682656b5509fba4d23"
+      }
+    },
+    {
+      "_id": "S3_overhang",
+      "name": "S3_overhang",
+      "schemaVersion": 1,
+      "nFrames": 1,
+      "frameDtS": 0.1,
+      "frame": "road frame (z=0 at the road surface); *_sensor_m is z in the sensor frame",
+      "sensor": {
+        "heightM": 1.7,
+        "nBeams": 64,
+        "nAzimuth": 1800,
+        "fovUpDeg": 3.0,
+        "fovDownDeg": -25.0,
+        "rMaxM": 100.0,
+        "rangeSigmaM": 0.02,
+        "seed": 20260830
+      },
+      "expectNoHazards": false,
+      "nPrimitives": 4,
+      "primitives": [
+        {
+          "type": "plane",
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0,
+          "sx": 200.0,
+          "sy": 200.0,
+          "sz": 0.0,
+          "class": 1,
+          "vx": 0.0,
+          "vy": 0.0,
+          "hazard": "",
+          "note": "road surface"
+        },
+        {
+          "type": "box",
+          "x": 38.0,
+          "y": 0.0,
+          "z": 3.85,
+          "sx": 24.0,
+          "sy": 20.0,
+          "sz": 1.5,
+          "class": 3,
+          "vx": 0.0,
+          "vy": 0.0,
+          "hazard": "clearance",
+          "note": "overpass deck \u2014 underside at 3.10 m"
+        },
+        {
+          "type": "cyl",
+          "x": 38.0,
+          "y": -9.0,
+          "z": 1.55,
+          "sx": 1.2,
+          "sy": 1.2,
+          "sz": 3.1,
+          "class": 3,
+          "vx": 0.0,
+          "vy": 0.0,
+          "hazard": "",
+          "note": "left pier"
+        },
+        {
+          "type": "cyl",
+          "x": 38.0,
+          "y": 9.0,
+          "z": 1.55,
+          "sx": 1.2,
+          "sy": 1.2,
+          "sz": 3.1,
+          "class": 3,
+          "vx": 0.0,
+          "vy": 0.0,
+          "hazard": "",
+          "note": "right pier"
+        }
+      ],
+      "groundTruth": {
+        "potholeDepth": null,
+        "clearance": 3.1,
+        "curbHeight": null,
+        "truckSpeed": null
+      },
+      "hazards": [
+        {
+          "index": 1,
+          "instanceId": 1,
+          "tag": "clearance",
+          "type": "box",
+          "classId": 3,
+          "note": "overpass deck \u2014 underside at 3.10 m",
+          "centreXyM": [
+            38.0,
+            0.0
+          ],
+          "rangeM": 38.0,
+          "footprintXyM": [
+            [
+              26.0,
+              -10.0
+            ],
+            [
+              50.0,
+              10.0
+            ]
+          ],
+          "clearanceM": 3.1,
+          "structureDepthM": 1.5,
+          "spanM": 20.0,
+          "undersideZRoadM": 3.1,
+          "undersideZSensorM": 1.4
+        }
+      ],
+      "source": {
+        "csv": "S3_overhang.csv",
+        "sha256": "4f692bf0322a25b94a9ba427cf089bad2a3a23db9a5d4fe39d98641bbd375730"
+      }
+    },
+    {
+      "_id": "S4_curb",
+      "name": "S4_curb",
+      "schemaVersion": 1,
+      "nFrames": 1,
+      "frameDtS": 0.1,
+      "frame": "road frame (z=0 at the road surface); *_sensor_m is z in the sensor frame",
+      "sensor": {
+        "heightM": 1.7,
+        "nBeams": 64,
+        "nAzimuth": 1800,
+        "fovUpDeg": 3.0,
+        "fovDownDeg": -25.0,
+        "rMaxM": 100.0,
+        "rangeSigmaM": 0.02,
+        "seed": 20260830
+      },
+      "expectNoHazards": false,
+      "nPrimitives": 3,
+      "primitives": [
+        {
+          "type": "plane",
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0,
+          "sx": 200.0,
+          "sy": 200.0,
+          "sz": 0.0,
+          "class": 1,
+          "vx": 0.0,
+          "vy": 0.0,
+          "hazard": "",
+          "note": "road surface"
+        },
+        {
+          "type": "box",
+          "x": 30.0,
+          "y": 6.0,
+          "z": 0.075,
+          "sx": 120.0,
+          "sy": 0.3,
+          "sz": 0.15,
+          "class": 2,
+          "vx": 0.0,
+          "vy": 0.0,
+          "hazard": "step",
+          "note": "kerb \u2014 0.15 m high along y = +6 m"
+        },
+        {
+          "type": "box",
+          "x": 30.0,
+          "y": 7.65,
+          "z": 0.075,
+          "sx": 120.0,
+          "sy": 3.0,
+          "sz": 0.15,
+          "class": 2,
+          "vx": 0.0,
+          "vy": 0.0,
+          "hazard": "",
+          "note": "raised footway behind the kerb"
+        }
+      ],
+      "groundTruth": {
+        "potholeDepth": null,
+        "clearance": null,
+        "curbHeight": 0.15,
+        "truckSpeed": null
+      },
+      "hazards": [
+        {
+          "index": 1,
+          "instanceId": 1,
+          "tag": "step",
+          "type": "box",
+          "classId": 2,
+          "note": "kerb \u2014 0.15 m high along y = +6 m",
+          "centreXyM": [
+            30.0,
+            6.0
+          ],
+          "rangeM": 30.594117,
+          "footprintXyM": [
+            [
+              -30.0,
+              5.85
+            ],
+            [
+              90.0,
+              6.15
+            ]
+          ],
+          "heightM": 0.15,
+          "widthM": 0.3,
+          "topZRoadM": 0.15,
+          "topZSensorM": -1.55,
+          "edgeYM": 5.85
+        }
+      ],
+      "source": {
+        "csv": "S4_curb.csv",
+        "sha256": "3c652901a806677424117d4f63a44f7306062e265dd0df99bea5d9f5ffaae57b"
+      }
+    },
+    {
+      "_id": "S5_crossing_truck",
+      "name": "S5_crossing_truck",
+      "schemaVersion": 1,
+      "nFrames": 40,
+      "frameDtS": 0.1,
+      "frame": "road frame (z=0 at the road surface); *_sensor_m is z in the sensor frame",
+      "sensor": {
+        "heightM": 1.7,
+        "nBeams": 64,
+        "nAzimuth": 1800,
+        "fovUpDeg": 3.0,
+        "fovDownDeg": -25.0,
+        "rMaxM": 100.0,
+        "rangeSigmaM": 0.02,
+        "seed": 20260830
+      },
+      "expectNoHazards": false,
+      "nPrimitives": 4,
+      "primitives": [
+        {
+          "type": "plane",
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0,
+          "sx": 200.0,
+          "sy": 200.0,
+          "sz": 0.0,
+          "class": 1,
+          "vx": 0.0,
+          "vy": 0.0,
+          "hazard": "",
+          "note": "road surface"
+        },
+        {
+          "type": "box",
+          "x": 25.0,
+          "y": -16.0,
+          "z": 1.6,
+          "sx": 7.0,
+          "sy": 2.5,
+          "sz": 3.2,
+          "class": 4,
+          "vx": 0.0,
+          "vy": 8.0,
+          "hazard": "track",
+          "note": "truck crossing left to right at 8.0 m/s"
+        },
+        {
+          "type": "cyl",
+          "x": 20.0,
+          "y": -8.0,
+          "z": 2.0,
+          "sx": 0.25,
+          "sy": 0.25,
+          "sz": 4.0,
+          "class": 3,
+          "vx": 0.0,
+          "vy": 0.0,
+          "hazard": "",
+          "note": "roadside pole \u2014 static"
+        },
+        {
+          "type": "cyl",
+          "x": 20.0,
+          "y": 8.0,
+          "z": 2.0,
+          "sx": 0.25,
+          "sy": 0.25,
+          "sz": 4.0,
+          "class": 3,
+          "vx": 0.0,
+          "vy": 0.0,
+          "hazard": "",
+          "note": "roadside pole \u2014 static"
+        }
+      ],
+      "groundTruth": {
+        "potholeDepth": null,
+        "clearance": null,
+        "curbHeight": null,
+        "truckSpeed": 8.0
+      },
+      "hazards": [
+        {
+          "index": 1,
+          "instanceId": 1,
+          "tag": "track",
+          "type": "box",
+          "classId": 4,
+          "note": "truck crossing left to right at 8.0 m/s",
+          "centreXyM": [
+            25.0,
+            -16.0
+          ],
+          "rangeM": 29.681644,
+          "footprintXyM": [
+            [
+              21.5,
+              -17.25
+            ],
+            [
+              28.5,
+              -14.75
+            ]
+          ],
+          "speedMps": 8.0,
+          "velocityMps": [
+            0.0,
+            8.0
+          ],
+          "headingDeg": 90.0,
+          "dimsM": [
+            7.0,
+            2.5,
+            3.2
+          ],
+          "positionsXyM": [
+            [
+              25.0,
+              -16.0
+            ],
+            [
+              25.0,
+              -15.2
+            ],
+            [
+              25.0,
+              -14.4
+            ],
+            [
+              25.0,
+              -13.6
+            ],
+            [
+              25.0,
+              -12.8
+            ],
+            [
+              25.0,
+              -12.0
+            ],
+            [
+              25.0,
+              -11.2
+            ],
+            [
+              25.0,
+              -10.4
+            ],
+            [
+              25.0,
+              -9.6
+            ],
+            [
+              25.0,
+              -8.8
+            ],
+            [
+              25.0,
+              -8.0
+            ],
+            [
+              25.0,
+              -7.2
+            ],
+            [
+              25.0,
+              -6.4
+            ],
+            [
+              25.0,
+              -5.6
+            ],
+            [
+              25.0,
+              -4.8
+            ],
+            [
+              25.0,
+              -4.0
+            ],
+            [
+              25.0,
+              -3.2
+            ],
+            [
+              25.0,
+              -2.4
+            ],
+            [
+              25.0,
+              -1.6
+            ],
+            [
+              25.0,
+              -0.8
+            ],
+            [
+              25.0,
+              0.0
+            ],
+            [
+              25.0,
+              0.8
+            ],
+            [
+              25.0,
+              1.6
+            ],
+            [
+              25.0,
+              2.4
+            ],
+            [
+              25.0,
+              3.2
+            ],
+            [
+              25.0,
+              4.0
+            ],
+            [
+              25.0,
+              4.8
+            ],
+            [
+              25.0,
+              5.6
+            ],
+            [
+              25.0,
+              6.4
+            ],
+            [
+              25.0,
+              7.2
+            ],
+            [
+              25.0,
+              8.0
+            ],
+            [
+              25.0,
+              8.8
+            ],
+            [
+              25.0,
+              9.6
+            ],
+            [
+              25.0,
+              10.4
+            ],
+            [
+              25.0,
+              11.2
+            ],
+            [
+              25.0,
+              12.0
+            ],
+            [
+              25.0,
+              12.8
+            ],
+            [
+              25.0,
+              13.6
+            ],
+            [
+              25.0,
+              14.4
+            ],
+            [
+              25.0,
+              15.2
+            ]
+          ]
+        }
+      ],
+      "source": {
+        "csv": "S5_crossing_truck.csv",
+        "sha256": "3b4ada22173aa31b96645e05ff00c4700be85bb1fac5b2c13a0d788864786bee"
+      }
+    },
+    {
+      "_id": "S6_occluded_pothole",
+      "name": "S6_occluded_pothole",
+      "schemaVersion": 1,
+      "nFrames": 1,
+      "frameDtS": 0.1,
+      "frame": "road frame (z=0 at the road surface); *_sensor_m is z in the sensor frame",
+      "sensor": {
+        "heightM": 1.7,
+        "nBeams": 64,
+        "nAzimuth": 1800,
+        "fovUpDeg": 3.0,
+        "fovDownDeg": -25.0,
+        "rMaxM": 100.0,
+        "rangeSigmaM": 0.02,
+        "seed": 20260830
+      },
+      "expectNoHazards": false,
+      "nPrimitives": 3,
+      "primitives": [
+        {
+          "type": "plane",
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0,
+          "sx": 200.0,
+          "sy": 200.0,
+          "sz": 0.0,
+          "class": 1,
+          "vx": 0.0,
+          "vy": 0.0,
+          "hazard": "",
+          "note": "road surface"
+        },
+        {
+          "type": "box",
+          "x": 8.0,
+          "y": 0.9,
+          "z": 0.75,
+          "sx": 4.5,
+          "sy": 1.8,
+          "sz": 1.5,
+          "class": 4,
+          "vx": 0.0,
+          "vy": 0.0,
+          "hazard": "",
+          "note": "stopped car \u2014 the occluder; its silhouette edge cuts the pit in half"
+        },
+        {
+          "type": "pit",
+          "x": 11.38,
+          "y": 3.8,
+          "z": -0.11,
+          "sx": 1.4,
+          "sy": 1.0,
+          "sz": 0.22,
+          "class": 2,
+          "vx": 0.0,
+          "vy": 0.0,
+          "hazard": "pothole",
+          "note": "pothole \u2014 0.22 m deep at 12.0 m"
+        }
+      ],
+      "groundTruth": {
+        "potholeDepth": 0.22,
+        "clearance": null,
+        "curbHeight": null,
+        "truckSpeed": null
+      },
+      "hazards": [
+        {
+          "index": 2,
+          "instanceId": 2,
+          "tag": "pothole",
+          "type": "pit",
+          "classId": 2,
+          "note": "pothole \u2014 0.22 m deep at 12.0 m",
+          "centreXyM": [
+            11.38,
+            3.8
+          ],
+          "rangeM": 11.997683,
+          "footprintXyM": [
+            [
+              10.68,
+              3.3
+            ],
+            [
+              12.08,
+              4.3
+            ]
+          ],
+          "depthM": 0.22,
+          "lengthM": 1.4,
+          "widthM": 1.0,
+          "floorZRoadM": -0.22,
+          "rimZRoadM": 0.0,
+          "floorZSensorM": -1.92,
+          "rimZSensorM": -1.7
+        }
+      ],
+      "source": {
+        "csv": "S6_occluded_pothole.csv",
+        "sha256": "19f51b6d84ff3e9ff2c8e595d3caccce10dbe1b210180fffc87ca47ccc9f3909"
+      }
+    },
+    {
+      "_id": "S7_tunnel_curb",
+      "name": "S7_tunnel_curb",
+      "schemaVersion": 1,
+      "nFrames": 1,
+      "frameDtS": 0.1,
+      "frame": "road frame (z=0 at the road surface); *_sensor_m is z in the sensor frame",
+      "sensor": {
+        "heightM": 1.7,
+        "nBeams": 64,
+        "nAzimuth": 1800,
+        "fovUpDeg": 3.0,
+        "fovDownDeg": -25.0,
+        "rMaxM": 100.0,
+        "rangeSigmaM": 0.02,
+        "seed": 20260830
+      },
+      "expectNoHazards": false,
+      "nPrimitives": 6,
+      "primitives": [
+        {
+          "type": "plane",
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0,
+          "sx": 200.0,
+          "sy": 200.0,
+          "sz": 0.0,
+          "class": 1,
+          "vx": 0.0,
+          "vy": 0.0,
+          "hazard": "",
+          "note": "road surface"
+        },
+        {
+          "type": "box",
+          "x": 45.0,
+          "y": 0.0,
+          "z": 3.9,
+          "sx": 30.0,
+          "sy": 10.0,
+          "sz": 1.0,
+          "class": 3,
+          "vx": 0.0,
+          "vy": 0.0,
+          "hazard": "clearance",
+          "note": "tunnel roof \u2014 underside at 3.40 m"
+        },
+        {
+          "type": "box",
+          "x": 45.0,
+          "y": -4.75,
+          "z": 1.7,
+          "sx": 30.0,
+          "sy": 0.5,
+          "sz": 3.4,
+          "class": 3,
+          "vx": 0.0,
+          "vy": 0.0,
+          "hazard": "",
+          "note": "left tunnel wall"
+        },
+        {
+          "type": "box",
+          "x": 45.0,
+          "y": 4.75,
+          "z": 1.7,
+          "sx": 30.0,
+          "sy": 0.5,
+          "sz": 3.4,
+          "class": 3,
+          "vx": 0.0,
+          "vy": 0.0,
+          "hazard": "",
+          "note": "right tunnel wall"
+        },
+        {
+          "type": "box",
+          "x": 45.0,
+          "y": 3.0,
+          "z": 0.075,
+          "sx": 30.0,
+          "sy": 0.3,
+          "sz": 0.15,
+          "class": 2,
+          "vx": 0.0,
+          "vy": 0.0,
+          "hazard": "step",
+          "note": "kerb inside the tunnel \u2014 0.15 m high at y = +3 m"
+        },
+        {
+          "type": "box",
+          "x": 45.0,
+          "y": 3.9,
+          "z": 0.075,
+          "sx": 30.0,
+          "sy": 1.5,
+          "sz": 0.15,
+          "class": 2,
+          "vx": 0.0,
+          "vy": 0.0,
+          "hazard": "",
+          "note": "raised footway behind the kerb"
+        }
+      ],
+      "groundTruth": {
+        "potholeDepth": null,
+        "clearance": 3.4,
+        "curbHeight": 0.15,
+        "truckSpeed": null
+      },
+      "hazards": [
+        {
+          "index": 1,
+          "instanceId": 1,
+          "tag": "clearance",
+          "type": "box",
+          "classId": 3,
+          "note": "tunnel roof \u2014 underside at 3.40 m",
+          "centreXyM": [
+            45.0,
+            0.0
+          ],
+          "rangeM": 45.0,
+          "footprintXyM": [
+            [
+              30.0,
+              -5.0
+            ],
+            [
+              60.0,
+              5.0
+            ]
+          ],
+          "clearanceM": 3.4,
+          "structureDepthM": 1.0,
+          "spanM": 10.0,
+          "undersideZRoadM": 3.4,
+          "undersideZSensorM": 1.7
+        },
+        {
+          "index": 4,
+          "instanceId": 4,
+          "tag": "step",
+          "type": "box",
+          "classId": 2,
+          "note": "kerb inside the tunnel \u2014 0.15 m high at y = +3 m",
+          "centreXyM": [
+            45.0,
+            3.0
+          ],
+          "rangeM": 45.099889,
+          "footprintXyM": [
+            [
+              30.0,
+              2.85
+            ],
+            [
+              60.0,
+              3.15
+            ]
+          ],
+          "heightM": 0.15,
+          "widthM": 0.3,
+          "topZRoadM": 0.15,
+          "topZSensorM": -1.55,
+          "edgeYM": 2.85
+        }
+      ],
+      "source": {
+        "csv": "S7_tunnel_curb.csv",
+        "sha256": "7b66fa4cde641a90f0a5a872b677cadb6bce3906823dedc0dbf54aa0cff5e7cb"
+      }
+    }
+  ]
+}

@@ -7,6 +7,11 @@ about hazard preservation — and hazard preservation is the whole argument for
 pothole is 0.220 m deep and the gantry clearance is 3.100 m to machine
 precision, which turns "the hazard is visible in the render" into a measurement
 with an error in metres.
+
+``registry`` exports that same ground truth as the MongoDB ``scenes``
+documents of FR-40.  It is deliberately not imported here: it is a boundary
+layer with a CLI of its own, and importing it would make
+``python -m avr25d.synth.registry`` load the module twice.
 """
 
 from avr25d.synth.raycast import Primitive, Scene, SensorSpec, raycast

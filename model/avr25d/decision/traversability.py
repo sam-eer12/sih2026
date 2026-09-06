@@ -1,7 +1,29 @@
 """Per-cell traversability score in [0, 1].  FR-19.  IMPLEMENTATION_PLAN §6.8.
 
-Owner: Sameer (this stub gives the correct signature so costmap.py can import
-it without error; Sameer replaces the body).
+Owner: Sameer.  Written by Anuj against the §6.8 signature so ``costmap.py``
+could import something real rather than a stub, and reviewed here against FR-19
+and §6.8: the formula, the weights and the confidence pull all match, and the
+body stands as written.  Two things the review changed or is worth knowing:
+
+*The roughness normaliser now lives in ``config.yaml``.*  It was the one term in
+the formula carrying a hardcoded threshold while every weight beside it had a
+line of justification in the file — and "why 0.05?" is exactly the question
+§6.8 warns will be asked.
+
+*The step penalty is the STEP flag alone, and that is not a shortcut.*  §6.8
+says "STEP flag or |dz| > step_max"; the flag fires at ``hazards.tau_step``
+(0.08 m) and the vehicle limit is ``vehicle.max_step`` (0.12 m), so every cell
+the second clause would catch already carries the flag and the union collapses
+to it.  If ``tau_step`` is ever raised above ``max_step`` that stops being true,
+which is why the two numbers are named here.
+
+*The clearance penalty is currently inert on real scenes.*  It keys on
+FLAG_OVERHANG, which encodes "drivable cell whose clearance is under the vehicle
+height" — correct, but the flag fires on 2 of 916 cells under S3's deck and 0 of
+191 in S7's tunnel, because a beam that hits a deck underside and a beam that
+hits the road below it land at different ranges and rarely share a cell.  See
+``docs/progress/sameer.md``; the fix is open with Anuj in ``core/cell.py``, and
+this term starts working the day it lands, with no change here.
 
 Score formula (weights from config.yaml decision.traversability):
 
@@ -59,8 +81,7 @@ def score(cells: CellGrid, cfg) -> np.ndarray:
     conf_pull   = float(t.low_confidence_pull) # 0.5
 
     max_slope   = float(cfg.vehicle.max_slope_deg)   # 15 deg
-    max_rough   = 0.05   # m²  (not in config but documented in §6.8)
-    n = cells._grid.n_cells
+    max_rough   = float(t.max_roughness)             # 0.05 m²
     occ = cells.count > 0
 
     # ── slope penalty ─────────────────────────────────────────────────────
