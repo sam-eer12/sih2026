@@ -353,7 +353,7 @@ Every FR-28 field is present and sourced, not computed:
 
 **Step 3 is complete.** T-V4 and T-W7 both pass.
 
-### Step 4 — View controls and decision panel `[~]`
+### Step 4 — View controls and decision panel `[x]`
 
 **Objective.** Drive the demo from the UI; make the reroute legible.
 **Files.** `frontend/components/hud/ViewControls.tsx`,
@@ -385,13 +385,16 @@ readable from three metres.
       `NaN` or `undefined` reaches the markup in any of them
 - [x] `tsc`, `eslint` and `next build` clean; `/dashboard` still prerenders, which exercises the
       controls' no-handle path
-- [ ] **Browser: the controls actually drive the scene** — each button changes the view, and
-      keyboard and buttons stay in sync
-- [ ] **Browser: the A/B wipe button shows the draggable divider** (see the constraint below)
-- [ ] **Browser: run-book beats 58–82 s** — track appears, reroute fires, reason legible from
-      three metres. *First attempt showed nothing: the fixture truck crossed once in the first
-      8 s of server uptime and never returned. That was a fixture bug, not a panel bug — fixed
-      Day 9 (§7). Re-check: a track and a reroute should now recur every 10 s.*
+- [x] **Browser: the controls drive the scene** — each button changes the view, and keyboard and
+      buttons stay in sync. Confirmed by Navya, Day 9
+- [x] **Browser: the A/B wipe button shows the draggable divider** — the keystroke-dispatch
+      workaround below does hold in practice. Confirmed by Navya, Day 9
+- [x] **Browser: run-book beats 58–82 s** — track appears, reroute fires, reason legible.
+      Confirmed by Navya, Day 9. *First attempt showed nothing: the fixture truck crossed once
+      in the first 8 s of server uptime and never returned. That was a fixture bug, not a panel
+      bug — fixed Day 9 (§7), and the crossing now recurs every 10 s.*
+
+**Step 4 is complete.**
 
 **One integration constraint, and it is Shubham's to close.** `setWipe()` on `SceneHandle`
 drives the scissor-rect render, but the draggable divider is a React overlay inside
@@ -605,12 +608,40 @@ accounts and handling credentials is not mine to do:
 
 Browser checks, recorded as pending rather than blocking:
 
-- [ ] Step 4 — controls drive the scene, the wipe divider appears, run-book beats 58–82 s
+- [x] Step 4 — controls drive the scene, the wipe divider appears, run-book beats 58–82 s.
+      Confirmed by Navya, Day 9
 - [ ] Step 8 — responsive at the demo resolution; zero console errors across all pages
 
 ---
 
 ## 7. Progress log
+
+### Day 9 · Saturday 5 Sep 2026 (session 8) — Step 4 confirmed in the browser
+
+**Landed.** No code. Step 4's three browser checks were run by Navya and all pass, so Step 4
+moves to **`[x]`**.
+
+**Acceptance.** Controls drive the scene and stay in sync with the keyboard; the A/B wipe button
+does show the draggable divider; and the run-book's 58–82 s beats play — track appears, reroute
+fires, reason legible.
+
+**Decisions and surprises.**
+
+1. **The keystroke-dispatch workaround holds in practice.** The wipe button cannot go through
+   `SceneHandle` because the divider overlay is gated on React state inside `Viewer.tsx`, so the
+   control dispatches `W` instead. It was reasoned-about last session and is now observed. It
+   still deserves a controlled prop on `Viewer` — **Shubham's file, his call** — but it is no
+   longer an unknown.
+2. **The reroute beat is confirmed working after the fixture fix.** The first attempt at this
+   check showed nothing at all, which turned out to be the truck driving away permanently 8 s
+   after server start. Worth recording that the check only became meaningful once that was
+   fixed: a passing browser check on a broken fixture would have proved nothing.
+
+**Steps 0–5 are now `[x]`.** Steps 6, 7 and 8 remain `[~]`, and nothing left in them is
+unwritten code — four external accounts and two Step 8 browser checks.
+
+---
+
 
 ### Day 9 · Saturday 5 Sep 2026 (session 7) — connecting the code that was never called
 
