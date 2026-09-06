@@ -18,6 +18,7 @@ import numpy as np
 import pytest
 
 from avr25d import load_config
+from avr25d.config import Config
 from avr25d.core.cell import CellGrid, FLAG_STEP, FLAG_OVERHANG
 from avr25d.core.grid import RingGrid
 from avr25d.decision import costmap as costmap_mod
@@ -115,6 +116,45 @@ class TestTraversability:
             assert mean_oh <= mean_all + 0.05, (
                 f"OVERHANG mean {mean_oh:.3f} not ≤ overall {mean_all:.3f}"
             )
+
+
+    def test_roughness_normaliser_is_read_from_config(self, grid, cfg):
+        """NFR-7: every tunable in the FR-19 formula is a config key.
+
+        It was not: ``max_roughness`` was a constant in the source while the
+        five weights beside it each carried a line of justification in
+        ``config.yaml``.  Doubling the normaliser must halve the penalty, which
+        a hardcoded value cannot do.
+        """
+        cells = CellGrid(grid)
+        cells.count[:3]      = 5
+        cells.roughness[:3]  = 0.025          # half of the 0.05 default
+        cells.slope[:3]      = 0.0
+        cells.class_id[:3]   = labelmap.DRIVABLE
+        cells.confidence[:3] = 255
+
+        data = cfg.to_dict()
+        data["decision"]["traversability"]["max_roughness"] = 0.10
+        doubled_cfg = Config(data)
+
+        default = trav_mod.score(cells, cfg)[:3]
+        doubled = trav_mod.score(cells, doubled_cfg)[:3]
+
+        w_rough = float(cfg.decision.traversability.roughness_penalty)
+        assert doubled == pytest.approx(default + w_rough * 0.25, abs=1e-6)
+
+    def test_step_flag_subsumes_the_vehicle_step_limit(self, cfg):
+        """Why the step penalty keys on the flag alone.
+
+        §6.8 defines it as "STEP flag or |dz| > step_max".  The flag fires at
+        ``hazards.tau_step`` and the limit is ``vehicle.max_step``; while the
+        first is below the second, every cell the second clause would catch
+        already carries the flag and the union collapses to it.  Raise
+        ``tau_step`` above ``max_step`` and ``traversability.score`` starts
+        missing steps the vehicle cannot climb — so the ordering is pinned here
+        rather than left as a comment.
+        """
+        assert float(cfg.hazards.tau_step) <= float(cfg.vehicle.max_step)
 
 
 # ---------------------------------------------------------------------------
