@@ -125,11 +125,13 @@ was reused rather than recreated. Branches live less than a day.
   gone. Now polls the queue without blocking and watches for the ASGI disconnect. Verified:
   clean close, abrupt kill, six rapid refresh cycles, SIGTERM honoured in ~1 s, idle CPU 0%,
   throughput ~26 fps / 29 MB/s. **This is Anuj's module — tell him.**
-- ⚠️ **Two clients starve each other.** All WebSocket handlers pop from one shared
-  `worker._queue`, so each frame goes to exactly one connection. A second tab — or a forgotten
-  one — silently halves or steals the stream, and the symptom is a viewer that stutters or
-  freezes for no visible reason. Pre-existing, not introduced by the wedge fix. **Keep exactly
-  one dashboard tab open during the demo.** Proper fix is per-connection fan-out; Anuj's call.
+- ✅ **Client starvation is fixed** (Day 9, `server/app.py`). It was worse than "starve each
+  other": handlers *consumed* from one shared queue, so one won the race and the rest got
+  **zero** — measured 0 frames/s for a second client, and 0 for a fresh client connecting while
+  a departing handler still drained. A browser refresh landed exactly there, which is why a
+  reloaded dashboard reported "stream stalled" while the server streamed perfectly. `FrameHub`
+  now publishes each frame as a latest-value with a version counter and connections *read* it
+  instead of consuming. Multiple tabs are safe. **This is Anuj's module — tell him.**
 - **Measured frame shape** (fixtures, Day 8): 1,134,852 bytes · `cells.n = 41,990` ·
   `refined.n = 0` · 15 `stats` fields · `n_points_conserved == n_points == 121,344` ·
   `n_cells_total = 705,771`. Matches the ~42,000 cells / ~1.1 MB in Shubham's guide.
@@ -578,8 +580,13 @@ zero console errors.
 - [ ] **Vercel deploy.** Needs an account and a deploy from Navya's machine; creating accounts
       and handling credentials is hers, not mine. `.env.local.example` lists everything the
       deployment needs
+- [x] `/` and `/runs` load; `/dashboard` runs. Confirmed by Navya, Day 9 — and the check
+      earned its keep: it surfaced a stream stall that turned out to be a real server bug (§7)
 - [ ] **Responsive at the demo machine's resolution** — a browser check
-- [ ] Zero console errors across all pages — a browser check
+- [ ] Zero console errors across all pages — a browser check. Two are currently *expected*:
+      a `401` from `/api/runs` because Firebase is unconfigured, and a benign
+      "WebSocket is closed before the connection is established" when Fast Refresh tears down a
+      still-connecting socket. Neither is hidden on purpose
 
 ---
 
@@ -615,6 +622,54 @@ Browser checks, recorded as pending rather than blocking:
 ---
 
 ## 7. Progress log
+
+### Day 9 · Saturday 5 Sep 2026 (session 9) — the stall was real: one client took every frame
+
+**Landed.** `model/avr25d/server/app.py` — `FrameHub`, fan-out for the frame stream. Backend
+suite **347 passed**; frontend **237 assertions**, `tsc`, `eslint` and `next build` clean.
+
+**Acceptance.** The stall Navya reported on `/dashboard` was a genuine server bug, not fixture
+behaviour and not a frontend problem. Reproduced, fixed, and verified against the sequence that
+produced it.
+
+**Decisions and surprises.**
+
+1. **It was worse than the "starvation" I had already documented.** Every handler *consumed*
+   from the one shared `queue.Queue`, so a frame taken by one connection was gone for the rest.
+   One handler won the race consistently and the others got **zero** — not a reduced rate.
+   Measured: a second client sat at 0 frames/s, and a client connecting *after* the first had
+   closed also sat at 0 because the departing handler was still draining.
+2. **That is exactly what a browser refresh does.** Fast Refresh remounts the dashboard, the new
+   socket opens beside the old one, and whichever handler won kept every frame. The reloaded
+   page reported "stream stalled — no frame for 3000 ms" while the server was streaming
+   perfectly at 30 Hz. My `ws.ts` stall detector was telling the truth.
+3. **The first fix was correct and three times too slow.** A one-slot mailbox per connection
+   fixed fairness but dropped a single client from 26 fps to 8. Instrumenting the handler found
+   it: send 40 ms, **wait-for-frame 46 ms** — the mailbox was empty exactly when a handler
+   finished sending, so it waited a whole producer period for the next push. Publishing a
+   latest-value with a version counter restores the old pull behaviour — a handler that has
+   just finished takes whatever is current — while still letting every connection see it.
+4. **I nearly mis-diagnosed the fix as a regression.** After the change a single client measured
+   8 fps and I spent two rounds hunting a phantom. The cause was that **Navya's browser tab was
+   still connected**: with fan-out working it was now *also* receiving 1.1 MB frames, so my
+   probe was sharing capacity instead of monopolising it. Re-measured on a port the browser was
+   not attached to: **27 fps, 30.6 MB/s — no regression at all.** The lesson is that every
+   before/after number in this file was taken with an unknown number of other consumers
+   attached, and only an isolated port makes them comparable.
+5. **Two console messages are expected and were deliberately not hidden.** The `401` from
+   `/api/runs` is Firebase being unconfigured — the run session is inert by design and the
+   browser logs the failed fetch itself. The "WebSocket is closed before the connection is
+   established" warning is what a browser prints when Fast Refresh tears down a socket that is
+   still connecting; it is benign and unavoidable from the page's side.
+6. **Third file of Anuj's changed today.** `app.py` twice now, plus `fixtures.py`. All three
+   were demo-fatal and all three were on Navya's instruction, but the standup conversation is
+   overdue.
+
+**Next step.** Nothing blocked on code. Provision the accounts; re-run the two remaining Step 8
+browser checks.
+
+---
+
 
 ### Day 9 · Saturday 5 Sep 2026 (session 8) — Step 4 confirmed in the browser
 
