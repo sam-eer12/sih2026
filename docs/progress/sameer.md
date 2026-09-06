@@ -4,6 +4,235 @@ Newest entry at the top. Format and rules: [`README.md`](./README.md).
 
 ---
 
+## Sun 6 Sep 2026 · later — T-P6, and `--infer cached` was never reading the cache
+
+Board audit through Day 11, against the tree rather than against this log. Days
+1-11 are complete; three things were not, and two of them are now closed.
+
+**Landed.**
+
+| Module | What it does |
+|---|---|
+| `tests/test_server_modes.py` (8) | T-P6 — every mode emits a valid `FrameMessage` and `mode` on the wire is the mode that ran |
+| `server/app.py` | **Fix:** the cached-mode cache path, plus a `--cache` flag and a log line naming the cache and what built it |
+| `.github/workflows/tests.yml` | The suite on macOS **and Windows** — NFR-4, T-P3's "on both platforms" |
+| `IMPLEMENTATION_PLAN.md` §6.12 | The `**Tests:** T-P6` line it never had |
+| `decision/traversability.py` + 2 tests | The review Anuj asked for twice — `max_roughness` moved into `config.yaml` |
+
+Suite **374, all green** (364 + 8 + 2).
+
+**Acceptance.** T-P6 was the only id in the plan's test tables with no
+implementation anywhere in the tree. It has one now, and writing it found a
+defect that would have run in front of judges.
+
+### `--infer cached` fell back to geometric on every single run
+
+`app.py` looked for the label cache at `data/cache/<seq>` — `data/cache/04`.
+Caches are laid out by **builder**, not by sequence: `tools/build_cache.py`
+writes `data/cache/<mode>` and keys every frame `"<seq>/<frame>"`, so one cache
+spans the whole subset. `data/cache/04` has never existed. The directory test
+failed, the code logged a warning, ran `GeometricSegmenter` instead and set
+`mode = "geometric"`.
+
+So the mode the plan calls *"fastest, demo mode"* has been running the geometric
+segmenter since it was written. Measured on seq 04 frame 0, before and after:
+
+| | perception |
+|---|---:|
+| before — geometric fallback | 8.55 ms |
+| after — the memmap slice it was meant to be | **0.14 ms** |
+
+The HUD was never lying, and that is the one piece of good news: the fallback
+rewrites `mode` before it reaches the wire, so a demo would have shown
+"geometric" honestly while we thought it was showing cached labels. Anuj wrote
+that rewrite and it did its job.
+
+**Anuj — the fix is in your file.** Three lines: `DEFAULT_CACHE_DIR =
+data/cache/network` (matching the Makefile's `CACHE`), a `--cache` argument, and
+the existence check moved from the directory to its `index.json`, so a stale
+empty directory cannot pass either. Shout if you would rather have taken it.
+
+### Why the test asserts on labels and not on the mode string
+
+A test that checks `mode == "cached"` passes on the fallback path too — the
+fallback sets the mode it actually used, honestly, and the assertion never fires.
+That is how this survived. So the cache in the test is built by a stub segmenter
+that answers `STATIC_OBSTACLE` for every point, and the test asserts the decoded
+cells carry exactly that class: a flat road coming back as an obstacle is proof
+the labels came from the cache, and geometric segmentation of a flat road can
+never fake it.
+
+The other two fallback paths get the same treatment from the other side — a
+missing cache and a missing ONNX file must both report `geometric`, because
+FR-6 puts the mode on the HUD at all times.
+
+**No dataset needed.** The sequence is ray-cast from `S1_flat_road` into
+`tmp_path` and exported through `synth/export.py`, so T-P6 runs in a fresh clone.
+That mattered more than it looks — see CI.
+
+### CI, and what it is allowed to tell us
+
+`pytest -q` green *"on Mac and Windows"* has been an acceptance criterion since
+Day 1 and has only ever been observed on a Mac; T-P3's own wording is "asserted
+on both platforms in CI", and there was no CI. There is now: macOS and Windows,
+`fail-fast: false` so a Windows-only failure cannot hide a Mac one, and a step
+that regenerates the FR-40 registry and fails if it differs.
+
+**It has not run yet, and it may well go red on Windows first time.** The
+candidates are known — `np.memmap` keeps a file handle open and Windows will not
+let `tmp_path` delete underneath it, and `test_cache.py` builds real caches. If
+it does, that is the workflow doing its job on the first day rather than the
+demo doing it on the last.
+
+### The review Anuj asked for twice — `traversability.py`
+
+`decision/traversability.py` is mine by §6.8. Anuj wrote a working body rather
+than a stub so `costmap.py` had something real to import, said so in his log
+twice, and asked for a review. Its docstring still opened *"this stub gives the
+correct signature; Sameer replaces the body"*, which is now the least accurate
+sentence in the decision layer.
+
+**Reviewed against FR-19 and §6.8. The body stands** — formula, five weights and
+the confidence pull all match. Three things came out of it:
+
+1. **`max_roughness` was a constant in the source.** Every weight beside it
+   carries a line of justification in `config.yaml`; the normaliser those
+   weights are weights *of* was `max_rough = 0.05  # (not in config)`. NFR-7
+   says otherwise and §6.8 warns the question will be *"why 0.05?"*. Moved, with
+   its reason: 0.05 m² is 4x `hazards.roughness_thresh`, so a surface must be
+   well past "rough enough to flag" before roughness alone condemns it.
+   Behaviour is unchanged — same default, and a test now doubles it and asserts
+   the penalty halves, which a hardcoded value cannot do.
+2. **The step penalty keys on the flag alone, and that is correct, conditionally.**
+   §6.8 says "STEP flag or |dz| > step_max". The flag fires at
+   `hazards.tau_step` (0.08 m), the limit is `vehicle.max_step` (0.12 m), so the
+   second clause is a subset of the first and the union collapses to the flag.
+   That holds only while 0.08 < 0.12, so there is now a test pinning the
+   ordering instead of a comment hoping for it.
+3. **The clearance penalty is inert today**, and not because of anything here:
+   it keys on FLAG_OVERHANG, which fires on 2 of 916 cells under S3's deck. The
+   `core/cell.py` fix is still open with Anuj; this term starts working the day
+   it lands, with no change to this file.
+
+Also dropped a dead `n = cells._grid.n_cells` that reached into a private
+attribute and was never read.
+
+**Blocked / blocking.**
+
+- **Anuj — two things.** The OVERHANG per-cell fix from the entry below is still
+  open, and `bench/hazard.py` still measures 0.004 detection on S3 and 0.000 on
+  S7 because of it. It is the last number in §11.4 that reads worse than the
+  representation deserves, and Veda will be quoting that table. Second, smaller:
+  `server/app.py` changed today — see above.
+- **Navya — `frontend/lib/protocol.ts` is unmerged.** Two commits sit on
+  `origin/navya/platform-hud` and `main`'s `frontend/lib/` holds only
+  `palette.ts`, so there is no browser-side decoder on `main` at all. §3 of the
+  work distribution promises integration is "a FLAG CHANGE, `--fixtures` ->
+  `--infer cached`" — that is true only once something on `main` can decode a
+  frame. As integration lead this is mine to chase, not to merge over her head.
+- **Whoever is at the Windows box** — still no answer on Q-1's second half.
+  `python tools/finetune.py probe`, paste the output. It is wanted only for the
+  HUD's live-inference figure; nothing depends on it. Once CI runs, we will at
+  least know whether the *suite* passes there.
+- **The feature freeze has not been called.** Day 11's second half is "call the
+  feature freeze at 21:00" and there is no such declaration in this log. Not
+  something to record retroactively — it needs saying at a standup, with the
+  board state in front of everyone.
+- **Navya** — unchanged from the entry below: T-W5's Atlas half.
+
+**Decisions and surprises.**
+
+- **Nothing else on the board is outstanding.** Days 1-11 check out against the
+  tree: 971 scans on disk (00: 400, 04: 271, 05: 300), the label cache holds all
+  971 with its provenance in `index.json`, every §11 section of `RESULTS.md` is
+  populated, and every other test id in the plan — T-G, T-P, T-H, T-R, T-D, T-B
+  — resolves to a test that runs. The earlier loose ends are closed: seq 05
+  finished, and the numpy/scipy-on-3.14 pin conflict is settled in
+  `backend/requirements.txt` with the reasoning written down.
+- **`backend/requirements.txt` said "the 758-scan label cache".** It holds 971.
+  Corrected — a stale number in a tracked file is the kind of thing that ends up
+  quoted in a slide.
+- **§6.12 was the only module section in the plan with no `Tests:` line**, which
+  is the mechanical reason T-P6 belonged to nobody: it is listed under
+  *Perception* (mine) but implemented in `server/app.py` (Anuj's). Added.
+
+---
+
+## Sun 6 Sep 2026 — FR-40: the scene registry, exported from `synth/`
+
+**Landed.**
+
+| Module | What it does |
+|---|---|
+| `synth/registry.py` | Every scene as the MongoDB `scenes` document of FR-40, derived from its CSV |
+| `tests/test_registry.py` (17) | T-W5's model half — the exported values re-checked against the raw CSV |
+| `data/scenes_registry.json` | The seed file: 7 documents, 20 kB, **committed** |
+| `make scenes-registry` | Writes it. `make scenes` now depends on it |
+
+Suite **364, all green** (347 + 17).
+
+    S1_flat_road         no hazards
+    S2_pothole           potholeDepth=0.22
+    S3_overhang          clearance=3.1
+    S4_curb              curbHeight=0.15
+    S5_crossing_truck    truckSpeed=8.0
+    S6_occluded_pothole  potholeDepth=0.22
+    S7_tunnel_curb       clearance=3.4, curbHeight=0.15
+
+**Acceptance.** FR-40 is "synthetic scenes registered in a `scenes` collection
+carrying their exact ground-truth values". The export half is met: the seven
+documents exist, regenerate deterministically, and T-W5's exactness clause is
+tested against the CSVs rather than against the parser. The half that is not
+mine is the write to Atlas — see *blocking*.
+
+**Blocked / blocking.** **Navya**: `app/api/scenes/route.ts` seeds from
+`model/data/scenes_registry.json`. `registry.scenes` is a list of documents
+ready to `insertMany`/upsert as-is — `_id` is the scene name, so re-seeding is
+idempotent and the `{name:1}` unique index is satisfied by construction. It is
+in git, so no ray-casting or dataset is needed to seed a fresh clone; if a CSV
+changes, `make scenes-registry` and commit the diff. T-W5's other half —
+each scene has a document in Mongo — is yours once the route lands.
+
+**Decisions and surprises.**
+
+- **The document is a superset of the plan's four fields, and it had to be.**
+  §8 specifies `{_id, name, primitives, groundTruth:{potholeDepth, clearance,
+  curbHeight, truckSpeed}}`. Those four numbers are what the dashboard renders,
+  and they cannot carry the *comparison* FR-40's own clause asks for: scoring
+  S2 needs the pit's footprint and its instance id, S5 needs 40 per-frame truck
+  positions. So `groundTruth` stays exactly the four keys T-W5 checks, and the
+  per-hazard detail rides alongside in `hazards`. Without it the dashboard would
+  read the store while `bench/hazard.py` still read the file, which is the split
+  FR-40 exists to close.
+- **`from_document` is the thing that makes it one store rather than two that
+  agree today.** It reconstructs the exact dict `bench/hazard.py` scores
+  against, and a test round-trips all seven scenes through JSON. That is why I
+  did *not* rewire `bench/hazard.py` to load the registry: the CSV is the
+  source, the document is derived from it, and a test proves they are the same
+  numbers. Adding a file dependency to the benchmark would buy nothing and
+  could fail in a clone that had not run `make scenes-registry`.
+- **All four keys are always present, `null` where absent.** A fixed shape means
+  the dashboard renders a fixed set of rows instead of branching on key
+  existence, and `null` says "this scene has no pothole" where a missing key
+  says nothing at all.
+- **Two hazards of one kind raise rather than summarise.** The flat shape holds
+  one value per key; a scene with two potholes is legitimate to author but
+  cannot be summarised this way, and keeping the last one silently would put a
+  wrong number on a slide. S7 is fine — its two hazards are different kinds.
+- **camelCase, converted mechanically both ways.** The consumer is a TypeScript
+  route handler. `_camel`/`_snake` are three lines each; what licenses them is
+  the round trip over every scene and every key, not inspection.
+- **No timestamp in the output.** The same CSVs give a byte-identical file, so
+  regenerating is a no-op diff instead of churn, and the SHA-256 of each source
+  CSV travels in the document — "does this document match the spec file?" is
+  answerable without re-deriving anything.
+- **It needs no data.** Ground truth comes from the CSV, not from the scans, so
+  the registry builds in milliseconds in a fresh clone. That is why it is a
+  separate target from `make scenes` and why `make scenes` depends on it rather
+  than the other way round.
+
+---
+
 ## Days 7-11 · Thu 3 Sep 2026 — hazard scoring exists, and it found two bugs in `core/`
 
 Board cleared through Day 11. Every section of `docs/RESULTS.md` is populated —

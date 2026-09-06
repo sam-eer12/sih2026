@@ -10,6 +10,7 @@ Usage
 
     # Real pipeline with cached labels (fastest, demo mode)
     python -m avr25d.server.app --infer cached --seq 04
+    python -m avr25d.server.app --infer cached --seq 04 --cache data/cache/geometric
 
     # Replay a pre-recorded log (demo fallback)
     python -m avr25d.server.app --replay data/logs/demo.log
@@ -85,8 +86,8 @@ logger = logging.getLogger(__name__)
 
 _BASELINE_BYTES_CONST = b1_dense_uniform_25d().bytes   # 400 MB
 
-# WebSocket send loop: how long to yield when the frame queue is empty, and
-# how long a client may hear nothing before it gets a zero-length keepalive.
+# WebSocket send loop: how long a client may hear nothing before it gets a
+# zero-length keepalive.
 _POLL_INTERVAL_S   = 0.002
 _KEEPALIVE_AFTER_S = 2.0
 # How often the fan-out hub looks for a new frame. The source is a
@@ -96,6 +97,12 @@ _KEEPALIVE_AFTER_S = 2.0
 # The queue holds two frames and the pipeline produces one every ~33 ms, so
 # 10 ms is frequent enough never to miss one.
 _HUB_POLL_INTERVAL_S = 0.010
+
+#: Where ``--infer cached`` looks unless told otherwise.  Caches are laid out
+#: by *builder*, not by sequence — ``tools/build_cache.py`` writes
+#: ``data/cache/<mode>`` and keys every frame ``"<seq>/<frame>"``, so one
+#: cache spans the whole subset.  Matches the Makefile's ``CACHE`` default.
+DEFAULT_CACHE_DIR = Path("data/cache/network")
 
 
 def _build_cell_arrays(cells: CellGrid, grid: RingGrid) -> CellArrays:
@@ -156,6 +163,7 @@ class PipelineWorker:
         *,
         seq: str = "04",
         data_root: Path | None = None,
+        cache_dir: Path | None = None,
         record_path: Path | None = None,
     ) -> None:
         self._cfg        = cfg
@@ -163,6 +171,7 @@ class PipelineWorker:
         self._queue      = out_queue
         self._seq        = seq
         self._data_root  = data_root or Path("data/kitti")
+        self._cache_dir  = Path(cache_dir) if cache_dir else DEFAULT_CACHE_DIR
         self._record_path = record_path
         self._stop_event = threading.Event()
         self._thread: threading.Thread | None = None
@@ -235,19 +244,23 @@ class PipelineWorker:
 
         elif mode == "cached":
             from ..perception.cache import LabelCache
-            cache_dir = Path("data/cache") / self._seq
-            if not cache_dir.exists():
+            cache_dir = self._cache_dir
+            if not (cache_dir / "index.json").is_file():
                 logger.warning(
-                    "Label cache for seq %s not found at %s — "
-                    "falling back to geometric segmenter.  "
-                    "Run tools/build_cache.py to build the cache.",
-                    self._seq, cache_dir,
+                    "No label cache at %s — falling back to the geometric "
+                    "segmenter.  Run tools/build_cache.py, or pass --cache "
+                    "with the directory holding index.json.",
+                    cache_dir,
                 )
                 from ..perception.geometric_seg import GeometricSegmenter
                 segmenter = GeometricSegmenter(cfg)
                 mode = "geometric"
             else:
                 cache = LabelCache(cache_dir)
+                logger.info(
+                    "Label cache: %s — %d frames, built by the %s segmenter",
+                    cache_dir, len(cache), cache.meta.get("mode", "unknown"),
+                )
 
         elif mode == "live":
             from ..perception.onnx_infer import OnnxSegmenter
@@ -718,6 +731,9 @@ def _parse_args(argv=None) -> argparse.Namespace:
     p.add_argument("--seq",  default="04", help="KITTI sequence id (default: 04)")
     p.add_argument("--data", default="data/kitti", type=Path,
                    help="KITTI data root (default: data/kitti)")
+    p.add_argument("--cache", default=DEFAULT_CACHE_DIR, type=Path,
+                   help=f"label cache directory for --infer cached "
+                        f"(default: {DEFAULT_CACHE_DIR})")
     p.add_argument("--record", metavar="LOG", type=Path,
                    help="Record frames to a log file while running")
     p.add_argument("--host", default="0.0.0.0")
@@ -760,6 +776,7 @@ def main(argv=None) -> None:
             frame_queue,
             seq         = args.seq,
             data_root   = args.data,
+            cache_dir   = args.cache,
             record_path = args.record,
         )
 

@@ -66,6 +66,13 @@ decision:
                              #   envelope, not the surface — the ground stays drivable.
     low_confidence_pull: 0.5 # LOW_CONFIDENCE cells are pulled toward 0.5: unknown is
                              #   neither traversable nor blocked.
+    max_roughness: 0.05      # m² — roughness that scores a full penalty on its own.
+                             #   The normaliser the weights above are weights *of*,
+                             #   and the only one that was hardcoded: §6.8 names it
+                             #   and NFR-7 says every tunable lives here with its
+                             #   reason.  0.05 is four times hazards.roughness_thresh
+                             #   (0.03), so a surface has to be well past "rough
+                             #   enough to flag" before roughness alone condemns it.
 
   # FR-20 tracker (IMPLEMENTATION_PLAN.md §6.9).  A dynamic object is clustered
   # in the metric XY plane, not in (ring, bin) index space: a vehicle at 25 m

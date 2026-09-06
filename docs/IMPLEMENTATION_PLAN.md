@@ -725,6 +725,11 @@ worker thread and pushes `FrameMessage`s on a fixed cadence, dropping frames rat
 queueing them if a consumer falls behind — a demo must degrade in frame rate, never in
 latency.
 
+**Tests:** T-P6. The mode on the wire is the mode that ran: both fallbacks here — a missing
+ONNX file and a missing label cache — rewrite `mode` to `geometric`, because FR-6 puts the
+active mode on the HUD at all times and a badge reading "network" over geometric labels is
+worse than a crash.
+
 ### 6.13 `webapp/components/viewer/` — the Three.js viewer · Shubham
 
 Owns the entire rendering path. **No React state touches per-frame data** (FR-42).
