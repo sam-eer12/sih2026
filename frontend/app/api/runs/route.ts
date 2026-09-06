@@ -91,6 +91,38 @@ export async function GET(req: Request): Promise<Response> {
   }
 }
 
+/**
+ * Close a run — set `finishedAt` when the dashboard session ends.
+ *
+ * Scoped by uid as well as _id, so this cannot touch another account's run
+ * even with a valid token and a guessed id. Only `finishedAt` is writable:
+ * the config and results are the provenance of every number in the deck and
+ * must not be editable after the fact.
+ */
+export async function PATCH(req: Request): Promise<Response> {
+  try {
+    const user = await requireUser(req);          // FR-37 — before any Mongo call
+    const body = await readJson<{ id?: string; finishedAt?: string }>(req);
+
+    if (!body.id || !ObjectId.isValid(body.id)) {
+      throw new BadRequestError('`id` must be a run id');
+    }
+    const finishedAt = parseDate(body.finishedAt) ?? new Date();
+
+    await ensureIndexes();
+    const result = await (await runs()).updateOne(
+      { _id: new ObjectId(body.id), uid: user.uid },
+      { $set: { finishedAt } }
+    );
+    if (result.matchedCount === 0) {
+      return Response.json({ error: 'Run not found' }, { status: 404 });
+    }
+    return Response.json({ id: body.id, finishedAt: finishedAt.toISOString() });
+  } catch (err) {
+    return handleRouteError(err);
+  }
+}
+
 function parseDate(value: string | undefined): Date | undefined {
   if (!value) return undefined;
   const d = new Date(value);

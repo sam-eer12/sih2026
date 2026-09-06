@@ -7,6 +7,8 @@ import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { connectFrames, DEFAULT_STREAM_URL } from '../../lib/ws';
 import type { SceneHandle } from '../../components/viewer/useThreeScene';
 import StreamStatus, { type StatusSink } from '../../components/hud/StreamStatus';
+import SessionChip from '../../components/hud/SessionChip';
+import { startRunSession, type RunSession } from '../../lib/runSession';
 import Hud from '../../components/hud/Hud';
 import ViewControls from '../../components/hud/ViewControls';
 import DecisionPanel, {
@@ -43,6 +45,9 @@ export default function DashboardPage() {
   // React is never told a frame arrived.
   const latestFrameRef = useRef<FrameMessage | null>(null);
   const sceneRef = useRef<SceneHandle | null>(null);
+  // The audit trail (FR-38, FR-39). Inert until there is a signed-in user and
+  // a reachable database, so the frame path below does not branch on config.
+  const sessionRef = useRef<RunSession | null>(null);
 
   // Fires once, from inside the viewer's mount effect. It must not set React
   // state — the frame path stays outside reconciliation entirely (FR-42), so
@@ -50,11 +55,17 @@ export default function DashboardPage() {
   const handleReady = useCallback((handle: SceneHandle) => {
     disconnectRef.current?.();
     sceneRef.current = handle;
+    sessionRef.current ??= startRunSession({
+      onError: (err) => console.error('[runs]', err.message),
+    });
     disconnectRef.current = connectFrames(
       DEFAULT_STREAM_URL,
       (msg) => {
         latestFrameRef.current = msg;
         handle.pushFrame(msg);
+        // Synchronous and cheap: the log decides whether this frame is worth a
+        // record, and nothing is awaited here (FR-39).
+        sessionRef.current?.record(msg);
       },
       {
         onStatus: (status, detail) => {
@@ -113,6 +124,11 @@ export default function DashboardPage() {
       disconnectRef.current = null;
       sceneRef.current = null;
       latestFrameRef.current = null;
+      // Flush whatever the log still holds and close the run. Fire-and-forget:
+      // an unmount cannot await, and losing the tail of an audit trail must
+      // never surface as an error while the page is going away.
+      void sessionRef.current?.stop();
+      sessionRef.current = null;
     };
   }, []);
 
@@ -122,7 +138,24 @@ export default function DashboardPage() {
           in the path (FR-41). `devStream` is deliberately not passed; the
           synthetic generator stays in the tree as Shubham's offline fallback. */}
       {viewer}
-      <StreamStatus onMount={handleStatusMount} />
+      {/* Top-left column: session first, then connection state. Stacked here
+          rather than each positioning itself, so neither can land on the
+          other when one of them is hidden. */}
+      <div
+        style={{
+          position: 'absolute',
+          top: 16,
+          left: 16,
+          zIndex: 10,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'flex-start',
+          gap: 8,
+        }}
+      >
+        <SessionChip />
+        <StreamStatus onMount={handleStatusMount} />
+      </div>
       <Hud sample={sampleHud} />
       <ViewControls getHandle={getHandle} />
       <DecisionPanel sample={sampleDecision} />

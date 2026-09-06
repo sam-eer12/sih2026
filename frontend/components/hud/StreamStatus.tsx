@@ -59,10 +59,8 @@ export default function StreamStatus({ onMount }: StreamStatusProps) {
   return (
     <div
       style={{
-        position: 'absolute',
-        top: 16,
-        left: 16,
-        zIndex: 10,
+        // Positioning belongs to whatever lays this out — the dashboard stacks
+        // it under the session chip — so this only styles itself.
         display: 'flex',
         alignItems: 'center',
         gap: 10,

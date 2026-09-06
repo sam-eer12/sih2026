@@ -53,9 +53,9 @@ View 4.
 | `components/hud/*` | **Done** Day 9 — FR-28 complete; T-V4 and T-W7 pass |
 | `components/decision/*` | **Done** Day 9 — decision panel and track list; `tracks: []` handled |
 | `lib/firebase/{client,admin}.ts` | **Done** Day 9 — sign-in and `requireUser`; needs a project to switch on |
-| `lib/mongo.ts`, `lib/decisionLog.ts` | **Done** Day 9 — cached client, indexes, FR-39 batching; needs a cluster |
-| `app/(auth)/login`, `proxy.ts` gate, `app/api/{runs,decisions,scenes}` | **Done** Day 9 — T-W2 verified per route |
-| `app/runs`, `app/runs/[id]` | Missing — Step 8 |
+| `lib/mongo.ts`, `lib/decisionLog.ts`, `lib/runSession.ts` | **Done** Day 9 — cached client, indexes, FR-39 batching **wired into the dashboard**; needs a cluster |
+| `app/(auth)/login`, `proxy.ts` gate, sign-out chip, `app/api/{runs,decisions,scenes,users}` | **Done** Day 9 — T-W2 verified across all four routes |
+| `app/runs`, `app/runs/[id]` | **Done** Day 9 |
 | `.env.local.example` | **Done** Day 9 — every variable documented |
 | Firebase project, Atlas M0 cluster | **Not created** — external accounts, Navya's to provision |
 | `app/page.tsx`, `app/layout.tsx` metadata | Still create-next-app boilerplate |
@@ -463,6 +463,12 @@ complete a sign-in.
       malformed shapes, and — the T-W2 property — `requireUser` rejecting **before any SDK or
       database work**, asserted by checking no admin app exists afterwards
 - [x] `tsc`, `eslint`, `next build` clean; `/login` prerenders
+- [x] `components/hud/SessionChip.tsx` — who is signed in, a link to the run history, and a
+      **sign-out control**. Without one there was no way to get signed out, which made T-W1
+      awkward to even exercise. Renders nothing when auth is unconfigured
+- [x] `app/api/users/route.ts` — the `users` collection from §6.14, which existed in
+      `lib/mongo.ts` and had never been written to. Upserted on sign-in from the verified
+      token, never from the body
 - [ ] **T-W1 needs a Firebase project.** Nobody has created one, and creating accounts and
       handling credentials is Navya's to do, not mine. Once
       `NEXT_PUBLIC_FIREBASE_API_KEY`/`AUTH_DOMAIN`/`PROJECT_ID` are in `.env.local` the gate
@@ -515,7 +521,16 @@ records + ~10 heartbeats, not 600), T-W5 (scene ground truth equals the CSV).
       frames plus 5 change frames minus 2 that coincide. Also asserted — a per-frame jittering
       ETA triggers no writes at all, and a failing endpoint reports through `onError` without
       throwing at the caller or growing an unbounded backlog
-- [x] `tsc`, `eslint`, `next build` clean; all three routes register as dynamic
+- [x] **`lib/runSession.ts` — the decision log is now connected.** `decisionLog.ts` had the
+      batching and nothing called it: FR-39 was implemented but dead. The dashboard now opens a
+      run on mount, offers every frame to the log from inside the frame callback
+      (synchronous, nothing awaited), and closes the run on unmount via a new
+      `PATCH /api/runs` that can only set `finishedAt`
+- [x] **7 assertions on the inert path** — the state the project is actually in. With no
+      Firebase config the session reports `disabled`, invents no run id, records 1000 frames
+      without throwing, skips frames carrying no decision, and `stop()` is idempotent. A
+      missing account is deliberately *not* reported as an error
+- [x] `tsc`, `eslint`, `next build` clean; all four routes register as dynamic
 - [ ] **T-W3 needs an Atlas cluster and a real `results.json`** — round-trip a run document and
       compare byte-for-byte
 - [ ] **T-W5 needs scene ground truth.** The route stores and returns whatever it is given;
@@ -567,7 +582,7 @@ zero console errors.
 
 ## 6. Definition of done
 
-Verified headlessly, **221 assertions across 7 suites, 0 failures**:
+Verified headlessly, **237 assertions across 8 suites, 0 failures**:
 
 - [x] T-V4 — HUD shows no `NaN` and no `undefined`, including against degenerate stats
 - [x] T-W2 — every write route rejects a bad token with 401 before touching Mongo, asserted
@@ -596,6 +611,47 @@ Browser checks, recorded as pending rather than blocking:
 ---
 
 ## 7. Progress log
+
+### Day 9 · Saturday 5 Sep 2026 (session 7) — connecting the code that was never called
+
+**Landed.** `lib/runSession.ts`, `app/api/users/route.ts`, `PATCH /api/runs`,
+`components/hud/SessionChip.tsx`, and the dashboard wiring. **237 assertions across 8 suites,
+0 failures**; `tsc`, `eslint` and `next build` clean at 10 routes.
+
+**Acceptance.** Every piece of the roadmap that can be built without credentials now exists
+*and is reachable from the app*. What remains is four external accounts and a handful of
+browser checks.
+
+**Decisions and surprises.**
+
+1. **FR-39 was implemented and dead.** `lib/decisionLog.ts` shipped with 13 passing assertions
+   in the previous session and **nothing ever called it** — no run was created, no record was
+   written, no batch was ever sent. Tests passing is not the same as a feature existing, and a
+   grep for the module's own name is what surfaced it. `runSession.ts` is the missing half.
+2. **Two more things were defined but never used:** the `users` collection had a typed helper in
+   `lib/mongo.ts` and no writer, and there was no sign-out control anywhere — which would have
+   made T-W1 ("unauthenticated `/dashboard` redirects") awkward to verify, since verifying it
+   requires being able to get signed out first. Both closed.
+3. **The session is inert rather than conditional.** The frame callback calls
+   `sessionRef.current?.record(msg)` unconditionally; when there is no account the session
+   reports `disabled` and `record()` costs one null check. The dashboard does not branch on
+   configuration, so the code path that runs today is the same one that will run with Atlas
+   attached — only the destination changes.
+4. **A missing account is not an error.** `startRunSession` swallows 401 and 503 without
+   calling `onError`: that is the expected state until the accounts exist, and a console full
+   of red during a demo would train everyone to ignore it. Anything else *is* reported.
+5. **`PATCH /api/runs` can only set `finishedAt`.** Config and results are the provenance of
+   every number in the deck; making them editable after the fact would undermine the reason the
+   collection exists.
+6. **The two top-left overlays now stack in one container.** Previously `StreamStatus`
+   positioned itself absolutely; adding the session chip at the same corner would have put one
+   on top of the other whenever the other was hidden. Layout belongs to the parent.
+
+**Next step.** Nothing further can be built without credentials. Provision Firebase and Atlas
+and four tests close themselves; everything else outstanding is a browser check.
+
+---
+
 
 ### Day 9 · Saturday 5 Sep 2026 (session 6) — Steps 5–8: the rest of the roadmap
 
