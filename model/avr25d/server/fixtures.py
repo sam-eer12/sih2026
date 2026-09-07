@@ -223,10 +223,27 @@ _SCENE = _build_static_scene()
 # Dynamic (per-frame) content
 # ---------------------------------------------------------------------------
 
+# The crossing repeats on this cycle so the demo beat can be rehearsed rather
+# than caught once.  Previously y grew without bound, so the truck crossed in
+# the first 8 s of server uptime and then drove away for good — 26 km out by
+# frame 100,000.  A live viewer therefore saw no track, no reroute and a
+# constant reason string, because by the time a browser connected the only
+# dynamic object in the scene was long gone.  Frontend __dev__/devFrames.ts had
+# always looped its truck; the server had not, which is why the viewer looked
+# right in development and empty against the real stream.
+#
+# 80 m at 8 m/s is a 10 s cycle: the truck enters at y = -30, crosses the road,
+# leaves the field of view at y = 35, and is off-scene for ~1.9 s before it
+# re-enters.  That gap matters — it keeps the run-book's "track appears" beat
+# demonstrable, and it keeps the empty-`tracks` path exercised rather than
+# leaving a dynamic object permanently parked in view.
+_TRUCK_CYCLE_M = 80.0
+
+
 def _truck_position(frame_id: int, dt: float = 1.0 / 30) -> tuple[float, float]:
-    """Truck moves at 8.0 m/s in the y direction, starting at y = -30."""
+    """Truck crosses at 8.0 m/s in +y from y = -30, repeating every cycle."""
     t = frame_id * dt
-    return 18.0, -30.0 + 8.0 * t   # x = 18 m ahead, y starts at -30
+    return 18.0, -30.0 + (8.0 * t) % _TRUCK_CYCLE_M   # x = 18 m ahead
 
 
 def _truck_cells(x: float, y: float) -> tuple[list, list, list]:

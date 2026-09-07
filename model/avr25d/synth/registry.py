@@ -236,10 +236,19 @@ def build_registry(
 
 
 def write_registry(registry: dict, out_path: str | Path = DEFAULT_OUT) -> Path:
-    """Write the registry as JSON.  -> the path written."""
+    """Write the registry as JSON.  -> the path written.
+
+    ``newline="\\n"`` rather than ``Path.write_text``: text mode translates
+    every ``\\n`` to ``os.linesep`` on write, so on Windows the regenerated
+    file comes out CRLF and differs from the committed one on every line.  CI
+    regenerates this file and checks it byte for byte, so the bytes have to be
+    identical on every platform.  On macOS and Linux this writes exactly what
+    ``write_text`` already produced.
+    """
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    out_path.write_text(json.dumps(registry, indent=2) + "\n", encoding="utf-8")
+    with open(out_path, "w", encoding="utf-8", newline="\n") as fh:
+        fh.write(json.dumps(registry, indent=2) + "\n")
     return out_path
 
 

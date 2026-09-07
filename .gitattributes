@@ -1,0 +1,28 @@
+# Line endings are part of the FR-40 contract, not a cosmetic preference.
+#
+# avr25d/synth/registry.py hashes each scene CSV and stores the digest in
+# data/scenes_registry.json as `source.sha256`, so the digest identifies the
+# scene specification. A checkout that converted those CSVs to CRLF — which is
+# what Git for Windows does by default — would change every one of those
+# hashes, and `make scenes-registry` would produce a registry that differs from
+# the committed one on a machine where nothing is actually wrong. That is the
+# Windows CI failure this file prevents.
+#
+# Every tracked file was already LF when this was added, so nothing is
+# renormalised by it.
+
+*.csv   text eol=lf
+*.json  text eol=lf
+*.py    text eol=lf
+*.ts    text eol=lf
+*.tsx   text eol=lf
+*.md    text eol=lf
+*.yml   text eol=lf
+
+# Committed binaries must never be touched by newline conversion.
+*.onnx  binary
+*.pt    binary
+*.bin   binary
+*.pdf   binary
+*.ico   binary
+*.png   binary

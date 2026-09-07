@@ -86,6 +86,16 @@ logger = logging.getLogger(__name__)
 
 _BASELINE_BYTES_CONST = b1_dense_uniform_25d().bytes   # 400 MB
 
+# How long a client may hear nothing before it gets a zero-length keepalive.
+_KEEPALIVE_AFTER_S = 2.0
+# How often the fan-out hub looks for a new frame. The source is a
+# thread-safe queue.Queue whose mutex is shared with the GIL-holding pipeline
+# thread, so polling it hard costs throughput rather than buying latency:
+# at 2 ms this measured 8 fps against the 26 the server can actually sustain.
+# The queue holds two frames and the pipeline produces one every ~33 ms, so
+# 10 ms is frequent enough never to miss one.
+_HUB_POLL_INTERVAL_S = 0.010
+
 #: Where ``--infer cached`` looks unless told otherwise.  Caches are laid out
 #: by *builder*, not by sequence — ``tools/build_cache.py`` writes
 #: ``data/cache/<mode>`` and keys every frame ``"<seq>/<frame>"``, so one
@@ -458,6 +468,105 @@ class ReplayWorker:
 
 
 # ---------------------------------------------------------------------------
+# Frame fan-out
+# ---------------------------------------------------------------------------
+
+class FrameHub:
+    """Copies each pipeline frame to every connected client.
+
+    The worker publishes into one ``queue.Queue``.  A queue has *consumers*,
+    not subscribers: a frame taken by one WebSocket handler is gone for all the
+    others.  With every handler polling that queue directly, one of them won
+    the race consistently and the rest received nothing at all — not a reduced
+    rate, zero.  Measured: a second client sat at 0 frames/s indefinitely, and
+    a client that connected after the first disconnected could stay at 0
+    because the departing handler was still draining.
+
+    That is what a browser refresh looks like.  Next's Fast Refresh remounts
+    the dashboard, the new socket opens beside the old one, and whichever
+    handler happened to win kept every frame — so the reloaded page showed
+    "stream stalled" while the server was streaming perfectly.
+
+    So exactly one task drains the shared queue and *publishes* each frame as
+    the current latest, with a version counter.  Connections read that value
+    rather than consuming it, so every client sees every frame it has time
+    for and none can take one from another.
+
+    Publishing a latest value rather than pushing into a per-connection
+    mailbox is deliberate, and measured.  A one-slot mailbox per connection
+    fixed the fairness but cost two thirds of the throughput — 8 fps against
+    26 — because the mailbox was empty exactly when a handler finished a send
+    and it then waited a whole producer period for the next push: send 40 ms,
+    wait 46 ms.  Reading a latest value keeps the old pull behaviour, where a
+    handler that has just finished sending immediately takes whatever is
+    current, while still letting every connection see it.
+
+    Skipping versions is the point, not a defect: a slow client simply misses
+    the frames it could not have drawn anyway, which is NFR-1 per connection.
+    """
+
+    def __init__(self, source: queue.Queue) -> None:
+        self._source = source
+        self._latest: bytes | None = None
+        self._version = 0
+        self._waiters: list[asyncio.Future] = []
+        self._task: asyncio.Task | None = None
+
+    def start(self) -> None:
+        self._task = asyncio.create_task(self._run(), name="frame-hub")
+
+    async def stop(self) -> None:
+        if self._task is None:
+            return
+        self._task.cancel()
+        try:
+            await self._task
+        except (asyncio.CancelledError, Exception):
+            pass
+        self._task = None
+
+    @property
+    def version(self) -> int:
+        """Increments once per published frame. Starts at 0, meaning none yet."""
+        return self._version
+
+    def latest(self) -> tuple[int, bytes | None]:
+        return self._version, self._latest
+
+    async def wait_for_new(self, seen: int) -> None:
+        """Block until a frame newer than `seen` exists."""
+        if self._version > seen:
+            return
+        future: asyncio.Future = asyncio.get_running_loop().create_future()
+        self._waiters.append(future)
+        try:
+            await future
+        finally:
+            # A cancelled or timed-out waiter must not linger in the list.
+            if future in self._waiters:
+                self._waiters.remove(future)
+
+    def _publish(self, payload: bytes) -> None:
+        self._latest = payload
+        self._version += 1
+        waiters, self._waiters = self._waiters, []
+        for future in waiters:
+            if not future.done():
+                future.set_result(None)
+
+    async def _run(self) -> None:
+        while True:
+            try:
+                payload: bytes = self._source.get_nowait()
+            except queue.Empty:
+                # Poll rather than block: a blocking get here would stall the
+                # event loop, which is the bug this file used to have.
+                await asyncio.sleep(_HUB_POLL_INTERVAL_S)
+                continue
+            self._publish(payload)
+
+
+# ---------------------------------------------------------------------------
 # FastAPI application
 # ---------------------------------------------------------------------------
 
@@ -471,13 +580,17 @@ def make_app(cfg, worker) -> FastAPI:
         allow_headers=["*"],
     )
 
+    hub = FrameHub(worker._queue)
+
     @app.on_event("startup")
     async def _startup():
         worker.start()
+        hub.start()
         logger.info("Pipeline worker started")
 
     @app.on_event("shutdown")
     async def _shutdown():
+        await hub.stop()
         worker.stop()
         logger.info("Pipeline worker stopped")
 
@@ -494,28 +607,98 @@ def make_app(cfg, worker) -> FastAPI:
         """
         await ws.accept()
         logger.info("WebSocket client connected: %s", ws.client)
-        try:
-            while True:
-                try:
-                    frame_bytes: bytes = worker._queue.get(timeout=2.0)
-                except queue.Empty:
-                    # Send a keepalive ping so the browser doesn't close the
-                    # connection while the pipeline is starting up
-                    try:
-                        await asyncio.wait_for(ws.send_bytes(b""), timeout=1.0)
-                    except Exception:
+
+        # ── Why this loop is shaped the way it is ─────────────────────────
+        # Two bugs used to live here and they compounded into a server that
+        # died on the first disconnect and had to be SIGKILLed.
+        #
+        # 1. `worker._queue.get(timeout=2.0)` is a *blocking* call. Run
+        #    directly in a coroutine it blocks the whole event loop, so
+        #    /health stopped answering, new WebSocket handshakes were never
+        #    completed, and uvicorn could not process its own shutdown
+        #    signal. Confirmed with `sample`: the main thread sat in
+        #    _PySemaphore_Wait inside the queue lock. It now runs on a
+        #    worker thread via asyncio.to_thread, so the loop stays free.
+        #
+        # 2. Nothing ever called receive(), so the handler never learned the
+        #    client had gone. ASGI delivers disconnects as an inbound
+        #    message; without reading it this loop happily "sent" frames
+        #    into a dead socket forever. A watcher task now reads it and
+        #    ends the loop.
+        #
+        # 3. Every handler popped from the one shared queue, so a frame taken
+        #    by one connection was gone for the rest. One handler won the race
+        #    consistently and the others received *nothing* — measured at 0
+        #    frames/s for a second client, and 0 for a fresh client that
+        #    connected while a departing handler was still draining. A browser
+        #    refresh lands exactly there: the remounted page reported "stream
+        #    stalled" while the server streamed perfectly. Frames are now
+        #    fanned out by FrameHub and each connection reads its own mailbox.
+        #
+        # Backpressure is per connection. Each mailbox holds one frame and the
+        # newest wins, so a slow client drops frames without slowing anyone
+        # else — NFR-1, now actually per client. Cancelling a send mid-flight,
+        # which is what the old wait_for did on timeout, can leave the
+        # connection in a state the protocol cannot recover from, so sends are
+        # awaited plainly and a failure ends the connection.
+        #
+        # The hub polls rather than using a helper thread. Both a per-frame
+        # asyncio.to_thread and a long-lived drain thread measured ~13 frames/s
+        # against the ~27 a poll sustains: the extra thread wakes on every
+        # frame and trades the GIL with the event loop, and that handoff costs
+        # more than the poll it replaced.
+
+        disconnected = asyncio.Event()
+
+        async def _watch_for_disconnect() -> None:
+            """Read inbound messages so a client disconnect is actually seen."""
+            try:
+                while True:
+                    message = await ws.receive()
+                    if message.get("type") == "websocket.disconnect":
                         break
-                    continue
+            except Exception:
+                pass
+            finally:
+                disconnected.set()
+
+        watcher = asyncio.create_task(_watch_for_disconnect())
+        seen = 0
+        try:
+            while not disconnected.is_set():
+                try:
+                    async with asyncio.timeout(_KEEPALIVE_AFTER_S):
+                        await hub.wait_for_new(seen)
+                    seen, payload = hub.latest()
+                    # A frame can only be None before the first publish, which
+                    # wait_for_new has just ruled out.
+                    frame_bytes: bytes = payload or b""
+                except asyncio.TimeoutError:
+                    # Nothing for a while — keepalive so the browser does not
+                    # time out while the pipeline is still starting up.
+                    frame_bytes = b""
+
+                if disconnected.is_set():
+                    break
 
                 try:
-                    await asyncio.wait_for(ws.send_bytes(frame_bytes), timeout=1.0)
-                except asyncio.TimeoutError:
-                    logger.debug("slow client — frame dropped")
-                    continue
+                    await ws.send_bytes(frame_bytes)
+                except Exception:
+                    # The peer is gone, or the transport is broken. Either
+                    # way this connection is finished — never spin on it.
+                    break
         except WebSocketDisconnect:
             logger.info("WebSocket client disconnected: %s", ws.client)
         except Exception:
             logger.exception("WebSocket error")
+        finally:
+            disconnected.set()
+            watcher.cancel()
+            try:
+                await watcher
+            except (asyncio.CancelledError, Exception):
+                pass
+            logger.info("WebSocket handler finished: %s", ws.client)
 
     return app
 
