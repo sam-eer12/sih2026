@@ -1,0 +1,7 @@
+term,value_cm
+tdc_quantisation,0.2164
+jitter_at_100m,3.5250
+walk_threshold,49.4897
+walk_cfd,0.4949
+total_threshold,49.6155
+total_cfd,3.5661
