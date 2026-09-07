@@ -3,7 +3,7 @@
 // React renders this component exactly ONCE.
 'use client';
 
-import { useRef, useEffect, useState } from 'react';
+import { useRef, useEffect, useState, useCallback } from 'react';
 import { useThreeScene, type SceneHandle, type ViewMode } from './useThreeScene';
 import { startDevStream } from './__dev__/devFrames';
 import WipeOverlay from './WipeOverlay';
@@ -27,6 +27,17 @@ export interface ViewerProps {
    * needs some way to drive itself until then.
    */
   enableKeyboard?: boolean;
+  /**
+   * Controlled wipe state. When provided together with onWipeChange, the
+   * parent owns the wipe toggle and ViewControls can drive it directly
+   * without dispatching a synthetic keyboard event.
+   *
+   * Omitting both props leaves the viewer in uncontrolled mode — the 'W'
+   * key still works exactly as before (FR-42: no extra React renders).
+   */
+  isWipeActive?: boolean;
+  /** Called by the viewer whenever the wipe state changes (key or external). */
+  onWipeChange?: (active: boolean) => void;
 }
 
 const KEY_TO_VIEW: Record<string, ViewMode> = {
@@ -45,13 +56,30 @@ export default function Viewer({
   onReady,
   devStream = false,
   enableKeyboard = false,
+  isWipeActive,
+  onWipeChange,
 }: ViewerProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const handleRef = useThreeScene(canvasRef, onReady);
 
-  // wipeOn is the only React state here, and it changes on a keypress —
-  // never on a streamed frame, and never during a drag (FR-42).
-  const [wipeOn, setWipeOn] = useState(false);
+  // Controlled mode: parent owns wipe state (isWipeActive + onWipeChange both
+  // provided). Uncontrolled mode: internal state driven by the 'W' key only.
+  // Either way, wipeOn is the single source of truth for whether the React
+  // overlay is mounted — it never changes on a streamed frame (FR-42).
+  const controlled = isWipeActive !== undefined && onWipeChange !== undefined;
+  const [internalWipe, setInternalWipe] = useState(false);
+  const wipeOn = controlled ? isWipeActive : internalWipe;
+
+  // Stable setter: in controlled mode delegates to the parent; in uncontrolled
+  // mode updates local state. The Three.js scene is always kept in sync.
+  const setWipe = useCallback((next: boolean) => {
+    handleRef.current?.setWipe(next);
+    if (controlled) {
+      onWipeChange!(next);
+    } else {
+      setInternalWipe(next);
+    }
+  }, [controlled, onWipeChange, handleRef]);
   const lineRef = useRef<HTMLDivElement>(null);
   const knobRef = useRef<HTMLDivElement>(null);
 
@@ -123,9 +151,8 @@ export default function Viewer({
       }
 
       if (e.key === 'w' || e.key === 'W') {
-        const next = !handle.getWipe();
-        handle.setWipe(next);
-        setWipeOn(next);
+        const next = !handleRef.current?.getWipe();
+        setWipe(!!next);
         console.log(`[viewer] wipe → ${next ? 'on' : 'off'}`);
         return;
       }
@@ -142,7 +169,7 @@ export default function Viewer({
 
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [enableKeyboard, handleRef]);
+  }, [enableKeyboard, handleRef, setWipe]);
 
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%' }}>

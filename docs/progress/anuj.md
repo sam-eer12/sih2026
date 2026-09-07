@@ -4,7 +4,143 @@ Newest entry at the top. Format and rules: [`README.md`](./README.md).
 
 ---
 
-## Day 6 (session 3) · Wed 2 Sep 2026 — server wired + refine.py + board cleared
+## Day 11 · Mon 7 Sep 2026 — OVERHANG fix, wipe seam refactor, 382 tests green
+
+Feature Freeze day. Two code changes landed before the 21:00 lock.
+
+---
+
+### What landed
+
+**`core/cell.py` — OVERHANG neighbourhood fix (FR-13)**
+
+Root cause confirmed: a LiDAR beam striking a deck underside (range ~12.5 m)
+and a beam striking the road beneath it (range ~12.0 m) land in *different*
+rings. The road cell has `z_obstacle = NaN` — no overhead return ever lands
+there — so the original same-cell clearance check fired on at most a handful
+of cells where the geometry coincidentally placed both returns in the same ring.
+Measured before fix: 2/916 cells under S3's deck; 0/191 under S7's tunnel.
+
+Fix mirrors the `_ground_reference` neighbourhood pattern already used by
+NEGATIVE_OBSTACLE. In `analyse()`, after the 4 cardinal neighbour ids
+(`id_ring_next`, `id_ring_prev`, `id_bin_right`, `id_bin_left`) are built for
+STEP/SLOPE, the OVERHANG block now:
+
+1. Computes `nb_max = np.fmax` across those 4 neighbours' `z_obstacle` values.
+2. Uses `z_obs_eff = own z_obstacle if finite, else nb_max` as the effective
+   overhead height.
+3. Runs the clearance check against `z_obs_eff`.
+
+**Result after fix:**
+- S3 (deck overhang): **62 road cells** carry FLAG_OVERHANG (was 2)
+- S7 (tunnel): **10 cells** carry FLAG_OVERHANG (was 0)
+- All 62/10 cells are the drivable road cells *under* the structure — exactly
+  what the planner needs to know a vehicle cannot pass here.
+
+The benchmark scorer (`bench/hazard.py`) measures FLAG_OVERHANG within the
+hazard's instance-id footprint, which is mostly deck-surface cells
+(NON_DRIVABLE_TERRAIN). The per-footprint `detection_rate` stays low by design
+— those cells carry the deck return, not the road return. The planning-relevant
+flags fire on the correct road cells outside the footprint. `§11.4` note
+updated in `test_hazard.py` to document this distinction clearly.
+
+**`tests/test_hazard.py` — assertion updated**
+
+`test_per_cell_clearance_yield_is_recorded` docstring rewritten to explain the
+neighbourhood fix. The `clearance_cells_with_both < 10` bound is kept — it
+counts the same-cell form (own z_ground + own z_obstacle in one cell), which
+remains rare due to sensor geometry and is the §11.4 note's subject.
+
+**`components/viewer/Viewer.tsx` — controlled wipe props**
+
+Added `isWipeActive?: boolean` and `onWipeChange?: (active: boolean) => void`
+to `ViewerProps`. When both are provided (controlled mode), the parent owns
+wipe state and `ViewControls` can drive it directly. When omitted (uncontrolled
+mode), the 'W' key path works exactly as before — no behaviour change for
+Shubham's offline dev setup.
+
+Internal `setWipe` callback (useCallback) keeps the Three.js scissor-rect and
+the React overlay in sync in both modes. Keyboard effect dep array updated to
+include `setWipe`.
+
+**`components/hud/ViewControls.tsx` — dispatchEvent hack removed**
+
+`toggleWipe()` now accepts `onWipeChange` prop and calls it directly. The
+`window.dispatchEvent(new KeyboardEvent(...))` workaround is gone. The fallback
+path (no prop) still calls `h.setWipe()` for uncontrolled mounts.
+
+**`app/dashboard/page.tsx` — wipe state lifted to dashboard**
+
+`wipeActive` useState lives in the dashboard (user-action state, never
+frame-driven — T-W7 is unaffected). Passed as `isWipeActive` + `onWipeChange`
+to `<Viewer>` and `onWipeChange` to `<ViewControls>`. `useCallback` wraps
+`handleWipeChange` so the memoised viewer subtree doesn't re-mount.
+
+---
+
+### Acceptance — Day 11 exit criteria
+
+- OVERHANG fix: 62 cells flagged under S3 deck, 10 under S7 tunnel. ✓
+- `test_hazard.py` assertion updated and passing. ✓
+- Wipe seam: `dispatchEvent` removed, prop-driven path verified by tsc. ✓
+- Zero TS errors in touched frontend files. ✓
+- **382 passed, 0 failed** — full Python suite including hazard (26 tests,
+  ~11 s ray-cast). ✓
+
+---
+
+### Suite: 382 passed, 0 failed
+
+| Batch | Count |
+|---|---|
+| Sameer (perception, bench, synth) | ~220 |
+| Anuj (grid, cell, decision, refine, server) | ~162 |
+| **Total** | **382** |
+
+---
+
+### Decisions made today
+
+**The benchmark score for OVERHANG does not change much — and that is correct.**
+The `bench/hazard.py` scorer associates cells to a hazard by *instance id*,
+which returns the deck surface cells (class NON_DRIVABLE_TERRAIN). Those cells
+have `z_obstacle` from the deck return itself, which is essentially `z_ground`
+for the deck — so the clearance check sees near-zero clearance and the
+`detection_rate` stays near zero within the footprint. The planning-relevant
+flags (road cells under the deck) are outside the instance footprint and the
+scorer doesn't count them. Both things are true simultaneously and §11.4's note
+explains this. The fix is correct for the system; the benchmark just measures
+a different slice.
+
+**Wipe state in dashboard, not in Viewer, because Viewer is memoised.**
+The `useMemo` for `<Viewer>` now includes `wipeActive` in its deps, which means
+Viewer re-renders on a wipe toggle. That is unavoidable (the WipeOverlay must
+mount/unmount) and fine — wipe toggles are deliberate user actions at ~1 Hz,
+not frame events.
+
+---
+
+### What remains (Anuj's board — Day 12)
+
+| Task | Notes |
+|---|---|
+| Record `demo.log` on the demo machine | `python -m avr25d.server.app --infer cached --seq 04 --cache data/cache/geometric --record data/logs/demo.log` |
+| Verify `--replay demo.log` plays back cleanly | After recording, confirm browser receives frames |
+| Backend telemetry during Day 12 bench run | Monitor memory, socket connections, CPU |
+
+---
+
+### Blocked / blocking
+
+**Nobody is blocked on Anuj.** OVERHANG fix is live and tested. Wipe seam is
+clean for Shubham's polish pass. Server `--record`/`--replay` is implemented
+and verified in code (Day 6 session 3) — physical recording on demo machine is
+a Day 12 action pending feature freeze.
+
+**Anuj is not blocked by anyone** for Day 12 work. Recording `demo.log`
+requires KITTI data or `--fixtures` — both paths work.
+
+
 
 Third session today. Anuj's board is now fully clear through Day 9.
 
