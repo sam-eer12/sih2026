@@ -1,0 +1,16 @@
+component,power_W,mass_g
+905 nm laser diode + GaN driver,1.200,8.00
+TX collimating optics (50 mm),0.000,45.00
+RX objective + 905 nm bandpass filter,0.000,55.00
+APD + HV bias supply,0.350,6.00
+TIA,0.150,2.00
+CFD comparator,0.250,2.00
+TDC,0.400,2.00
+MEMS mirror + driver ASIC,1.500,12.00
+MCU/FPGA aggregator + UDP PHY,2.000,15.00
+Power regulation losses,1.000,25.00
+PCB, connectors, wiring,0.000,40.00
+Enclosure, optical bench, mount,0.000,120.00
+TOTAL,6.850,332.00
+LIMIT,15.000,500.00
+MARGIN,8.150,168.00
