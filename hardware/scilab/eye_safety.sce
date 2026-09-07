@@ -148,6 +148,7 @@ xtitle("Class 1 peak-power ceiling vs exit aperture (905 nm, 5 ns, scanned)", ..
 xgrid();
 try
     xs2png(1, "../figures/fig_eye_safety.png");
+    xs2svg(1, "../figures/svg/fig_eye_safety.svg");
 catch
     mprintf("  (PNG export skipped)\n");
 end

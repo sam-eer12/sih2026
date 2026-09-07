@@ -116,6 +116,7 @@ xtitle("Range error budget terms vs range (HW-4)", "range [m]", ..
 xgrid();
 try
     xs2png(1, "../figures/fig_range_accuracy.png");
+    xs2svg(1, "../figures/svg/fig_range_accuracy.svg");
 catch
     mprintf("  (PNG export skipped)\n");
 end
