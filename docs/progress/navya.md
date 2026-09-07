@@ -635,6 +635,43 @@ Browser checks, recorded as pending rather than blocking:
 
 ## 7. Progress log
 
+### Day 11 · Monday 7 Sep 2026 (session 2) — Windows CI: the registry was not reproducible
+
+**Landed.** `.gitattributes` and a one-line newline fix in `avr25d/synth/registry.py`. Backend
+**382 passed**, registry tests 17/17, frontend **273 assertions**, `tsc`/`eslint`/`build` clean.
+
+**Acceptance.** The PR's Windows CI failed at *"Regenerate the FR-40 scene registry and check it
+is unchanged"* while pytest passed. It is a **real cross-platform reproducibility bug in the
+registry**, not a CI or path quirk, and it would have failed on any Windows machine.
+
+**Decisions and surprises.**
+
+1. **Two independent causes, either of which fails the check alone.**
+   - `source.sha256` is the hash of the scene CSV's **bytes**. Git for Windows checks text files
+     out as CRLF by default, so every one of the seven hashes changes. Reproduced locally by
+     converting the CSVs to CRLF and regenerating: **14 changed lines, all `sha256`** — exactly
+     the shape of the CI diff.
+   - `write_registry` used `Path.write_text`, which is text mode and translates every `\n` to
+     `os.linesep` on write. On Windows the regenerated JSON would be CRLF throughout and differ
+     from the committed file on every line.
+2. **Fixed at the source, not in the hash.** It was tempting to normalise line endings inside
+   `_sha256`, but that changes the FR-40 contract: the digest would no longer be the hash of the
+   file on disk. `.gitattributes` pins the CSVs to LF so the working tree is identical on every
+   platform and the existing semantics simply hold. The writer now passes `newline="\n"`
+   explicitly.
+3. **macOS output is byte-identical before and after** — verified with `cmp` against a copy
+   taken before the change, and the committed registry still regenerates clean.
+4. **Nothing was renormalised.** Every tracked file was already LF when `.gitattributes` was
+   added, checked before writing it, so the commit changes no existing content.
+5. **This is Sameer's module.** The fix is two small changes and the contract is untouched, but
+   it belongs in his review along with the rest.
+
+**Next step.** Push and re-run CI. Everything else is unchanged: blocked only on Firebase,
+Atlas and Vercel.
+
+---
+
+
 ### Day 11 · Monday 7 Sep 2026 — pre-PR audit; branch open for review
 
 **Landed.** No code. A full audit of the branch against `origin/main`, and this file brought up
