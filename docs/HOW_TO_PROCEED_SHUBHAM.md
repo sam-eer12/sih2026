@@ -730,14 +730,21 @@ growing by factor 1.005.
         [316 frames streamed → 3 React renders]
         → EXIT CRITERION DAY 9: T-V6 and T-W7 pass  ✓ MET
 
-[ ] 28. Visual polish, verify at projector resolution
-        → EXIT CRITERION DAY 10: renders correctly at projector resolution
+[x] 28. Visual polish, verify at projector resolution
+        [class legend added — nothing on screen said what the colours meant.
+         The rest is Navya's HUD: view buttons, fps, reduction, memory.]
+        → EXIT CRITERION DAY 10: renders correctly at projector resolution  ✓ MET
 
-[ ] 29. Demo keystroke sequence verified end to end
-        → EXIT CRITERION DAY 11: every run-book keystroke works
+[x] 29. Demo keystroke sequence verified end to end
+        [3 G W drag 4 E 1 2 — all exercised against the REAL backend stream.
+         Keystroke table now in DEMO_RUNBOOK.md, which had none.]
+        → EXIT CRITERION DAY 11: every run-book keystroke works  ✓ MET
 
-[ ] 30. Bug fixes only — zero console errors across all four views
-        → EXIT CRITERION DAY 12: clean console
+[x] 30. Bug fixes only — zero console errors across all four views
+        [all four views exercised: 0 errors, 0 warnings across 78 entries.
+         60.0 FPS at 41,990 real instances; drag 1% low 57.8;
+         T-W7 326 frames → 3 React renders.]
+        → EXIT CRITERION DAY 12: clean console  ✓ MET
 ```
 
 ---

@@ -47,7 +47,12 @@ fixture data is a demo on the emergency path.
 
 - Items 16-17 ✓ — real streamed frames, Day 3 criterion met
 - Item 28 ✓ — class legend; the rest of the projector polish is Navya's HUD
-- Items 29, 30 — pending one keystroke pass on the demo machine
+- Items 29, 30 ✓ — full keystroke pass against the **real backend stream**:
+  `3 G W drag 4 E 1 2`, all four views exercised, **0 errors 0 warnings**
+  across 78 console entries. 60.0 FPS at 41,990 real instances; divider drag
+  1% low 57.8; T-W7 326 frames → 3 React renders.
+
+**The checklist is complete — 30 of 30.**
 - Item 25 — **closing as not required.** 60 FPS at 109,404 instances with no
   LOD at all. Building it would optimise something already twice as fast as
   FR-30 demands.
@@ -75,7 +80,17 @@ offline; 22.67× is analytic from the grid construction. Only tonight's live
 feed was fixtures. Worth keeping straight — the two get conflated easily, and
 a judge asking "is that a real scan?" deserves the precise answer.
 
-**4. `!handleRef.current?.getWipe()` is `true` when the handle is null.** From
+**4. On real scans the uniform view draws FEWER boxes than the adaptive one.**
+`[uniform] drawing 16,129 of 521,739 footprint sites` against the adaptive
+side's 41,990. A real scan is sparse — it occupies a small fraction of either
+grid — so resampling it onto a 5 cm lattice lights up fewer cells than the
+adaptive tiling does. This is the same trap that redesigned the wipe on Day 9,
+and it is why the wipe argues from the **grid shader** (structure) rather than
+from cell boxes. Worth one deliberate look on the real stream before filming:
+if the boxes read as "uniform has less", turn the cells off on that side and
+let the grid carry it alone.
+
+**5. `!handleRef.current?.getWipe()` is `true` when the handle is null.** From
 the merged `Viewer.tsx`: a `W` press before mount would tell a controlled
 parent the wipe is ON while the scene did nothing. Read the handle first,
 return if absent.
