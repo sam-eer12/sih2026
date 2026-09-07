@@ -1,0 +1,11 @@
+quantity,value,unit
+angular_pitch,0.005000,rad
+angular_pitch_mrad,5.0000,mrad
+fov_az_deg,30.00,deg
+fov_el_deg,20.00,deg
+n_directions,7350,-
+frame_rate_hz,6.8027,Hz
+prf_hz,200000.0,Hz
+points_per_s,50000.0,pts/s
+duty_cycle_pct,0.100000,%
+avg_optical_mW,4.4000,mW

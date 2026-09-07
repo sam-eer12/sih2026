@@ -67,6 +67,7 @@ xtitle("Angular sampling vs PS-6 cell size (HW-5)", "range [m]", "size [cm]");
 xgrid();
 try
     xs2png(1, "../figures/fig_scan_pitch.png");
+    xs2svg(1, "../figures/svg/fig_scan_pitch.svg");
 catch
     mprintf("  (PNG export skipped)\n");
 end
@@ -78,6 +79,7 @@ xtitle("Point density on the target surface vs range", ..
 xgrid();
 try
     xs2png(2, "../figures/fig_scan_density.png");
+    xs2svg(2, "../figures/svg/fig_scan_density.svg");
 catch
     mprintf("  (PNG export skipped)\n");
 end
@@ -90,6 +92,7 @@ xtitle("Points per PS-6 grid cell vs range", "range [m]", "points per cell [-]")
 xgrid();
 try
     xs2png(3, "../figures/fig_scan_pts_per_cell.png");
+    xs2svg(3, "../figures/svg/fig_scan_pts_per_cell.svg");
 catch
     mprintf("  (PNG export skipped)\n");
 end
@@ -114,4 +117,19 @@ for i = 1:10:500
          cell_size(i), pts_per_cell(i), density(i))];
 end
 mputl(L, "../results/scan_coverage.csv");
+
+// Summary row set, so the Day-12 audit can read the scan numbers from a
+// file instead of someone copying them off the console.
+S = ["quantity,value,unit";
+     msprintf("angular_pitch,%.6f,rad", ANG_PITCH);
+     msprintf("angular_pitch_mrad,%.4f,mrad", ANG_PITCH*1e3);
+     msprintf("fov_az_deg,%.2f,deg", FOV_AZ_DEG);
+     msprintf("fov_el_deg,%.2f,deg", FOV_EL_DEG);
+     msprintf("n_directions,%.0f,-", n_dir);
+     msprintf("frame_rate_hz,%.4f,Hz", frame_rate);
+     msprintf("prf_hz,%.1f,Hz", prf_needed);
+     msprintf("points_per_s,%.1f,pts/s", pts_per_s);
+     msprintf("duty_cycle_pct,%.6f,%%", prf_needed*PULSE_FWHM*100);
+     msprintf("avg_optical_mW,%.4f,mW", P_PEAK*PULSE_FWHM*prf_needed*1e3)];
+mputl(S, "../results/scan_summary.csv");
 mprintf("Saved ../results/scan_coverage.csv and 3 figures.\n\n");

@@ -27,6 +27,7 @@ xtitle("SNR vs target reflectivity at 100 m", "reflectivity [-]", "SNR [-]");
 xgrid();
 try
     xs2png(1, "../figures/fig_sweep_reflectivity.png");
+    xs2svg(1, "../figures/svg/fig_sweep_reflectivity.svg");
 catch
     mprintf("  (PNG export skipped)\n");
 end
@@ -48,6 +49,7 @@ xtitle("SNR vs receiver aperture", "receiver aperture [mm]", "SNR [-]");
 xgrid();
 try
     xs2png(2, "../figures/fig_sweep_aperture.png");
+    xs2svg(2, "../figures/svg/fig_sweep_aperture.svg");
 catch
     mprintf("  (PNG export skipped)\n");
 end
@@ -69,6 +71,7 @@ xtitle("SNR vs solar background", ..
 xgrid();
 try
     xs2png(3, "../figures/fig_sweep_sunlight.png");
+    xs2svg(3, "../figures/svg/fig_sweep_sunlight.svg");
 catch
     mprintf("  (PNG export skipped)\n");
 end
@@ -91,6 +94,7 @@ xtitle("SNR vs pulses accumulated per direction", ..
 xgrid();
 try
     xs2png(4, "../figures/fig_sweep_accumulation.png");
+    xs2svg(4, "../figures/svg/fig_sweep_accumulation.svg");
 catch
     mprintf("  (PNG export skipped)\n");
 end
