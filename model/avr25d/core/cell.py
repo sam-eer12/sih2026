@@ -476,14 +476,50 @@ class CellGrid:
         self.flags[neg_obs_mask] |= FLAG_NEGATIVE_OBSTACLE
 
         # ── OVERHANG flag (FR-13) ─────────────────────────────────────────
-        # A drivable cell where (z_obstacle − z_ground) < H_vehicle.
-        # The ground is traversable but the overhead structure constrains the
-        # vehicle envelope.  Both z values must be finite (real data).
+        # A drivable cell where the effective overhead clearance < H_vehicle.
+        #
+        # Root cause of the original near-zero detection rate
+        # ---------------------------------------------------
+        # A LiDAR beam striking a deck underside (e.g. range 12.5 m) and a
+        # beam striking the road beneath it (range ~12.0 m) land in *different*
+        # rings.  The road cell therefore has z_obstacle = NaN — no overhead
+        # return ever lands there — so the same-cell clearance check fires on
+        # at most the handful of cells where geometry coincidentally places both
+        # returns in the same ring.  Measured: 2/916 cells under S3's deck;
+        # 0/191 under S7's tunnel.
+        #
+        # Fix — neighbourhood-extended obstacle height
+        # --------------------------------------------
+        # Take the maximum finite z_obstacle across a cell's 4 ring-neighbours
+        # (ids already computed above for STEP / SLOPE) and use that as the
+        # overhead reference for any cell whose own z_obstacle is NaN.  This
+        # mirrors the _ground_reference neighbourhood pattern used by
+        # NEGATIVE_OBSTACLE.  Per-cell same-cell hits are still the preferred
+        # source (they are more accurate); the neighbourhood is only the
+        # fallback.  bench/hazard.py still counts `clearance_cells_with_both`
+        # separately as the §11.4 note on sensor geometry.
         from ..perception.labelmap import DRIVABLE as DRIV
         drivable = self.class_id == DRIV
+
+        z_obs_safe = np.where(np.isfinite(z_obs), z_obs.astype(np.float64), np.nan)
+
+        def _nb_z_obs(idx: np.ndarray) -> np.ndarray:
+            """z_obstacle of neighbour idx; NaN where neighbour is unoccupied."""
+            return np.where(self.count[idx] > 0, z_obs_safe[idx], np.nan)
+
+        # nanmax across the 4 neighbours: np.fmax propagates non-NaN over NaN.
+        nb_max = np.fmax(
+            np.fmax(_nb_z_obs(id_ring_next), _nb_z_obs(id_ring_prev)),
+            np.fmax(_nb_z_obs(id_bin_right),  _nb_z_obs(id_bin_left)),
+        )
+
+        # Own z_obstacle wins when finite (most accurate); neighbourhood fills
+        # in where no overhead return landed in this cell.
+        z_obs_eff = np.where(np.isfinite(z_obs_safe), z_obs_safe, nb_max)
+
         clearance = np.where(
-            np.isfinite(z_obs) & np.isfinite(z_gnd),
-            z_obs.astype(np.float64) - z_gnd_safe.astype(np.float64),
+            np.isfinite(z_obs_eff) & np.isfinite(z_gnd),
+            z_obs_eff - z_gnd_safe.astype(np.float64),
             np.inf,
         )
         overhang_mask = (

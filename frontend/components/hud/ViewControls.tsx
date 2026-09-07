@@ -33,8 +33,11 @@ interface ControlState {
 
 export default function ViewControls({
   getHandle,
+  onWipeChange,
 }: {
   getHandle: () => SceneHandle | null;
+  /** Called when the wipe button is toggled. Wires to Viewer's onWipeChange. */
+  onWipeChange?: (active: boolean) => void;
 }) {
   const [state, setState] = useState<ControlState | null>(null);
 
@@ -73,23 +76,20 @@ export default function ViewControls({
     setState(read());
   };
 
-  // The wipe is the one control that cannot go straight through SceneHandle.
-  // setWipe() drives the scissor-rect render, but the draggable divider is a
-  // React overlay inside Viewer.tsx gated on state only its own key handler
-  // sets — so calling setWipe() directly would enable the wipe and leave the
-  // divider unmountable, which is worse than not offering the button.
-  //
-  // Dispatching the keystroke drives Shubham's existing, tested path and
-  // keeps his state and the scene in step, without editing his file. The
-  // direct call is kept as a fallback for the case where the viewer was
-  // mounted without `enableKeyboard`. The clean fix is a controlled prop on
-  // Viewer — his file, his call; raised for standup.
   const toggleWipe = () => {
     const h = getHandle();
     if (!h) return;
-    const before = h.getWipe();
-    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'w', bubbles: true }));
-    if (h.getWipe() === before) h.setWipe(!before);
+    const next = !h.getWipe();
+    // Drive through the prop so Viewer's controlled/uncontrolled path decides
+    // how to update state. No synthetic keyboard events needed.
+    if (onWipeChange) {
+      onWipeChange(next);
+    } else {
+      // Fallback: viewer was mounted without controlled wipe props (e.g. in
+      // Shubham's offline dev mode). Drive SceneHandle directly; the overlay
+      // won't update but the GPU scissor will, which is better than nothing.
+      h.setWipe(next);
+    }
     setState(read());
   };
 

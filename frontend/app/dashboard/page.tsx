@@ -3,7 +3,7 @@
 // Navya will add the HUD and decision panel around this.
 'use client';
 import dynamic from 'next/dynamic';
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { connectFrames, DEFAULT_STREAM_URL } from '../../lib/ws';
 import type { SceneHandle } from '../../components/viewer/useThreeScene';
 import StreamStatus, { type StatusSink } from '../../components/hud/StreamStatus';
@@ -48,6 +48,15 @@ export default function DashboardPage() {
   // The audit trail (FR-38, FR-39). Inert until there is a signed-in user and
   // a reachable database, so the frame path below does not branch on config.
   const sessionRef = useRef<RunSession | null>(null);
+
+  // Wipe state lives here so ViewControls and Viewer stay in sync without
+  // either component owning it. Changes only on user interaction — never on
+  // a streamed frame — so this does not affect T-W7.
+  const [wipeActive, setWipeActive] = useState(false);
+
+  const handleWipeChange = useCallback((active: boolean) => {
+    setWipeActive(active);
+  }, []);
 
   // Fires once, from inside the viewer's mount effect. It must not set React
   // state — the frame path stays outside reconciliation entirely (FR-42), so
@@ -113,9 +122,21 @@ export default function DashboardPage() {
   // page can re-render without touching the canvas subtree, which is what
   // keeps T-W7 (fewer than 10 React renders across 300 frames) safe as the
   // HUD grows in Step 3.
+  //
+  // wipeActive is the one exception that requires a re-render: the WipeOverlay
+  // React element is conditionally mounted inside Viewer based on this prop,
+  // so Viewer must re-render when it changes. That is exactly correct — a wipe
+  // toggle is a user action, not a frame event, so T-W7 is unaffected.
   const viewer = useMemo(
-    () => <Viewer onReady={handleReady} enableKeyboard />,
-    [handleReady]
+    () => (
+      <Viewer
+        onReady={handleReady}
+        enableKeyboard
+        isWipeActive={wipeActive}
+        onWipeChange={handleWipeChange}
+      />
+    ),
+    [handleReady, wipeActive, handleWipeChange]
   );
 
   useEffect(() => {
@@ -157,7 +178,7 @@ export default function DashboardPage() {
         <StreamStatus onMount={handleStatusMount} />
       </div>
       <Hud sample={sampleHud} />
-      <ViewControls getHandle={getHandle} />
+      <ViewControls getHandle={getHandle} onWipeChange={handleWipeChange} />
       <DecisionPanel sample={sampleDecision} />
     </main>
   );
