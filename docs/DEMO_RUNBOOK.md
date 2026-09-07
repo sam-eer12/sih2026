@@ -108,6 +108,58 @@ only if A, B and C are all gone, and say what it is.
 
 ---
 
+## The viewer: what to press, and when
+
+Owner: Shubham. Every key below is bound in `components/viewer/Viewer.tsx`.
+Item 29 of [`HOW_TO_PROCEED_SHUBHAM.md`](./HOW_TO_PROCEED_SHUBHAM.md) is the
+end-to-end verification that each one still works on the demo machine — run it
+before every rehearsal, not once.
+
+The same keys are also buttons in the HUD's view controls, so nothing here
+depends on keyboard focus landing in the right place. **Use the buttons when
+presenting.** A keystroke that silently goes to the URL bar looks like a crash.
+
+| Key | Does | Say while pressing it |
+|---|---|---|
+| `3` | Adaptive grid — **the default** | "This is our representation. Cells grow with range." |
+| `G` | Grid boundaries on/off | "Those are the actual cell walls — fine near the vehicle, coarse at 100 m." |
+| `W` | **The A/B wipe** | "Same scan, same camera. Uniform 5 cm on the left, ours on the right." |
+| *drag* | Move the divider | "16,000,000 cells against 705,771. That is the 22.67×." |
+| `4` | Decision layer | "The truck is tracked, its path predicted, and the route re-planned around it." |
+| `E` | Elevation shading | Only if asked how height is handled. |
+| `1` | Raw cloud | Only if asked what the input looks like. |
+| `2` | Uniform grid alone | Rarely — the wipe already makes this point better. |
+
+### The sixty seconds that matter
+
+The wipe is the single most persuasive object in the submission. Give it the
+full minute the timing sheet allows and do not rush to View 4.
+
+1. Start on `3` with `G` **on**. Let them see the grid coarsen with range.
+2. Press `W`. Do not touch the mouse for two seconds — let the split land.
+3. Drag the divider **slowly**, once left, once right. The counts are already
+   on screen; read them out rather than pointing.
+4. Press `4` last. The reroute is the payoff, and it only reads as a decision
+   if they have already accepted the map underneath it.
+
+### Camera
+
+The near field is 5 cm on **both** sides of the wipe by construction, so a
+top-down view shows two identical halves and proves nothing. **Get low and look
+along the road.** The difference only exists at range, and a grazing angle puts
+the far field across most of the screen.
+
+### If the viewer misbehaves
+
+| Symptom | Cause | Do this |
+|---|---|---|
+| Canvas black, HUD fine | Stream connected, frames not decoding | Check `StreamStatus`; fall back to Path C |
+| "Connecting…" forever | Backend not up, or https origin blocking `ws://` (NFR-9) | Demo from `http://localhost:3000`, never the deployed link |
+| Wipe seam not under the divider | Stale build | Hard reload — Fast Refresh does not re-run the viewer's mount effect |
+| Frame rate visibly poor | Another GPU-heavy tab | Close it. 60 FPS at 109k instances is the measured baseline |
+
+---
+
 ## The three timed rehearsals
 
 Same script every time, stopwatch running, no restarts mid-run. The point is

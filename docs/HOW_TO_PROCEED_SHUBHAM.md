@@ -720,7 +720,10 @@ growing by factor 1.005.
 
         ─────────────── ↓ START HERE NEXT ↓ ───────────────
 
-[ ] 25. LOD tuning  [not needed yet — 60 FPS at 109k with no LOD at all]
+[x] 25. LOD tuning — CLOSED AS NOT REQUIRED
+        [60.0 FPS at 109,404 instances with no LOD at all, against FR-30's
+         30 FPS. Building it would optimise something already 2x faster
+         than required. Reopen only if the real KITTI stream is slower.]
 [x] 26. Verify ≥30 FPS at 100,000 instances (T-V6)
         [109,404 instances → 60.0 FPS, 1% low 56.7]
 [x] 27. Verify React render count < 10 across 300 frames (T-W7)

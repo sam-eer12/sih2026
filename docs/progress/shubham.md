@@ -4,6 +4,84 @@ Newest entry at the top. Format and rules: [`README.md`](./README.md).
 
 ---
 
+## Day 12 · Monday 8 Sep 2026 — real stream connected; legend, run-book, KITTI
+
+---
+
+### Landed
+
+**The viewer is on the real backend stream.** Navya's `lib/ws.ts` and
+`lib/protocol.ts` merged; the dashboard already called
+`connectFrames(DEFAULT_STREAM_URL, handle.pushFrame)` through the `onReady`
+prop. No rewiring was needed — the handoff worked as designed. Confirmed by
+cell count: the backend sends **41,996** per frame, `__dev__/devFrames.ts`
+sends 43,946. Items 16-17 and the **Day 3 exit criterion are met**.
+
+**`components/hud/ClassLegend.tsx` — new.** Nothing on screen said what any
+semantic colour meant. `CLASS_NAMES` has carried the comment "For the HUD
+legend" since day one and nobody built it; a judge watching a recording cannot
+ask. Renders straight from `palette.ts` arrays rather than a hand-written list,
+so it cannot go stale when a colour changes.
+
+> **Navya — this is in your directory.** `ClassLegend.tsx` sits in
+> `components/hud/` and `Hud.tsx` gains two lines to mount it. It reads only
+> `lib/palette.ts`. It is there rather than in `components/viewer/` because it
+> is chrome, not canvas — putting HUD markup inside the viewer to respect a
+> directory boundary would have been the wrong trade. Move or restyle it
+> freely; the palette import is the only thing that must survive.
+
+**`DEMO_RUNBOOK.md` — the viewer section it never had.** Roles, timings and
+fallback paths were all there, but nothing said which keys to press. Added:
+what to press and what to say while pressing it, the sixty seconds the wipe
+deserves, and the camera note that matters most — the near field is 5 cm on
+**both** sides of the wipe by construction, so a top-down shot shows two
+identical halves and proves nothing. Get low and look along the road.
+
+**Fetching SemanticKITTI** (~1.8 GB, sequence 04 plus subsets of 00 and 05).
+The run-book classes `--fixtures` as Path D, "last resort", so a demo on
+fixture data is a demo on the emergency path.
+
+---
+
+### Acceptance
+
+- Items 16-17 ✓ — real streamed frames, Day 3 criterion met
+- Item 28 ✓ — class legend; the rest of the projector polish is Navya's HUD
+- Items 29, 30 — pending one keystroke pass on the demo machine
+- Item 25 — **closing as not required.** 60 FPS at 109,404 instances with no
+  LOD at all. Building it would optimise something already twice as fast as
+  FR-30 demands.
+
+---
+
+### Decisions and surprises
+
+**1. Two independent copies of the wire types had already drifted.** I wrote
+`components/viewer/types.ts` from `protocol.py` while Navya wrote
+`lib/protocol.ts` from the same source. Mine had widened `selected` and `risk`
+to `| string` and made `tracks`/`decision`/`stats` optional — quietly
+permitting frames the real stream never sends. The decode owns the contract,
+so `types.ts` now re-exports hers and nothing else.
+
+**2. That immediately caught a real defect.** `devFrames.ts` was emitting
+`stats: { n_cells, fps }`, which is not a `FrameStats` at all. A generator
+whose entire purpose is *schema-valid* frames must emit the complete message,
+or the viewer grows a dependency on fields that do not exist. Duplicated types
+had been hiding it.
+
+**3. The live demo was synthetic, but the headline numbers are not.** 0.878
+mIoU and 0.934 point accuracy were measured over 971 real SemanticKITTI scans
+offline; 22.67× is analytic from the grid construction. Only tonight's live
+feed was fixtures. Worth keeping straight — the two get conflated easily, and
+a judge asking "is that a real scan?" deserves the precise answer.
+
+**4. `!handleRef.current?.getWipe()` is `true` when the handle is null.** From
+the merged `Viewer.tsx`: a `W` press before mount would tell a controlled
+parent the wipe is ON while the scene did nothing. Read the handle first,
+return if absent.
+
+---
+
 ## Day 9 · Saturday 5 Sep 2026 — View 2, the A/B wipe, View 4; T-V6 and T-W7 pass
 
 Viewer track went from Day 2 to **Day 6 complete** in one session. Calendar is
