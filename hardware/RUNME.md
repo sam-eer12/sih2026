@@ -101,11 +101,11 @@ Three things must also be true after a run:
 ## One-slide payload summary (give this to Veda)
 
 > **We also designed the sensor.**
-> A 905 nm direct time-of-flight LiDAR payload: 4.4 W peak, 5 ns pulses, 200 kHz,
+> A 905 nm direct time-of-flight LiDAR payload: 3.8 W peak, 5 ns pulses, 200 kHz,
 > APD + 200 MHz TIA + constant-fraction discriminator + 50 ps TDC, MEMS-scanned
 > 30°×20° at 5 mrad, 6.8 Hz, 50 kpts/s over UDP in KITTI format.
-> **116 m** at 10% reflectivity. **±8 cm** range error at 100 m. **Class 1
-> eye-safe.** **332 g, 6.9 W** — inside a 500 g / 15 W drone budget.
+> **107 m** at 10% reflectivity. **±4.9 cm** range error at 100 m. **Class 1
+> eye-safe with 14.7% margin.** **332 g, 6.9 W** — inside a 1.5 kg / 25 W drone budget.
 > Two findings: PS-6's variable-resolution cell law *is* a constant 5 mrad
 > angular pitch, so the sensor and the grid agree by construction; and eye
 > safety, not the link budget, is what sizes the emitter.
@@ -116,10 +116,10 @@ Three things must also be true after a run:
 | Question | Short answer |
 |---|---|
 | "Did you build this?" | No. It is a simulated and analytical design. Every figure regenerates from a script; nothing is measured. We say so on the slide. |
-| "Is it eye-safe?" | Class 1 by calculation against IEC 60825-1 Ed. 3, worked through in the report. Not a lab certification. The exit aperture is what makes it close, and margin is currently thin — we flag that. |
+| "Is it eye-safe?" | Class 1 by calculation against IEC 60825-1 Ed. 3, worst-case ratio 0.853, a 14.7% margin. Not a lab certification. The 50 mm exit aperture is what makes it close — we derated the laser from 4.4 W to 3.8 W specifically to widen that margin. |
 | "Why 905 nm and not 1550 nm?" | 1550 nm allows far more power under Class 1, but needs InGaAs detectors, which are much more expensive and heavier. 905 nm with silicon is the right point for a student drone payload. |
 | "Why an APD and not a SiPM?" | An APD gives a linear analogue pulse a CFD can time directly. A SiPM needs photon counting, a different timing architecture. We chose the one our model actually represents. |
-| "Why is the CFD worth the complexity?" | It removes ~68 cm of systematic walk over 10–100 m. It costs about 2× in jitter. Net gain ~3.4× in total error. |
+| "Why is the CFD worth the complexity?" | It removes 77 cm of systematic walk over 10–100 m and costs nothing in jitter. Total range error drops from 35 cm to 4.9 cm at 100 m, a 7× gain. |
 | "What limits your accuracy?" | Noise jitter, not the TDC. The 50 ps TDC contributes 2 mm; jitter contributes ~3.5 cm at 100 m. So more aperture or more accumulation, not a faster TDC. |
 | "How does this connect to your software?" | It doesn't have to — PRD §16 makes it a companion workstream with no runtime dependency. But it outputs the same KITTI `.bin` layout the pipeline already reads, so it is a drop-in source. |
 | "Are your component numbers real?" | The parts are real families. The power/mass/cost figures are class-level estimates, flagged as unverified in `BOM.md`. We did not want to present estimates as datasheet values. |
@@ -130,7 +130,6 @@ Three things must also be true after a run:
 |---|---|---|
 | 1 | Run all seven scripts, confirm they execute | Nothing else is real until they do |
 | 2 | Write today's `khanak.md` log entry | Team rule; the log is worthless reconstructed later |
-| 3 | Decide the P_PEAK derating (4.4 → 3.5 W) | Eye-safety margin is ~1%; a judge will find it |
 | 4 | Verify the 14 BOM rows against datasheets | The only fabrication risk in the pack |
 | 5 | Fill the *insert here* gaps in `DESIGN_REPORT.md` | HW-8 |
 | 6 | Hand the slide text and Q&A table to Veda | She owns the deck |

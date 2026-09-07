@@ -4,10 +4,10 @@ AEL_single,1.069857e-09,J,quoted formula
 N_pulses_T2,272,-,derived
 C5,0.4000,-,quoted rule
 AEL_train,4.279426e-10,J,derived
-E_pulse,2.200000e-08,J,design
+E_pulse,1.900000e-08,J,design
 frac_stop,0.019214,-,derived
-E_accessible,4.227037e-10,J,derived
-rule1_ratio,0.3951,-,derived
+E_accessible,3.650622e-10,J,derived
+rule1_ratio,0.3412,-,derived
 rule2_ratio,0.000001,-,derived
-rule3_ratio,0.9878,-,derived
-worst_ratio,0.9878,-,derived
+rule3_ratio,0.8531,-,derived
+worst_ratio,0.8531,-,derived

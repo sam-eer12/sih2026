@@ -213,6 +213,7 @@ for k = 1:3
 end
 try
     xs2png(1, "../figures/fig_rx_waveforms.png");
+    xs2svg(1, "../figures/svg/fig_rx_waveforms.svg");
 catch
     mprintf("  (PNG export skipped)\n");
 end
@@ -226,6 +227,7 @@ xtitle("Measured vs true range (HW-3)", "true range [m]", "mean measured range [
 xgrid();
 try
     xs2png(2, "../figures/fig_rx_measured_vs_true.png");
+    xs2svg(2, "../figures/svg/fig_rx_measured_vs_true.svg");
 catch
     mprintf("  (PNG export skipped)\n");
 end
@@ -239,6 +241,7 @@ xtitle("Systematic range error (time walk)", "true range [m]", "mean error [cm]"
 xgrid();
 try
     xs2png(3, "../figures/fig_rx_walk.png");
+    xs2svg(3, "../figures/svg/fig_rx_walk.svg");
 catch
     mprintf("  (PNG export skipped)\n");
 end
@@ -253,6 +256,7 @@ xtitle("Random and total range error", "true range [m]", "range error [cm]");
 xgrid();
 try
     xs2png(4, "../figures/fig_rx_jitter.png");
+    xs2svg(4, "../figures/svg/fig_rx_jitter.svg");
 catch
     mprintf("  (PNG export skipped)\n");
 end
@@ -267,6 +271,7 @@ xtitle(msprintf("Pure time walk at %.0f m, no noise", R_CAL), ..
 xgrid();
 try
     xs2png(5, "../figures/fig_rx_walk_vs_rho.png");
+    xs2svg(5, "../figures/svg/fig_rx_walk_vs_rho.svg");
 catch
     mprintf("  (PNG export skipped)\n");
 end

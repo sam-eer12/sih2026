@@ -34,7 +34,7 @@ ANG_PITCH = 0.005;   // [DER] required angular sampling pitch  [rad]
 // ---- emitter ----------------------------------------------------------
 LAMBDA     = 905e-9;  // [PRD §16.1] 905 nm pulsed laser diode
 PULSE_FWHM = 5.0e-9;  // [ASM] pulse width  [s]
-P_PEAK     = 4.4;     // [DER] peak optical power [W]. NOT a free choice:
+P_PEAK     = 3.8;     // [DER] peak optical power [W]. NOT a free choice:
                       //       it is the Class 1 cap computed by
                       //       eye_safety.sce for D_TX = 50 mm. Do not
                       //       raise it without re-running eye_safety.sce.
@@ -93,9 +93,11 @@ FOV_AZ_DEG = 30.0;    // [ASM] azimuth field of view [deg]
 FOV_EL_DEG = 20.0;    // [ASM] elevation field of view [deg]
 
 // ---- platform ---------------------------------------------------------
-MASS_LIMIT_G  = 500.0; // [ASM] stated drone payload mass limit [g]
-                       //       PRD HW-6 says "a stated limit" - we state it
-POWER_LIMIT_W = 15.0;  // [ASM] stated drone payload power limit [W]
+MASS_LIMIT_G  = 1500.0; // [PLAN] drone payload mass limit [g]. WORK_DISTRIBUTION
+                        //       6.1 Day 11 states "mass < 1.5 kg". Earlier
+                        //       drafts of this file used 500 g; the team
+                        //       figure governs.
+POWER_LIMIT_W = 25.0;   // [PLAN] drone payload power limit [W], same source
 
 // ---- detection criterion ----------------------------------------------
 SNR_THRESH = 6.0;     // [ASM] SNR needed to declare a valid return
@@ -181,5 +183,6 @@ endfunction
 // Create the shared output folders if they are missing.
 function ensure_dirs()
     if ~isdir("../figures") then mkdir("../figures"); end
+    if ~isdir("../figures/svg") then mkdir("../figures/svg"); end
     if ~isdir("../results") then mkdir("../results"); end
 endfunction
