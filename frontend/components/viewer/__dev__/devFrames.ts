@@ -15,7 +15,14 @@ import {
   RING_DTHETA,
   RING_OFFSET,
 } from '../ringGeometry';
-import type { CellArrays, Decision, FrameMessage, Track } from '../types';
+import type {
+  CellArrays,
+  Decision,
+  FrameMessage,
+  FrameStats,
+  RefinedArrays,
+  Track,
+} from '../types';
 
 const DRIVE = 1, TERRAIN = 2, STATIC = 3, DYNAMIC = 4;
 
@@ -145,9 +152,49 @@ function makeFrame(frameId: number, t: number): FrameMessage {
     t_sec: t,
     mode: 'dev',
     cells: _cells,
+    refined: EMPTY_REFINED,
     tracks: makeTracks(truckY),
     decision: makeDecision(truckY),
-    stats: { n_cells: N, fps: 30 },
+    stats: makeStats(),
+  };
+}
+
+// A complete FrameMessage or nothing. The point of this generator is
+// schema-valid frames — a partial one lets the viewer grow a dependency on
+// fields the real stream always sends, which is exactly the bug that a
+// looser local FrameStats type hid until the two were merged.
+
+const EMPTY_REFINED: RefinedArrays = {
+  n: 0,
+  parent_id: new Uint32Array(0),
+  quadrant: new Uint8Array(0),
+  z_ground: new Float32Array(0),
+  z_obstacle: new Float32Array(0),
+  class_id: new Uint8Array(0),
+  flags: new Uint8Array(0),
+};
+
+const BYTES_PER_CELL = 25;
+const BASELINE_BYTES = 400_000_000;   // 16M uniform cells x 25 B
+
+function makeStats(): FrameStats {
+  const memBytes = N * BYTES_PER_CELL;
+  return {
+    fps: 30,
+    t_perception_ms: 0,
+    t_projection_ms: 0,
+    t_analysis_ms: 0,
+    t_refine_ms: 0,
+    t_decision_ms: 0,
+    t_serialise_ms: 0,
+    t_total_ms: 0,
+    n_points: N,
+    n_points_conserved: N,   // FR-10 holds trivially for synthesised cells
+    n_cells_occupied: N,
+    n_cells_total: 705_771,
+    mem_bytes: memBytes,
+    baseline_mem_bytes: BASELINE_BYTES,
+    reduction: BASELINE_BYTES / memBytes,
   };
 }
 

@@ -655,7 +655,7 @@ growing by factor 1.005.
 
 `[x]` done · `[~]` partial, reason in brackets · `[ ]` not started
 
-**Last updated: Day 9, Sat 5 Sep 2026.**
+**Last updated: Day 12, Mon 8 Sep 2026.**
 
 ```
 [x] 1.  npm install + npm install three @types/three
@@ -683,12 +683,14 @@ growing by factor 1.005.
 [x] 15. Elevation-shading toggle              [press E; plasma ramp]
         → EXIT CRITERION DAY 2: cells correctly sized at every range  ✓ MET
 
-[~] 16. View 1 (raw point cloud) on real streamed frames
-[~] 17. View 3 (adaptive grid) on real streamed frames
-        [both render, but on SYNTHETIC frames from __dev__/devFrames.ts.
-         Real frames need Navya's lib/protocol.ts to decode the binary payload.]
-        → EXIT CRITERION DAY 3: views render real frames, class-coloured
-          [NOT MET — "real frames" is the missing half]
+[x] 16. View 1 (raw point cloud) on real streamed frames
+[x] 17. View 3 (adaptive grid) on real streamed frames
+        [lib/ws.ts + lib/protocol.ts landed; the dashboard streams from the
+         backend over the real wire format. Confirmed by cell count: the
+         backend sends 41,996, __dev__/devFrames.ts sends 43,946.
+         NOTE the scan is still SYNTHETIC — the server runs --fixtures.
+         Real scans need tools/fetch_kitti.py then --infer geometric.]
+        → EXIT CRITERION DAY 3: views render real frames, class-coloured  ✓ MET
 
 [x] 18. View 2 (uniform 5 cm grid)
         → EXIT CRITERION DAY 4: uniform view renders the same scan as View 3  ✓ MET

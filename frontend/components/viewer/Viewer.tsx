@@ -151,8 +151,14 @@ export default function Viewer({
       }
 
       if (e.key === 'w' || e.key === 'W') {
-        const next = !handleRef.current?.getWipe();
-        setWipe(!!next);
+        // Read through the handle, not through optional chaining on the
+        // toggle: `!handleRef.current?.getWipe()` is `true` when the handle
+        // is null, so a keypress before the scene mounts would tell a
+        // controlled parent the wipe is ON while the scene does nothing.
+        const h = handleRef.current;
+        if (!h) return;
+        const next = !h.getWipe();
+        setWipe(next);
         console.log(`[viewer] wipe → ${next ? 'on' : 'off'}`);
         return;
       }
