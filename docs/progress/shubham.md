@@ -8,6 +8,70 @@ Newest entry at the top. Format and rules: [`README.md`](./README.md).
 
 ---
 
+### Late addition — the decision layer was 13.7x slower than it needed to be
+
+**FOR ANUJ. I changed one line in `decision/tracker.py`; it needs your review.**
+
+Running the real pipeline for the first time showed the server delivering
+**1.4-2.1 fps**, not the 30 the demo assumes. Stage breakdown put 56% of the
+frame in the decision layer, and profiling its five sub-stages found the
+tracker, not the A* planner:
+
+```
+trav        10.4 ms
+tracker    223.6 ms   <-- 83% of the decision layer
+costmap      2.1 ms
+plan        32.9 ms
+explain      0.5 ms
+```
+
+Inside `cluster_centroids`, the cost was not the spatial query but the line
+after it:
+
+```
+dynamic cells : 5,567
+pairs found   : 281,829
+query_pairs   :  33.7 ms
+sorted()+array: 146.3 ms   <-- building and sorting a Python set of tuples
+```
+
+A car at close range occupies thousands of 5 cm cells, so `query_pairs`
+returns ~280,000 pairs; `sorted()` on that set cost 4x the query itself. The
+sort was never needed — `connected_components` does not care about edge order.
+`query_pairs(link_m, output_type="ndarray")` returns the array directly.
+
+**Fixture scenes could never have shown this.** Their dynamic cells are sparse,
+so `t_decision_ms` read 0.8 ms. It only appears on a real scan.
+
+Verified before changing anything: identical clustering partitions across 8
+frames, and **382/382 tests pass**.
+
+```
+                  before      after
+decision         591.4 ms    43.2 ms     13.7x
+TOTAL            693.7 ms   172.7 ms
+pipeline fps         1.4        5.8
+```
+
+The remaining budget is `analysis` 77.0 ms and `projection` 47.2 ms — core
+hot loops I have not touched.
+
+**Also for the deck:** `DECK_NUMBERS.md` quotes 9.2 ms median end-to-end and
+says it is "comfortably inside a 10 Hz budget". That figure is
+`Read + Segment + Score` with cached labels — the map build. It does not
+include the decision layer, which no published benchmark covers. At 172.7 ms
+the live server is 5.8 Hz. Both numbers are honest; they measure different
+things, and a judge who watches the demo and reads the deck can find the gap.
+
+Reproduce:
+```
+cd model
+../backend/.venv/bin/python -m avr25d.server.app --infer cached --seq 04 \
+    --cache data/cache/geometric
+```
+
+---
+
 ### Landed
 
 **The viewer is on the real backend stream.** Navya's `lib/ws.ts` and
