@@ -31,45 +31,49 @@ field offset anywhere else.
 
 ## 2. Status snapshot
 
-Last verified against the code: **Fri 4 Sep 2026** (Day 8 of 14).
+Last verified against the code: **Mon 7 Sep 2026** (Day 11 of 14). Branch `navya/platform-hud`,
+24 commits ahead of `main` and 0 behind, open for review.
 
-**Complete (not mine).** Backend pipeline end-to-end — grid, cells, hazards, refine, decision
-layer, server; 303 tests green. Wire protocol frozen and tested. Viewer scene, ring geometry,
-instanced grid (View 3), point cloud (View 1), class + elevation colouring, palette.
+**Backend (Sameer and Anuj).** Pipeline complete end to end — grid, cells, hazards, refine,
+decision layer, server. **382 tests green** on macOS and Windows CI. Wire protocol frozen.
+FR-40 scene registry landed Day 10 (`synth/registry.py`, `data/scenes_registry.json`). Three
+demo-fatal bugs in `server/` were found from the frontend and fixed on this branch — see §3 and
+the Day 10 entries.
 
-**Partial (not mine).** Views 1 and 3 render **synthetic** frames from
-`components/viewer/__dev__/devFrames.ts` only — the Day 3 criterion is "real streamed frames"
-and it is unmet because it needs my decoder. FPS unmeasured (T-V6 untested). Canvas never
-visually inspected by anyone. Shubham has not built View 2, the A/B wipe, the ring overlay or
-View 4.
+**Viewer (Shubham).** All four views, the A/B wipe, the ring overlay and the decision layer are
+built. T-V6 passes (109,404 instances at 60 FPS) and T-W7 passes. Views render **real streamed
+frames** as of Day 9 — his Day 3 exit criterion, closed by `lib/protocol.ts` + `lib/ws.ts`.
 
-**Missing — all of it is mine.**
+**Platform (mine).** Roadmap Steps 0–5 complete; Steps 6–8 code-complete and waiting only on
+external accounts.
 
 | Area | State |
 |---|---|
-| `lib/protocol.ts` | **Done** Day 8 — decoder verified against Anuj's encoder, 118 assertions |
-| `lib/ws.ts` | **Done** Day 9 — reconnect, drop-not-queue, keepalives; **T-W6 passes** |
-| `components/hud/StreamStatus.tsx` | **Done** Day 9 — connection state on screen; the rest of the HUD is Step 3 |
-| `components/hud/*` | **Done** Day 9 — FR-28 complete; T-V4 and T-W7 pass |
-| `components/decision/*` | **Done** Day 9 — decision panel and track list; `tracks: []` handled |
-| `lib/firebase/{client,admin}.ts` | **Done** Day 9 — sign-in and `requireUser`; needs a project to switch on |
-| `lib/mongo.ts`, `lib/decisionLog.ts`, `lib/runSession.ts` | **Done** Day 9 — cached client, indexes, FR-39 batching **wired into the dashboard**; needs a cluster |
-| `app/(auth)/login`, `proxy.ts` gate, sign-out chip, `app/api/{runs,decisions,scenes,users}` | **Done** Day 9 — T-W2 verified across all four routes |
-| `app/runs`, `app/runs/[id]` | **Done** Day 9 |
-| `.env.local.example` | **Done** Day 9 — every variable documented |
-| Firebase project, Atlas M0 cluster | **Not created** — external accounts, Navya's to provision |
-| `app/page.tsx`, `app/layout.tsx` metadata | Still create-next-app boilerplate |
-| `docs/progress/navya.md` | This file — first entry Day 8 |
+| `lib/protocol.ts` | **Done** — decoder verified against Anuj's encoder, 118 assertions |
+| `lib/ws.ts` | **Done** — reconnect, drop-not-queue, connect timeout, NFR-9 guard; **T-W6 passes** |
+| `components/hud/*` | **Done** — FR-28 complete plus stream status, session chip, view controls; **T-V4 and T-W7 pass** |
+| `components/decision/*` | **Done** — decision panel and track list; `tracks: []` handled |
+| `lib/firebase/{client,admin}.ts`, `proxy.ts`, `app/(auth)/login` | **Done** — sign-in, route gate, `requireUser`; needs a project to switch on |
+| `lib/mongo.ts`, `lib/decisionLog.ts`, `lib/runSession.ts` | **Done** — cached client, indexes, FR-39 batching **wired into the dashboard**; needs a cluster |
+| `app/api/{runs,decisions,scenes,users}` | **Done** — **T-W2 verified per handler**; `/api/scenes` ingests the FR-40 registry losslessly |
+| `app/runs`, `app/runs/[id]` | **Done** — run list and detail with the decision log |
+| `app/page.tsx`, `app/layout.tsx` | **Done** — boilerplate and "Create Next App" metadata replaced |
+| `.env.local.example` | **Done** — every variable documented, no credential committed |
+| Firebase project, Atlas M0 cluster, Vercel | **Not created** — external accounts, Navya's to provision |
 
-**Environment.** Installed and verified Day 8 (Step 0). `frontend/node_modules` present (372
-packages, 0 vulnerabilities). `backend/.venv` present on Python 3.14.5 with
-`requirements.txt` + `pip install -e model/`. Node v22.19.0, npm 10.9.3. Still no `.env*` files
-and **no `firebase`, `firebase-admin` or `mongodb`** in `package.json` — those arrive in
-Steps 6–7.
+**Tests.** Backend **382**. Frontend **273 assertions across 9 suites** (protocol round-trip,
+HUD, decision panel, NFR-9, auth, T-W4 batching, per-route T-W2 guard, run session, scene
+registry). `tsc`, `eslint` and `next build` clean at 10 routes.
 
-**Git.** `main` = `4a6e80d` (PR #1 merge). `shubham/viewer-setup` is fully merged and 0 ahead.
-Working branch `navya/platform-hud` — it already existed at `main` with no commits on it, so it
-was reused rather than recreated. Branches live less than a day.
+**Environment.** `frontend/node_modules` present; `firebase`, `firebase-admin` and `mongodb`
+installed. `backend/.venv` on Python 3.14.5 with `requirements.txt` + `pip install -e model/`.
+Node v22.19.0, npm 10.9.3. No `.env.local` — auth and persistence are inert until one exists.
+`npm audit` reports 6 moderate advisories, all transitive through
+`firebase-admin → @google-cloud/storage → uuid`, a path this app does not use; `audit fix
+--force` would downgrade the SDK, so they are recorded rather than silently broken.
+
+**Git.** `origin/main` = `45c8d4b` (Sameer's FR-40 merge). Working branch `navya/platform-hud`,
+in sync with its remote, 0 behind `main`. `main` has never been pushed to from this branch.
 
 ---
 
@@ -631,7 +635,59 @@ Browser checks, recorded as pending rather than blocking:
 
 ## 7. Progress log
 
-### Day 9 · Saturday 5 Sep 2026 (session 11) — the fan-out now has tests in the repo
+### Day 11 · Monday 7 Sep 2026 — pre-PR audit; branch open for review
+
+**Landed.** No code. A full audit of the branch against `origin/main`, and this file brought up
+to date: §2 was still describing Day 8, and sessions 7–11 were logged as Day 9 when their
+commits are dated Sun 6 Sep. Both corrected.
+
+**Acceptance.** The branch is review-ready: **24 commits, 41 files, +8,821/−157**. Backend
+**382 passed**; frontend **273 assertions across 9 suites**; `tsc`, `eslint` and `next build`
+clean at 10 routes; working tree clean and in sync with its remote. `main` untouched.
+
+**What this branch delivers.**
+
+- **The realtime path** — `lib/protocol.ts` (binary decode, verified against Anuj's encoder
+  byte for byte) and `lib/ws.ts` (browser→FastAPI direct, drop-not-queue, reconnect, connect
+  timeout, NFR-9 refusal). Closed Shubham's Day 3 criterion.
+- **The HUD and decision panel** — every FR-28 field, sourced from `stats` or Shubham's
+  `SceneHandle` getters, never recomputed. 304 frames → 2 React renders.
+- **Auth and persistence** — Firebase client/admin, the `proxy.ts` gate, four guarded API
+  routes, FR-39 batching wired into the dashboard, run history. All additive: inert without
+  accounts.
+- **Three backend fixes in Anuj's module** — the event-loop wedge, the frame-monopoly stall,
+  and the fixture truck that drove away. Each found by being the first real client to connect.
+- **FR-40 registry ingestion** — `/api/scenes` takes Sameer's file as-is, losslessly.
+
+**Decisions and surprises.**
+
+1. **The audit found nothing to fix**, which is the point of running it: no secrets, no
+   credentials, no generated artefacts, no debug code, no stray files. The temporary `DIAG`
+   instrumentation and the negative-control edit I used while chasing the fan-out bug were both
+   fully reverted — worth confirming rather than assuming, since both were deliberate edits to
+   working code.
+2. **My own log had drifted.** Five sessions were dated Saturday when git says Sunday. This
+   file's rules call a reconstructed date fiction, so the headers now match the commits.
+   Recording it rather than quietly renumbering.
+3. **`gh` is not installed**, so the PR could not be opened from here. Installing a CLI and
+   authenticating it is not mine to do on someone's machine; the compare link and a prepared
+   title and body went to Navya instead.
+4. **The one watch item is timing, not correctness.** `test_frame_hub.py` uses real sleeps and
+   CI now runs Windows, where timer granularity is ~15 ms. Margins are ~4× the poll interval
+   and it passes 12/12 locally, so working code was left alone — but that is the first place to
+   look if it ever flakes there.
+
+**Blocked, and only on accounts Navya can create:** Firebase (T-W1), Atlas (T-W3, T-W5 — the
+registry ingests losslessly, it just needs somewhere to land), Vercel. Plus two Step 8 browser
+checks: responsive at demo resolution, and a console pass.
+
+**Next step.** Open the PR. Then the review conversation with Anuj — three of his files changed
+here, each explained in its commit with the measurements behind it.
+
+---
+
+
+### Day 10 · Sunday 6 Sep 2026 (session 5) — the fan-out now has tests in the repo
 
 **Landed.** `model/tests/test_frame_hub.py` (8 tests) and a dead constant removed from
 `server/app.py`. Backend **382 passed** (was 374), frontend **273 assertions**, `tsc`, `eslint`
@@ -665,7 +721,7 @@ Atlas, Vercel.
 ---
 
 
-### Day 9 · Saturday 5 Sep 2026 (session 10) — merged Sameer's FR-40 registry
+### Day 10 · Sunday 6 Sep 2026 (session 4) — merged Sameer's FR-40 registry
 
 **Landed.** Merged `origin/main` (Sameer's FR-40 registry, T-P6, CI, cache-path fix) and
 widened `/api/scenes` to ingest his registry losslessly. Backend **374 passed** (up from 347 —
@@ -706,7 +762,7 @@ it. Only the Atlas cluster stands between here and the test passing.
 ---
 
 
-### Day 9 · Saturday 5 Sep 2026 (session 9) — the stall was real: one client took every frame
+### Day 10 · Sunday 6 Sep 2026 (session 3) — the stall was real: one client took every frame
 
 **Landed.** `model/avr25d/server/app.py` — `FrameHub`, fan-out for the frame stream. Backend
 suite **347 passed**; frontend **237 assertions**, `tsc`, `eslint` and `next build` clean.
@@ -754,7 +810,7 @@ browser checks.
 ---
 
 
-### Day 9 · Saturday 5 Sep 2026 (session 8) — Step 4 confirmed in the browser
+### Day 10 · Sunday 6 Sep 2026 (session 2) — Step 4 confirmed in the browser
 
 **Landed.** No code. Step 4's three browser checks were run by Navya and all pass, so Step 4
 moves to **`[x]`**.
@@ -781,7 +837,7 @@ unwritten code — four external accounts and two Step 8 browser checks.
 ---
 
 
-### Day 9 · Saturday 5 Sep 2026 (session 7) — connecting the code that was never called
+### Day 10 · Sunday 6 Sep 2026 (session 1) — connecting the code that was never called
 
 **Landed.** `lib/runSession.ts`, `app/api/users/route.ts`, `PATCH /api/runs`,
 `components/hud/SessionChip.tsx`, and the dashboard wiring. **237 assertions across 8 suites,
