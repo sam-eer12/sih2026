@@ -53,8 +53,43 @@ TOTAL            693.7 ms   172.7 ms
 pipeline fps         1.4        5.8
 ```
 
-The remaining budget is `analysis` 77.0 ms and `projection` 47.2 ms — core
-hot loops I have not touched.
+**Second fix — `core/cell.py`, also needs review (Sameer).** `analyse()` was
+rebuilding each cell's four cardinal neighbour ids every frame, over all
+705,771 cells. Those ids are a pure function of the ring geometry and are
+identical on every frame — 21.3 ms per frame, 12% of the budget, spent
+rederiving a constant. Now memoised on first use.
+
+```
+                  start    +tracker   +nb cache
+decision         591.4      43-65        —
+analysis          53.9        77.0      44.4
+TOTAL            693.7       172.7     149.1
+pipeline fps         1.4         5.8       6.7
+```
+
+382/382 tests pass after each change.
+
+**Where the remaining budget sits, and why I stopped.** Sensor rate is 10 Hz
+(KITTI Velodyne), so 100 ms is the real target, not 33 ms and certainly not
+16 ms — a pipeline faster than the sensor is idle. We are at 149 ms.
+
+```
+plan          37.7 ms   pure-Python heapq A* over the costmap
+analysis      44.4 ms   full-grid ops; ~6% of cells are occupied
+projection    40.7 ms   accumulate
+tracker       14.2 ms   (was 223.6)
+trav          10.1 ms
+```
+
+The last 50 ms needs either the A* search rewritten or `accumulate`/`analyse`
+restructured to work on the occupied subset instead of all 705,771 cells.
+Both are real changes to core code owned by others, and neither is a 3 am
+change the night before filming. **Recorded rather than attempted.**
+
+**A negative result worth keeping:** `np.add.at` is NOT the bottleneck people
+assume. Measured against `np.bincount` on a real frame — 0.1 ms vs 0.4 ms for
+the 1D accumulators. Modern numpy has optimised `ufunc.at`; only the 2D class
+histogram would gain (4.2 → 1.8 ms). Do not spend an hour rediscovering this.
 
 **Also for the deck:** `DECK_NUMBERS.md` quotes 9.2 ms median end-to-end and
 says it is "comfortably inside a 10 Hz budget". That figure is
