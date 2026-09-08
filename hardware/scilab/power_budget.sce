@@ -77,6 +77,7 @@ xtitle("Mass by component (HW-6)", "component index", "mass [g]");
 xgrid();
 try
     xs2png(1, "../figures/fig_power_mass_bars.png");
+    xs2svg(1, "../figures/svg/fig_power_mass_bars.svg");
 catch
     mprintf("  (PNG export skipped)\n");
 end
@@ -92,6 +93,7 @@ xtitle("Mass: used vs limit", "1 = used, 2 = limit", "mass [g]");
 xgrid();
 try
     xs2png(2, "../figures/fig_budget_margins.png");
+    xs2svg(2, "../figures/svg/fig_budget_margins.svg");
 catch
     mprintf("  (PNG export skipped)\n");
 end

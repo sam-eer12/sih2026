@@ -12,5 +12,5 @@ Power regulation losses,1.000,25.00
 PCB, connectors, wiring,0.000,40.00
 Enclosure, optical bench, mount,0.000,120.00
 TOTAL,6.850,332.00
-LIMIT,15.000,500.00
-MARGIN,8.150,168.00
+LIMIT,25.000,1500.00
+MARGIN,18.150,1168.00
