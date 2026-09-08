@@ -364,59 +364,23 @@ class CellGrid:
         # Mark unoccupied cells as void-unobserved (simplified: all ~occ)
         self.flags[~occ] |= FLAG_VOID_UNOBSERVED
 
-        # ── Build neighbour z_ground arrays ──────────────────────────────
-        # For each occupied cell we need the z_ground values of its
-        # ring-adjacent cells (same bin, ring ± 1) and its bin-adjacent cells
-        # (same ring, bin ± 1).  We work on the flat cell-id arrays.
+        # ── Neighbour ids — computed ONCE, not per frame ─────────────────
+        # For each cell we need its four cardinal neighbours (same bin,
+        # ring ± 1; same ring, bin ± 1) as flat ids.
+        #
+        # These depend only on the ring geometry, never on frame data, so they
+        # are identical on every frame. Recomputing them cost 21.3 ms per
+        # frame over all 705,771 cells — 12% of the server's frame budget,
+        # spent rederiving a constant. Memoised on first use; RingGrid is
+        # built once at startup and never mutated.
+        (
+            id_ring_next,
+            id_ring_prev,
+            id_bin_right,
+            id_bin_left,
+        ) = self._neighbour_ids()
 
-        # ring+1 neighbours
-        k   = self._cell_ring   # int32[n_cells]
-        j   = self._cell_bin    # int32[n_cells]
-
-        # Safe k+1 / k-1 indices (clamp to valid range)
-        k_next = np.clip(k + 1, 0, grid.n_rings - 1)
-        k_prev = np.clip(k - 1, 0, grid.n_rings - 1)
-
-        # Bin index in adjacent ring: identity for outer rings (const 1257 bins)
-        # inner rings need the neighbour table.
-        def _bin_in_ring(k_target: np.ndarray, j_src: np.ndarray) -> np.ndarray:
-            """Given source bin j_src in ring k (self._cell_ring), return
-            the corresponding bin in ring k_target."""
-            result = j_src.copy()
-            inner  = k < self._n_inner
-            if inner.any():
-                nt = self._neighbour_table   # shape (n_inner, max_inner_bins)
-                # For inner rings only: look up the neighbour
-                i_mask = np.flatnonzero(inner)
-                k_src_i  = k[i_mask]
-                j_src_i  = j_src[i_mask]
-                # clip j to valid width of neighbour table
-                j_clipped = np.minimum(j_src_i, nt.shape[1] - 1)
-                result[i_mask] = nt[k_src_i, j_clipped]
-            # Outer rings: identity (all have same n_bins = 1257)
-            return result
-
-        # Flat ids of the four cardinal neighbours
-        def _flat_id(k_arr: np.ndarray, j_arr: np.ndarray) -> np.ndarray:
-            nb = grid.n_bins[k_arr]
-            j_w = j_arr % nb          # wrap angularly
-            return (grid.offset[k_arr] + j_w).astype(np.int32)
-
-        # ring ± 1 neighbour ids (same bin, adjusted for bin-count difference)
-        j_in_next = _bin_in_ring(k_next, j)
-        j_in_prev = _bin_in_ring(k_prev, j)
-        nb_j     = np.ones(n, dtype=np.int32)  # ±1 bin, wrapping
-        j_right  = (j + 1)
-        j_left   = (j - 1)
-
-        id_ring_next = _flat_id(k_next, j_in_next)
-        id_ring_prev = _flat_id(k_prev, j_in_prev)
-        id_bin_right = _flat_id(k,      j_right)
-        id_bin_left  = _flat_id(k,      j_left)
-
-        # Guard self-reference at k=0 or k=n_rings-1
-        id_ring_next = np.where(k == grid.n_rings - 1, np.arange(n, dtype=np.int32), id_ring_next)
-        id_ring_prev = np.where(k == 0,                np.arange(n, dtype=np.int32), id_ring_prev)
+        k = self._cell_ring   # still needed by the flag logic below
 
         # ── STEP flag (FR-15 — curb detection) ────────────────────────────
         # Set when |Δz_ground| to any 4-neighbour exceeds tau_step.
@@ -614,3 +578,50 @@ class CellGrid:
             f"CellGrid(n_cells={self._grid.n_cells:,}, "
             f"n_occupied={self.n_occupied:,})"
         )
+
+    def _neighbour_ids(self):
+        """Flat ids of each cell's four cardinal neighbours.
+
+        Pure function of the ring geometry, so it is built once and reused.
+        The derivation below is the one that used to run inline in analyse();
+        it is unchanged apart from being hoisted out of the per-frame path.
+        """
+        cached = getattr(self, "_nb_ids_cache", None)
+        if cached is not None:
+            return cached
+
+        import numpy as np
+        grid = self._grid
+        n = grid.n_cells
+        k = self._cell_ring
+        j = self._cell_bin
+
+        k_next = np.clip(k + 1, 0, grid.n_rings - 1)
+        k_prev = np.clip(k - 1, 0, grid.n_rings - 1)
+
+        def _bin_in_ring(k_target, j_src):
+            result = j_src.copy()
+            inner = k < self._n_inner
+            if inner.any():
+                nt = self._neighbour_table
+                i_mask = np.flatnonzero(inner)
+                j_clipped = np.minimum(j_src[i_mask], nt.shape[1] - 1)
+                result[i_mask] = nt[k[i_mask], j_clipped]
+            return result
+
+        def _flat_id(k_arr, j_arr):
+            nb = grid.n_bins[k_arr]
+            return (grid.offset[k_arr] + (j_arr % nb)).astype(np.int32)
+
+        id_ring_next = _flat_id(k_next, _bin_in_ring(k_next, j))
+        id_ring_prev = _flat_id(k_prev, _bin_in_ring(k_prev, j))
+        id_bin_right = _flat_id(k, j + 1)
+        id_bin_left = _flat_id(k, j - 1)
+
+        # Guard self-reference at the innermost and outermost rings.
+        own = np.arange(n, dtype=np.int32)
+        id_ring_next = np.where(k == grid.n_rings - 1, own, id_ring_next)
+        id_ring_prev = np.where(k == 0, own, id_ring_prev)
+
+        self._nb_ids_cache = (id_ring_next, id_ring_prev, id_bin_right, id_bin_left)
+        return self._nb_ids_cache

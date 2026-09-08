@@ -19,6 +19,7 @@ import { useEffect, useState } from 'react';
 import ModeBadge from './ModeBadge';
 import LatencyBars from './LatencyBars';
 import MemoryPanel from './MemoryPanel';
+import ClassLegend from './ClassLegend';
 import { count, num } from './format';
 import type { HudSampler, HudSnapshot } from './types';
 
@@ -73,6 +74,7 @@ export default function Hud({ sample }: { sample: HudSampler }) {
       <LatencyBars stats={stats} />
       <div style={{ height: 12 }} />
       <MemoryPanel stats={stats} uniform={uniform} capacity={capacity} />
+      <ClassLegend />
 
       <footer style={FOOTER} title="FR-10 — every projected point lands in a cell">
         <span style={{ color: '#8b8b9e' }}>Points conserved</span>

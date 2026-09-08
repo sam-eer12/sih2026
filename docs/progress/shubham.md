@@ -4,6 +4,198 @@ Newest entry at the top. Format and rules: [`README.md`](./README.md).
 
 ---
 
+## Day 12 · Monday 8 Sep 2026 — real stream connected; legend, run-book, KITTI
+
+---
+
+### Late addition — the decision layer was 13.7x slower than it needed to be
+
+**FOR ANUJ. I changed one line in `decision/tracker.py`; it needs your review.**
+
+Running the real pipeline for the first time showed the server delivering
+**1.4-2.1 fps**, not the 30 the demo assumes. Stage breakdown put 56% of the
+frame in the decision layer, and profiling its five sub-stages found the
+tracker, not the A* planner:
+
+```
+trav        10.4 ms
+tracker    223.6 ms   <-- 83% of the decision layer
+costmap      2.1 ms
+plan        32.9 ms
+explain      0.5 ms
+```
+
+Inside `cluster_centroids`, the cost was not the spatial query but the line
+after it:
+
+```
+dynamic cells : 5,567
+pairs found   : 281,829
+query_pairs   :  33.7 ms
+sorted()+array: 146.3 ms   <-- building and sorting a Python set of tuples
+```
+
+A car at close range occupies thousands of 5 cm cells, so `query_pairs`
+returns ~280,000 pairs; `sorted()` on that set cost 4x the query itself. The
+sort was never needed — `connected_components` does not care about edge order.
+`query_pairs(link_m, output_type="ndarray")` returns the array directly.
+
+**Fixture scenes could never have shown this.** Their dynamic cells are sparse,
+so `t_decision_ms` read 0.8 ms. It only appears on a real scan.
+
+Verified before changing anything: identical clustering partitions across 8
+frames, and **382/382 tests pass**.
+
+```
+                  before      after
+decision         591.4 ms    43.2 ms     13.7x
+TOTAL            693.7 ms   172.7 ms
+pipeline fps         1.4        5.8
+```
+
+**Second fix — `core/cell.py`, also needs review (Sameer).** `analyse()` was
+rebuilding each cell's four cardinal neighbour ids every frame, over all
+705,771 cells. Those ids are a pure function of the ring geometry and are
+identical on every frame — 21.3 ms per frame, 12% of the budget, spent
+rederiving a constant. Now memoised on first use.
+
+```
+                  start    +tracker   +nb cache
+decision         591.4      43-65        —
+analysis          53.9        77.0      44.4
+TOTAL            693.7       172.7     149.1
+pipeline fps         1.4         5.8       6.7
+```
+
+382/382 tests pass after each change.
+
+**Where the remaining budget sits, and why I stopped.** Sensor rate is 10 Hz
+(KITTI Velodyne), so 100 ms is the real target, not 33 ms and certainly not
+16 ms — a pipeline faster than the sensor is idle. We are at 149 ms.
+
+```
+plan          37.7 ms   pure-Python heapq A* over the costmap
+analysis      44.4 ms   full-grid ops; ~6% of cells are occupied
+projection    40.7 ms   accumulate
+tracker       14.2 ms   (was 223.6)
+trav          10.1 ms
+```
+
+The last 50 ms needs either the A* search rewritten or `accumulate`/`analyse`
+restructured to work on the occupied subset instead of all 705,771 cells.
+Both are real changes to core code owned by others, and neither is a 3 am
+change the night before filming. **Recorded rather than attempted.**
+
+**A negative result worth keeping:** `np.add.at` is NOT the bottleneck people
+assume. Measured against `np.bincount` on a real frame — 0.1 ms vs 0.4 ms for
+the 1D accumulators. Modern numpy has optimised `ufunc.at`; only the 2D class
+histogram would gain (4.2 → 1.8 ms). Do not spend an hour rediscovering this.
+
+**Also for the deck:** `DECK_NUMBERS.md` quotes 9.2 ms median end-to-end and
+says it is "comfortably inside a 10 Hz budget". That figure is
+`Read + Segment + Score` with cached labels — the map build. It does not
+include the decision layer, which no published benchmark covers. At 172.7 ms
+the live server is 5.8 Hz. Both numbers are honest; they measure different
+things, and a judge who watches the demo and reads the deck can find the gap.
+
+Reproduce:
+```
+cd model
+../backend/.venv/bin/python -m avr25d.server.app --infer cached --seq 04 \
+    --cache data/cache/geometric
+```
+
+---
+
+### Landed
+
+**The viewer is on the real backend stream.** Navya's `lib/ws.ts` and
+`lib/protocol.ts` merged; the dashboard already called
+`connectFrames(DEFAULT_STREAM_URL, handle.pushFrame)` through the `onReady`
+prop. No rewiring was needed — the handoff worked as designed. Confirmed by
+cell count: the backend sends **41,996** per frame, `__dev__/devFrames.ts`
+sends 43,946. Items 16-17 and the **Day 3 exit criterion are met**.
+
+**`components/hud/ClassLegend.tsx` — new.** Nothing on screen said what any
+semantic colour meant. `CLASS_NAMES` has carried the comment "For the HUD
+legend" since day one and nobody built it; a judge watching a recording cannot
+ask. Renders straight from `palette.ts` arrays rather than a hand-written list,
+so it cannot go stale when a colour changes.
+
+> **Navya — this is in your directory.** `ClassLegend.tsx` sits in
+> `components/hud/` and `Hud.tsx` gains two lines to mount it. It reads only
+> `lib/palette.ts`. It is there rather than in `components/viewer/` because it
+> is chrome, not canvas — putting HUD markup inside the viewer to respect a
+> directory boundary would have been the wrong trade. Move or restyle it
+> freely; the palette import is the only thing that must survive.
+
+**`DEMO_RUNBOOK.md` — the viewer section it never had.** Roles, timings and
+fallback paths were all there, but nothing said which keys to press. Added:
+what to press and what to say while pressing it, the sixty seconds the wipe
+deserves, and the camera note that matters most — the near field is 5 cm on
+**both** sides of the wipe by construction, so a top-down shot shows two
+identical halves and proves nothing. Get low and look along the road.
+
+**Fetching SemanticKITTI** (~1.8 GB, sequence 04 plus subsets of 00 and 05).
+The run-book classes `--fixtures` as Path D, "last resort", so a demo on
+fixture data is a demo on the emergency path.
+
+---
+
+### Acceptance
+
+- Items 16-17 ✓ — real streamed frames, Day 3 criterion met
+- Item 28 ✓ — class legend; the rest of the projector polish is Navya's HUD
+- Items 29, 30 ✓ — full keystroke pass against the **real backend stream**:
+  `3 G W drag 4 E 1 2`, all four views exercised, **0 errors 0 warnings**
+  across 78 console entries. 60.0 FPS at 41,990 real instances; divider drag
+  1% low 57.8; T-W7 326 frames → 3 React renders.
+
+**The checklist is complete — 30 of 30.**
+- Item 25 — **closing as not required.** 60 FPS at 109,404 instances with no
+  LOD at all. Building it would optimise something already twice as fast as
+  FR-30 demands.
+
+---
+
+### Decisions and surprises
+
+**1. Two independent copies of the wire types had already drifted.** I wrote
+`components/viewer/types.ts` from `protocol.py` while Navya wrote
+`lib/protocol.ts` from the same source. Mine had widened `selected` and `risk`
+to `| string` and made `tracks`/`decision`/`stats` optional — quietly
+permitting frames the real stream never sends. The decode owns the contract,
+so `types.ts` now re-exports hers and nothing else.
+
+**2. That immediately caught a real defect.** `devFrames.ts` was emitting
+`stats: { n_cells, fps }`, which is not a `FrameStats` at all. A generator
+whose entire purpose is *schema-valid* frames must emit the complete message,
+or the viewer grows a dependency on fields that do not exist. Duplicated types
+had been hiding it.
+
+**3. The live demo was synthetic, but the headline numbers are not.** 0.878
+mIoU and 0.934 point accuracy were measured over 971 real SemanticKITTI scans
+offline; 22.67× is analytic from the grid construction. Only tonight's live
+feed was fixtures. Worth keeping straight — the two get conflated easily, and
+a judge asking "is that a real scan?" deserves the precise answer.
+
+**4. On real scans the uniform view draws FEWER boxes than the adaptive one.**
+`[uniform] drawing 16,129 of 521,739 footprint sites` against the adaptive
+side's 41,990. A real scan is sparse — it occupies a small fraction of either
+grid — so resampling it onto a 5 cm lattice lights up fewer cells than the
+adaptive tiling does. This is the same trap that redesigned the wipe on Day 9,
+and it is why the wipe argues from the **grid shader** (structure) rather than
+from cell boxes. Worth one deliberate look on the real stream before filming:
+if the boxes read as "uniform has less", turn the cells off on that side and
+let the grid carry it alone.
+
+**5. `!handleRef.current?.getWipe()` is `true` when the handle is null.** From
+the merged `Viewer.tsx`: a `W` press before mount would tell a controlled
+parent the wipe is ON while the scene did nothing. Read the handle first,
+return if absent.
+
+---
+
 ## Day 9 · Saturday 5 Sep 2026 — View 2, the A/B wipe, View 4; T-V6 and T-W7 pass
 
 Viewer track went from Day 2 to **Day 6 complete** in one session. Calendar is
