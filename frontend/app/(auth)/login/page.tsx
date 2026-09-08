@@ -3,10 +3,16 @@
 // Email/password and Google, both required by the requirement. If Firebase is
 // not configured the page says so plainly and points at the file to fill in,
 // rather than rendering a form whose buttons throw.
+//
+// The styling is the landing page's: same ink, same accent, same mono
+// figures, with the neural field carried through so the transition from hero
+// to sign-in does not feel like two products. The logic below — the auth
+// handlers, the redirect guard, the error mapping — is unchanged.
 'use client';
 
 import { Suspense, useCallback, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import NeuralField from '../../../components/landing/NeuralField';
 import {
   isAuthConfigured,
   registerWithEmail,
@@ -24,11 +30,50 @@ import {
  */
 export default function LoginPage() {
   return (
-    <Suspense fallback={<main style={PAGE} />}>
+    <Suspense fallback={<Shell />}>
       <LoginForm />
     </Suspense>
   );
 }
+
+/** The page frame — background, field, and the centred card slot. */
+function Shell({ children }: { children?: React.ReactNode }) {
+  return (
+    <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[var(--ink-900)] p-6">
+      <NeuralField
+        className="pointer-events-none absolute inset-0 h-full w-full opacity-45"
+        density={64}
+        linkRadius={150}
+      />
+      {/* Pulls focus to the card without hiding the field behind it. */}
+      <div
+        className="pointer-events-none absolute inset-0"
+        style={{
+          background:
+            'radial-gradient(ellipse at 50% 45%, rgba(7,10,20,0) 0%, rgba(7,10,20,0.82) 62%, var(--ink-900) 100%)',
+        }}
+      />
+      <div className="relative z-10 w-full max-w-[400px]">{children}</div>
+    </main>
+  );
+}
+
+function Card({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="rise rounded-xl border border-[var(--line)] bg-[var(--ink-850)]/85 p-8 shadow-[0_24px_70px_-20px_rgba(0,0,0,0.85)] backdrop-blur-md">
+      {children}
+    </div>
+  );
+}
+
+const INPUT =
+  'mt-1.5 mb-4 w-full rounded-md border border-[var(--line)] bg-[var(--ink-800)] px-3 py-2.5 text-sm text-[var(--text-hi)] outline-none transition-colors duration-150 focus:border-[var(--accent)] placeholder:text-[var(--text-lo)]';
+const LABEL =
+  'block text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--text-lo)]';
+const PRIMARY =
+  'w-full rounded-md bg-[var(--accent)] px-4 py-2.5 text-sm font-semibold text-[#062713] transition-all duration-150 hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50';
+const SECONDARY =
+  'w-full rounded-md border border-[var(--line)] px-4 py-2.5 text-sm font-semibold text-[var(--text-hi)] transition-colors duration-150 hover:border-[var(--accent)] hover:text-[var(--accent)] disabled:cursor-not-allowed disabled:opacity-50';
 
 function LoginForm() {
   const router = useRouter();
@@ -68,28 +113,36 @@ function LoginForm() {
 
   if (!isAuthConfigured) {
     return (
-      <main style={PAGE}>
-        <div style={CARD}>
-          <h1 style={TITLE}>Sign-in unavailable</h1>
-          <p style={BODY}>
+      <Shell>
+        <Card>
+          <h1 className="text-xl font-semibold text-[var(--text-hi)]">
+            Sign-in unavailable
+          </h1>
+          <p className="mt-3 text-sm leading-relaxed text-[var(--text)]">
             No Firebase project is configured, so authentication is switched off and the
-            dashboard is open. Copy <code style={CODE}>.env.local.example</code> to{' '}
-            <code style={CODE}>.env.local</code> and fill in the{' '}
-            <code style={CODE}>NEXT_PUBLIC_FIREBASE_*</code> values to turn it on.
+            dashboard is open. Copy <Code>.env.local.example</Code> to <Code>.env.local</Code>{' '}
+            and fill in the <Code>NEXT_PUBLIC_FIREBASE_*</Code> values to turn it on.
           </p>
-          <a href="/dashboard" style={{ ...PRIMARY, textAlign: 'center', display: 'block' }}>
+          <a href="/dashboard" className={`${PRIMARY} mt-6 block text-center`}>
             Continue to the dashboard
           </a>
-        </div>
-      </main>
+        </Card>
+      </Shell>
     );
   }
 
   return (
-    <main style={PAGE}>
-      <div style={CARD}>
-        <h1 style={TITLE}>AVR-25D</h1>
-        <p style={BODY}>Sign in to reach the dashboard and run history.</p>
+    <Shell>
+      <Card>
+        <p className="tabular text-[10px] uppercase tracking-[0.34em] text-[var(--text-lo)]">
+          SIH26053 · DRDO / IDEX
+        </p>
+        <h1 className="mt-2 text-3xl font-semibold tracking-tight text-[var(--text-hi)]">
+          AVR-25D
+        </h1>
+        <p className="mt-2 mb-7 text-sm text-[var(--text-lo)]">
+          Sign in to reach the dashboard and run history.
+        </p>
 
         <form
           onSubmit={(e) => {
@@ -97,7 +150,7 @@ function LoginForm() {
             void run(() => signInWithEmail(email, password));
           }}
         >
-          <label style={LABEL} htmlFor="email">Email</label>
+          <label className={LABEL} htmlFor="email">Email</label>
           <input
             id="email"
             type="email"
@@ -105,10 +158,10 @@ function LoginForm() {
             autoComplete="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            style={INPUT}
+            className={INPUT}
           />
 
-          <label style={LABEL} htmlFor="password">Password</label>
+          <label className={LABEL} htmlFor="password">Password</label>
           <input
             id="password"
             type="password"
@@ -116,12 +169,19 @@ function LoginForm() {
             autoComplete="current-password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            style={INPUT}
+            className={INPUT}
           />
 
-          {error ? <p style={ERROR}>{error}</p> : null}
+          {error ? (
+            <p
+              role="alert"
+              className="mb-4 rounded-md border border-[#5a1f28] bg-[#2a0f14] px-3 py-2 text-[13px] text-[#ff8a80]"
+            >
+              {error}
+            </p>
+          ) : null}
 
-          <button type="submit" disabled={busy} style={PRIMARY}>
+          <button type="submit" disabled={busy} className={PRIMARY}>
             {busy ? 'Signing in…' : 'Sign in'}
           </button>
         </form>
@@ -130,25 +190,35 @@ function LoginForm() {
           type="button"
           disabled={busy}
           onClick={() => void run(() => registerWithEmail(email, password))}
-          style={LINK}
+          className="mt-3 w-full text-[13px] text-[var(--text-lo)] underline-offset-4 transition-colors duration-150 hover:text-[var(--accent)] hover:underline disabled:opacity-50"
         >
           Create an account with this email
         </button>
 
-        <div style={RULE}>
-          <span style={RULE_TEXT}>or</span>
+        <div className="my-6 flex items-center gap-3">
+          <span className="h-px flex-1 bg-[var(--line)]" />
+          <span className="text-[10px] uppercase tracking-[0.2em] text-[var(--text-lo)]">or</span>
+          <span className="h-px flex-1 bg-[var(--line)]" />
         </div>
 
         <button
           type="button"
           disabled={busy}
           onClick={() => void run(signInWithGoogle)}
-          style={SECONDARY}
+          className={SECONDARY}
         >
           Continue with Google
         </button>
-      </div>
-    </main>
+      </Card>
+    </Shell>
+  );
+}
+
+function Code({ children }: { children: React.ReactNode }) {
+  return (
+    <code className="tabular rounded bg-[var(--ink-700)] px-1.5 py-0.5 text-[12px] text-[var(--text)]">
+      {children}
+    </code>
   );
 }
 
@@ -185,105 +255,3 @@ function humanise(err: unknown): string {
       return err instanceof Error ? err.message : 'Sign-in failed.';
   }
 }
-
-const PAGE: React.CSSProperties = {
-  minHeight: '100vh',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  background: '#0b0b14',
-  padding: 24,
-};
-
-const CARD: React.CSSProperties = {
-  width: '100%',
-  maxWidth: 380,
-  padding: 28,
-  borderRadius: 10,
-  border: '1px solid rgba(255,255,255,0.14)',
-  background: 'rgba(255,255,255,0.03)',
-  color: '#e8e8ef',
-  font: '14px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace',
-};
-
-const TITLE: React.CSSProperties = { margin: '0 0 6px', font: '700 24px/1.2 inherit' };
-const BODY: React.CSSProperties = { margin: '0 0 20px', color: '#b9b9c8' };
-const LABEL: React.CSSProperties = {
-  display: 'block',
-  margin: '0 0 5px',
-  font: '600 11px/1 inherit',
-  letterSpacing: '0.1em',
-  textTransform: 'uppercase',
-  color: '#8b8b9e',
-};
-const INPUT: React.CSSProperties = {
-  width: '100%',
-  padding: '10px 12px',
-  marginBottom: 14,
-  borderRadius: 6,
-  border: '1px solid rgba(255,255,255,0.18)',
-  background: 'rgba(0,0,0,0.35)',
-  color: '#e8e8ef',
-  font: 'inherit',
-};
-const PRIMARY: React.CSSProperties = {
-  width: '100%',
-  padding: '11px 14px',
-  borderRadius: 6,
-  border: 'none',
-  background: '#00C853',
-  color: '#04120a',
-  font: '700 14px/1 inherit',
-  cursor: 'pointer',
-};
-const SECONDARY: React.CSSProperties = {
-  width: '100%',
-  padding: '11px 14px',
-  borderRadius: 6,
-  border: '1px solid rgba(255,255,255,0.22)',
-  background: 'transparent',
-  color: '#e8e8ef',
-  font: '600 14px/1 inherit',
-  cursor: 'pointer',
-};
-const LINK: React.CSSProperties = {
-  display: 'block',
-  width: '100%',
-  marginTop: 10,
-  padding: 0,
-  border: 'none',
-  background: 'none',
-  color: '#8b8b9e',
-  font: '12px/1.4 inherit',
-  textAlign: 'left',
-  cursor: 'pointer',
-  textDecoration: 'underline',
-};
-const RULE: React.CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  margin: '18px 0',
-  borderTop: '1px solid rgba(255,255,255,0.12)',
-};
-const RULE_TEXT: React.CSSProperties = {
-  transform: 'translateY(-50%)',
-  padding: '0 10px',
-  background: '#0b0b14',
-  color: '#6f6f83',
-  font: '11px/1 inherit',
-};
-const ERROR: React.CSSProperties = {
-  margin: '0 0 12px',
-  padding: '8px 10px',
-  borderRadius: 5,
-  border: '1px solid #D50000',
-  background: 'rgba(213,0,0,0.12)',
-  color: '#ff8a80',
-  font: '12px/1.4 inherit',
-};
-const CODE: React.CSSProperties = {
-  padding: '1px 4px',
-  borderRadius: 3,
-  background: 'rgba(255,255,255,0.10)',
-};
