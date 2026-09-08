@@ -655,7 +655,7 @@ growing by factor 1.005.
 
 `[x]` done · `[~]` partial, reason in brackets · `[ ]` not started
 
-**Last updated: Day 9, Sat 5 Sep 2026.**
+**Last updated: Day 12, Mon 8 Sep 2026.**
 
 ```
 [x] 1.  npm install + npm install three @types/three
@@ -683,12 +683,14 @@ growing by factor 1.005.
 [x] 15. Elevation-shading toggle              [press E; plasma ramp]
         → EXIT CRITERION DAY 2: cells correctly sized at every range  ✓ MET
 
-[~] 16. View 1 (raw point cloud) on real streamed frames
-[~] 17. View 3 (adaptive grid) on real streamed frames
-        [both render, but on SYNTHETIC frames from __dev__/devFrames.ts.
-         Real frames need Navya's lib/protocol.ts to decode the binary payload.]
-        → EXIT CRITERION DAY 3: views render real frames, class-coloured
-          [NOT MET — "real frames" is the missing half]
+[x] 16. View 1 (raw point cloud) on real streamed frames
+[x] 17. View 3 (adaptive grid) on real streamed frames
+        [lib/ws.ts + lib/protocol.ts landed; the dashboard streams from the
+         backend over the real wire format. Confirmed by cell count: the
+         backend sends 41,996, __dev__/devFrames.ts sends 43,946.
+         NOTE the scan is still SYNTHETIC — the server runs --fixtures.
+         Real scans need tools/fetch_kitti.py then --infer geometric.]
+        → EXIT CRITERION DAY 3: views render real frames, class-coloured  ✓ MET
 
 [x] 18. View 2 (uniform 5 cm grid)
         → EXIT CRITERION DAY 4: uniform view renders the same scan as View 3  ✓ MET
@@ -718,21 +720,31 @@ growing by factor 1.005.
 
         ─────────────── ↓ START HERE NEXT ↓ ───────────────
 
-[ ] 25. LOD tuning  [not needed yet — 60 FPS at 109k with no LOD at all]
+[x] 25. LOD tuning — CLOSED AS NOT REQUIRED
+        [60.0 FPS at 109,404 instances with no LOD at all, against FR-30's
+         30 FPS. Building it would optimise something already 2x faster
+         than required. Reopen only if the real KITTI stream is slower.]
 [x] 26. Verify ≥30 FPS at 100,000 instances (T-V6)
         [109,404 instances → 60.0 FPS, 1% low 56.7]
 [x] 27. Verify React render count < 10 across 300 frames (T-W7)
         [316 frames streamed → 3 React renders]
         → EXIT CRITERION DAY 9: T-V6 and T-W7 pass  ✓ MET
 
-[ ] 28. Visual polish, verify at projector resolution
-        → EXIT CRITERION DAY 10: renders correctly at projector resolution
+[x] 28. Visual polish, verify at projector resolution
+        [class legend added — nothing on screen said what the colours meant.
+         The rest is Navya's HUD: view buttons, fps, reduction, memory.]
+        → EXIT CRITERION DAY 10: renders correctly at projector resolution  ✓ MET
 
-[ ] 29. Demo keystroke sequence verified end to end
-        → EXIT CRITERION DAY 11: every run-book keystroke works
+[x] 29. Demo keystroke sequence verified end to end
+        [3 G W drag 4 E 1 2 — all exercised against the REAL backend stream.
+         Keystroke table now in DEMO_RUNBOOK.md, which had none.]
+        → EXIT CRITERION DAY 11: every run-book keystroke works  ✓ MET
 
-[ ] 30. Bug fixes only — zero console errors across all four views
-        → EXIT CRITERION DAY 12: clean console
+[x] 30. Bug fixes only — zero console errors across all four views
+        [all four views exercised: 0 errors, 0 warnings across 78 entries.
+         60.0 FPS at 41,990 real instances; drag 1% low 57.8;
+         T-W7 326 frames → 3 React renders.]
+        → EXIT CRITERION DAY 12: clean console  ✓ MET
 ```
 
 ---

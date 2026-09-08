@@ -110,9 +110,14 @@ def cluster_centroids(
         from scipy.sparse.csgraph import connected_components
         from scipy.spatial import cKDTree
 
-        pairs = np.array(
-            sorted(cKDTree(xy).query_pairs(link_m)), dtype=np.int64
-        ).reshape(-1, 2)
+        # ``output_type="ndarray"`` rather than sorting the default Python set.
+        # On a real SemanticKITTI scan a car at close range occupies thousands
+        # of 5 cm cells, so this returns ~280,000 pairs; building and sorting a
+        # set of that many tuples cost 146 ms against 34 ms for the spatial
+        # query itself, and dominated the whole decision layer. The sort was
+        # never needed — connected_components does not care about edge order.
+        # Fixture scenes never showed it: their dynamic cells are sparse.
+        pairs = cKDTree(xy).query_pairs(link_m, output_type="ndarray")
         if pairs.size:
             adj = coo_matrix(
                 (np.ones(pairs.shape[0], dtype=np.int8), (pairs[:, 0], pairs[:, 1])),

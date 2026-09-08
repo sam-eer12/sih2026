@@ -4,6 +4,105 @@ Newest entry at the top. Format and rules: [`README.md`](./README.md).
 
 ---
 
+## Day 11 · Mon 7 Sep 2026 — feature freeze, and the authoritative run
+
+**Landed.**
+
+| File | What it is |
+|---|---|
+| `docs/FEATURE_FREEZE.md` | **C1** — the freeze declared at `1ccc876`, with the exception process and what is deliberately *not* frozen |
+| `model/results.json` + `docs/RESULTS.md` | **C2** — `make bench-authoritative`, 971 scans, 24.9 s, re-run at the frozen commit |
+| `docs/DECK_NUMBERS.md` | **C3** — every deck figure with the `results.json` path it traces to, plus five things not to say |
+| `tools/publish_run.py` | **H2** — posts `results.json` to `/api/runs`; `--dry-run` works today |
+| `docs/DEMO_RUNBOOK.md` | **H5** — paths A/B/C/D, the three timed rehearsals, roles |
+
+Suite **382 passed**, exit 0, on a clean tree. That is what the freeze was
+declared against.
+
+**Acceptance.** C1, C2, C3 and H5's preparation are done. **H2 is written but
+not executed** — it needs Atlas and Firebase (C5, C6, Navya). M5 turned out to
+be already done; see below. H1 (Veda's placeholders) is unblocked as of now.
+
+**Blocked / blocking.**
+
+- **Blocked on Navya (C5, C6):** `publish_run.py` posts and gets HTTP 500 from
+  `localhost:3000/api/runs` — the route is there, the credentials are not. One
+  command once Atlas is live: `python tools/publish_run.py --email <you>`.
+- **Unblocking Veda (H1):** `DECK_NUMBERS.md` is the hand-off. Every
+  `_measured_` placeholder has a value on that sheet.
+- **Blocking Anuj (C4, H8):** the freeze is declared, so `demo.log` must be
+  recorded against `1ccc876`. `model/data/logs/` does not exist yet.
+
+**Decisions and surprises.**
+
+### The stale RESULTS.md was a provenance bug, not a numbers bug
+
+The board said the published results were from `b75aa46` with 50 commits since,
+including `9cbdf6a`, which rewrote the FR-14 ground reference feeding
+`NEGATIVE_OBSTACLE` and `OVERHANG`. The reasonable expectation was that the
+hazard table would move.
+
+It did not. Diffing the new `results.json` against the old, field by field:
+**zero non-latency differences.** mIoU `0.87814` both times, hazard max error
+`0.434` both times, cell reduction `22.6702` both times, projection `100.0`
+both times.
+
+What actually happened: the Sep-3 bench ran with `9cbdf6a`'s work *in the
+working tree* but recorded `git_commit` as the then-HEAD `b75aa46`. The numbers
+were always from the current code. The provenance stamp was lying, and
+provenance is the entire argument of NFR-5 — "every figure traces to a row of
+`results.json`" is worth nothing if `results.json` cannot say which code
+produced it.
+
+**So: benchmark a clean tree, or the commit field is fiction.** Worth a line in
+the bench docs; `publish_run.py` now warns to stderr when `results.json`'s
+commit and HEAD disagree, which is exactly the condition that hid this.
+
+Only latency and peak RSS moved, both machine variance: median 9.5 → 9.2 ms,
+p95 14.8 → 13.7 ms, peak RSS 292.6 → 220.9 MB. **Veda: the accuracy and hazard
+numbers you may already have transcribed are still correct.**
+
+### M5 was already done
+
+The board says "only S5 is pre-generated". All seven of S1–S7 are on disk as
+KITTI directories. Better than that — `make scenes` regenerates all **99 files
+and the registry byte-identically** (`shasum -a 256`, `git status` clean
+after). So the hazard numbers are reproducible in a fresh clone rather than an
+artefact of this laptop's history, which is a stronger claim than "the files
+exist" and is worth making if a judge asks whether the synthetic results are
+cherry-picked.
+
+### `--infer cached` verified live, not just in tests
+
+Started the server at the frozen commit and watched for the line the Day-11 fix
+added:
+
+```
+Label cache: data/cache/network — 971 frames, built by the network segmenter
+```
+
+It is there. That line is now in the runbook as the **one thing to check before
+speaking**: if it is absent, the cache was not found, the server has silently
+fallen back to geometric, and you are on Path B without knowing it. That is the
+defect that shipped for days, and the log line is how it stays caught.
+
+### `hazards/max_error_m` is 0.434, and it is not a distance
+
+It is S5's tracked **speed** error in m/s. Every geometric error in the run is
+under 1.1 cm. A slide that says "hazards measured to 43 cm" would be quoting a
+speed as a length and understating our own result by a factor of forty. Called
+out explicitly in `DECK_NUMBERS.md`.
+
+### The Vercel link cannot show the live stream
+
+`NEXT_PUBLIC_WS_URL` is `ws://`, and no browser opens an insecure socket from
+an `https://` origin — `lib/ws.ts` refuses deliberately (NFR-9). **The live
+demo runs from `http://localhost:3000`;** Vercel is the submission link and
+shows auth, run history and scenes. This is in the runbook because it is a
+design decision when stated early and a bug when discovered by a judge.
+
+---
+
 ## Sun 6 Sep 2026 · later — T-P6, and `--infer cached` was never reading the cache
 
 Board audit through Day 11, against the tree rather than against this log. Days
