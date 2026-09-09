@@ -82,12 +82,19 @@ export default function Viewer({
   }, [controlled, onWipeChange, handleRef]);
   const lineRef = useRef<HTMLDivElement>(null);
   const knobRef = useRef<HTMLDivElement>(null);
+  const leftLabelRef = useRef<HTMLDivElement>(null);
+  const rightLabelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     handleRef.current?.onDividerChange((x) => {
       const pct = `${(x * 100).toFixed(3)}%`;
       if (lineRef.current) lineRef.current.style.left = pct;
       if (knobRef.current) knobRef.current.style.left = pct;
+      // Labels track the seam so both counts stay readable at any split.
+      if (leftLabelRef.current)
+        leftLabelRef.current.style.right = `calc(100% - ${pct} + 18px)`;
+      if (rightLabelRef.current)
+        rightLabelRef.current.style.left = `calc(${pct} + 18px)`;
     });
   }, [handleRef, wipeOn]);
 
@@ -187,7 +194,13 @@ export default function Viewer({
           display: 'block',
         }}
       />
-      {wipeOn && <WipeOverlay lineRef={lineRef} knobRef={knobRef} initialDivider={0.5} />}
+      {wipeOn && <WipeOverlay
+          lineRef={lineRef}
+          knobRef={knobRef}
+          leftLabelRef={leftLabelRef}
+          rightLabelRef={rightLabelRef}
+          initialDivider={0.5}
+        />}
     </div>
   );
 }

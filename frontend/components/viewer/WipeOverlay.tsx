@@ -14,12 +14,20 @@ export interface WipeOverlayProps {
    *  re-render the viewer dozens of times per drag for no benefit. */
   lineRef: React.RefObject<HTMLDivElement | null>;
   knobRef: React.RefObject<HTMLDivElement | null>;
+  leftLabelRef: React.RefObject<HTMLDivElement | null>;
+  rightLabelRef: React.RefObject<HTMLDivElement | null>;
   initialDivider: number;
 }
 
+// The labels ride the divider rather than sitting in the screen corners.
+// In the corners the right-hand one lands underneath the HUD and the decision
+// panel, which hides "705,771" — and a wipe that shows only the 16,000,000
+// half is making half an argument. At the seam they are always visible, they
+// move with the drag, and each number sits against the grid it describes.
 const label: React.CSSProperties = {
   position: 'absolute',
-  top: 24,
+  top: '50%',
+  transform: 'translateY(-50%)',
   padding: '10px 14px',
   borderRadius: 6,
   background: 'rgba(10, 12, 24, 0.72)',
@@ -37,7 +45,13 @@ const count: React.CSSProperties = {
   marginTop: 2,
 };
 
-export default function WipeOverlay({ lineRef, knobRef, initialDivider }: WipeOverlayProps) {
+export default function WipeOverlay({
+  lineRef,
+  knobRef,
+  leftLabelRef,
+  rightLabelRef,
+  initialDivider,
+}: WipeOverlayProps) {
   const pct = `${(initialDivider * 100).toFixed(2)}%`;
 
   return (
@@ -76,7 +90,7 @@ export default function WipeOverlay({ lineRef, knobRef, initialDivider }: WipeOv
         }}
       />
 
-      <div style={{ ...label, left: 24 }}>
+      <div ref={leftLabelRef} style={{ ...label, right: `calc(100% - ${pct} + 18px)`, textAlign: 'right' }}>
         UNIFORM 5 cm
         <span style={{ ...count, color: '#ff8a80' }}>
           {GRID_CAPACITY.uniform.toLocaleString()}
@@ -84,7 +98,7 @@ export default function WipeOverlay({ lineRef, knobRef, initialDivider }: WipeOv
         cells
       </div>
 
-      <div style={{ ...label, right: 24, textAlign: 'right' }}>
+      <div ref={rightLabelRef} style={{ ...label, left: `calc(${pct} + 18px)` }}>
         AVR-25D ADAPTIVE
         <span style={{ ...count, color: '#69f0ae' }}>
           {GRID_CAPACITY.adaptive.toLocaleString()}

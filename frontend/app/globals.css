@@ -1,8 +1,30 @@
 @import "tailwindcss";
 
+/* ── AVR-25D palette ───────────────────────────────────────────────
+   Class colours are mirrored from lib/palette.ts, which stays the single
+   source of truth for anything rendered into the scene. These exist so CSS
+   can speak the same language as the canvas without hard-coding a hex in a
+   component. If they disagree, palette.ts wins. */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --ink-900: #070a14;
+  --ink-850: #0a0e1c;
+  --ink-800: #0e1426;
+  --ink-700: #151d33;
+  --ink-600: #1e2942;
+  --line:    #263353;
+
+  --text-hi: #eef2fb;
+  --text:    #c2cbe0;
+  --text-lo: #7f8bab;
+
+  --drivable:  #00c853;
+  --terrain:   #ffd600;
+  --obstacle:  #d50000;
+  --dynamic:   #2979ff;
+  --accent:    #69f0ae;
+
+  --background: var(--ink-900);
+  --foreground: var(--text);
 }
 
 @theme inline {
@@ -12,15 +34,33 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  color-scheme: dark;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* The product is a measuring instrument; numbers are set in mono everywhere
+   so a figure reads the same on the landing page as it does in the HUD. */
+.tabular {
+  font-family: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+@keyframes rise {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: none; }
+}
+
+.rise {
+  animation: rise 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rise { animation: none; }
 }
