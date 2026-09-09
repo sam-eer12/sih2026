@@ -32,17 +32,21 @@ const label: React.CSSProperties = {
   borderRadius: 6,
   background: 'rgba(10, 12, 24, 0.72)',
   color: '#e8ecf4',
-  font: '600 13px/1.35 ui-monospace, SFMono-Regular, Menlo, monospace',
-  letterSpacing: '0.02em',
+  // The words are read as language and the figure as a measurement, so they
+  // are set in different faces — which is also what makes the count the thing
+  // your eye lands on rather than one line of uniform mono.
+  font: '600 13px/1.35 var(--ui)',
+  letterSpacing: '0.01em',
   whiteSpace: 'nowrap',
   pointerEvents: 'none',
 };
 
 const count: React.CSSProperties = {
   display: 'block',
-  fontSize: 22,
-  fontWeight: 700,
-  marginTop: 2,
+  font: '600 26px/1.05 var(--tech)',
+  fontVariantNumeric: 'tabular-nums',
+  letterSpacing: '-0.03em',
+  margin: '3px 0 1px',
 };
 
 export default function WipeOverlay({
@@ -91,7 +95,7 @@ export default function WipeOverlay({
       />
 
       <div ref={leftLabelRef} style={{ ...label, right: `calc(100% - ${pct} + 18px)`, textAlign: 'right' }}>
-        UNIFORM 5 cm
+        Uniform 5 cm
         <span style={{ ...count, color: '#ff8a80' }}>
           {GRID_CAPACITY.uniform.toLocaleString()}
         </span>
@@ -99,7 +103,7 @@ export default function WipeOverlay({
       </div>
 
       <div ref={rightLabelRef} style={{ ...label, left: `calc(${pct} + 18px)` }}>
-        AVR-25D ADAPTIVE
+        AVR-25D adaptive
         <span style={{ ...count, color: '#69f0ae' }}>
           {GRID_CAPACITY.adaptive.toLocaleString()}
         </span>

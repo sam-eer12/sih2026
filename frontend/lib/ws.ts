@@ -62,16 +62,79 @@ export interface StreamOptions {
   connectTimeoutMs?: number;
 }
 
+/** Hosts that are always this machine, and so never behind TLS in development. */
+const LOOPBACK = new Set(['localhost', '127.0.0.1', '[::1]', '::1', '0.0.0.0']);
+
+export function isLoopbackHost(hostname: string): boolean {
+  return LOOPBACK.has(hostname.toLowerCase());
+}
+
 /**
- * ws://localhost:8000/stream unless NEXT_PUBLIC_WS_URL says otherwise.
+ * Resolve the frame-stream URL, correcting the scheme rather than trusting it.
  *
- * NFR-9: this is a `ws://` origin, so the page must be served over http from
- * localhost. An https origin on Vercel cannot open it — browsers block the
- * mixed content and the stream silently never connects. The deployment exists
- * for the submission link; the demo runs from http://localhost:3000.
+ * `NEXT_PUBLIC_WS_URL` stays authoritative for host, port and path — it is how
+ * the stream is pointed at a different machine — but the scheme is decided
+ * here, because that is the part that gets it wrong in practice:
+ *
+ * - **Loopback is always `ws://`.** A local pipeline server has no TLS
+ *   terminator in front of it, so `wss://localhost:8000` can never connect. A
+ *   browser in HTTPS-First mode will rewrite or block a plain `ws://`, which
+ *   surfaces as an attempt to reach `wss://localhost:8000/stream` and a socket
+ *   that never opens.
+ * - **Anywhere else follows the page.** An https deployment must use `wss://`
+ *   or the browser blocks it as mixed content, so a remote host inherits the
+ *   page's protocol and production keeps working untouched.
+ *
+ * A malformed value falls back to the local default with a warning instead of
+ * throwing inside `new WebSocket()`, where the failure is a bare SyntaxError
+ * and an endless reconnect loop.
  */
-export const DEFAULT_STREAM_URL =
-  process.env.NEXT_PUBLIC_WS_URL ?? 'ws://localhost:8000/stream';
+export function resolveStreamUrl(
+  configured: string | undefined = process.env.NEXT_PUBLIC_WS_URL,
+  pageProtocol: string | undefined = typeof window === 'undefined'
+    ? undefined
+    : window.location.protocol
+): string {
+  const fallback = 'ws://localhost:8000/stream';
+  if (!configured) return fallback;
+
+  let url: URL;
+  try {
+    url = new URL(configured);
+  } catch {
+    console.warn(
+      `[stream] NEXT_PUBLIC_WS_URL is not a valid URL (${configured}); ` +
+        `falling back to ${fallback}`
+    );
+    return fallback;
+  }
+
+  if (url.protocol !== 'ws:' && url.protocol !== 'wss:') {
+    console.warn(
+      `[stream] NEXT_PUBLIC_WS_URL must be ws:// or wss:// (${configured}); ` +
+        `falling back to ${fallback}`
+    );
+    return fallback;
+  }
+
+  url.protocol = isLoopbackHost(url.hostname)
+    ? 'ws:'
+    : pageProtocol === 'https:'
+      ? 'wss:'
+      : url.protocol;
+
+  return url.toString();
+}
+
+/**
+ * Where the browser opens its frame socket.
+ *
+ * NFR-9: on loopback this is a `ws://` origin, so the page must be served over
+ * http. An https origin cannot open it — browsers block the mixed content and
+ * the stream silently never connects. The deployment exists for the submission
+ * link; the demo runs from http://localhost:3000.
+ */
+export const DEFAULT_STREAM_URL = resolveStreamUrl();
 
 /**
  * Is this page going to be blocked from opening `url` as mixed content?

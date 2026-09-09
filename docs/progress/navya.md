@@ -31,8 +31,9 @@ field offset anywhere else.
 
 ## 2. Status snapshot
 
-Last verified against the code: **Mon 7 Sep 2026** (Day 11 of 14). Branch `navya/platform-hud`,
-24 commits ahead of `main` and 0 behind, open for review.
+Last verified against the code: **Wed 9 Sep 2026** (Day 13 of 14). `navya/platform-hud` **is
+merged** — PR #3, in `main`. Current branch `ui-redesign`, 4 commits ahead of `origin/main` and
+0 behind.
 
 **Backend (Sameer and Anuj).** Pipeline complete end to end — grid, cells, hazards, refine,
 decision layer, server. **382 tests green** on macOS and Windows CI. Wire protocol frozen.
@@ -44,8 +45,9 @@ the Day 10 entries.
 built. T-V6 passes (109,404 instances at 60 FPS) and T-W7 passes. Views render **real streamed
 frames** as of Day 9 — his Day 3 exit criterion, closed by `lib/protocol.ts` + `lib/ws.ts`.
 
-**Platform (mine).** Roadmap Steps 0–5 complete; Steps 6–8 code-complete and waiting only on
-external accounts.
+**Platform (mine).** Roadmap Steps 0–8 complete and merged. Work since is presentation-layer
+only, on `ui-redesign`: the dashboard rebuilt as a perception console, and a data-derived camera
+fit. The data path is untouched by all of it.
 
 | Area | State |
 |---|---|
@@ -59,7 +61,9 @@ external accounts.
 | `app/runs`, `app/runs/[id]` | **Done** — run list and detail with the decision log |
 | `app/page.tsx`, `app/layout.tsx` | **Done** — boilerplate and "Create Next App" metadata replaced |
 | `.env.local.example` | **Done** — every variable documented, no credential committed |
-| Firebase project, Atlas M0 cluster, Vercel | **Not created** — external accounts, Navya's to provision |
+| `components/dashboard/*` | **Done** (`ui-redesign`) — console chrome and instruments; every figure real |
+| Firebase project, Atlas M0 cluster | **Provisioned locally** — all ten keys set in `.env.local`; auth gate confirmed live (`/dashboard` redirects). End-to-end **T-W3/T-W5 against the cluster are still unverified by me** |
+| Vercel | **Not created** — Navya's to provision |
 
 **Tests.** Backend **382**. Frontend **273 assertions across 9 suites** (protocol round-trip,
 HUD, decision panel, NFR-9, auth, T-W4 batching, per-route T-W2 guard, run session, scene
@@ -67,13 +71,21 @@ registry). `tsc`, `eslint` and `next build` clean at 10 routes.
 
 **Environment.** `frontend/node_modules` present; `firebase`, `firebase-admin` and `mongodb`
 installed. `backend/.venv` on Python 3.14.5 with `requirements.txt` + `pip install -e model/`.
-Node v22.19.0, npm 10.9.3. No `.env.local` — auth and persistence are inert until one exists.
+Node v22.19.0, npm 10.9.3. **`.env.local` now exists** with all ten keys, so auth and
+persistence are live locally — which is why `/dashboard` redirects to `/login` rather than
+opening. It is gitignored and no credential is committed.
 `npm audit` reports 6 moderate advisories, all transitive through
 `firebase-admin → @google-cloud/storage → uuid`, a path this app does not use; `audit fix
 --force` would downgrade the SDK, so they are recorded rather than silently broken.
 
-**Git.** `origin/main` = `45c8d4b` (Sameer's FR-40 merge). Working branch `navya/platform-hud`,
-in sync with its remote, 0 behind `main`. `main` has never been pushed to from this branch.
+**Git.** `navya/platform-hud` merged to `main` via PR #3 (`1ccc876`); `main` is now `1aa9548`
+(Sameer's feature freeze). Working branch `ui-redesign`, 4 commits ahead of `origin/main` and 0
+behind, tip `2691edd`. `main` has never been pushed to from a branch of mine.
+
+**KITTI cached mode — set up, not finished.** `model/data/kitti` and `model/data/cache` did not
+exist. Sequence 04 is **partially fetched: 111 of 271 scans, 342 MB of 521 MB**, and the label
+cache was never built, so `--infer cached` would silently fall back to the geometric segmenter
+(`app.py:243-257`). The fetch is resumable. See the Day 13 entry for the commands.
 
 ---
 
@@ -634,6 +646,90 @@ Browser checks, recorded as pending rather than blocking:
 ---
 
 ## 7. Progress log
+
+### Day 13 · Wednesday 9 Sep 2026 — the dashboard is a console; the flat ribbon was the data
+
+**Landed.** `2691edd feat(ui): elevate perception dashboard` on `ui-redesign` — 16 files,
++1,643/−254. New `components/dashboard/{ConsoleChrome,instruments}.tsx` and
+`components/viewer/sceneDressing.ts`; a type system in `globals.css`; a data-derived camera fit
+in `useThreeScene.ts`. `tsc`, `eslint` and `next build` clean; working tree clean.
+
+**Acceptance.** Presentation only. `lib/ws.ts`, `lib/protocol.ts`, `lib/runSession.ts`,
+`instancedCells.ts`, `views.ts`, `wipe.ts`, `decisionLayer.ts` and the `SceneHandle` surface are
+byte-identical. Frames still land in refs and go to the GPU; panels sample on their own timers;
+FR-42 holds.
+
+**Decisions and surprises.**
+
+1. **The "flat elongated ribbon" is the data, not a rendering bug.** I measured before touching
+   anything, through the viewer's *own* decoder and ring table. One frame, 41,990 cells:
+
+   | | min | p50 | max | span |
+   |---|---|---|---|---|
+   | x (forward) | −0.03 | 11.36 | 99.92 | **99.94 m** |
+   | y (lateral) | −6.01 | 3.01 | 7.01 | **13.02 m** |
+   | z_ground | −0.02 | 0.00 | 0.02 | **0.04 m** |
+
+   **41,985 of 41,990 cells (99.99%) clamp to `MIN_HEIGHT`** — `z_obstacle == z_ground`
+   everywhere but five cells. Bounding box 99.9 × 13.0 × 1.62 m; vertical is **1.62%** of the
+   longest horizontal span. 99.98% of cells sit in a 0–50° wedge. That is `fixtures.py`'s
+   docstring exactly: *"A flat 100 m road running forward along x"*, half-width 4.0 m, ground
+   jitter `uniform(-0.02, 0.02)`.
+
+2. **The Three.js mapping is correct, on two independent checks.** Ranges pass through
+   unchanged (`position.x` = LiDAR x, `.z` = LiDAR y, `.y` = `z_ground + height/2`), and the
+   rotation is right analytically: −θ about Y sends local +X to `(cos θ, 0, sin θ)` — the radial
+   direction — and local +Z to the tangential, so `scale(EXTENT_R, height, EXTENT_T)` lands on
+   the right axes. I also rebuilt `RingGrid`'s construction standalone and diffed it against the
+   TS port: **662 rings, 705,771 cells, exact match** at rings 0, 1, 100, 199, 200, 201, 400,
+   661. Nothing to fix in the renderer.
+
+3. **The camera was the real defect, and it was mine.** It fitted a **38 m sphere at the
+   sensor** while the data runs 100 m forward by 13 m across — so most of the frame was empty
+   grid and two thirds of the corridor was off-screen. The fit is now measured from the first
+   frame's bounds and splits the box into extent *along* the view axis (depth, which perspective
+   handles free) and *across* it (what must fit the frustum). Fitting the bounding **sphere**
+   treats a 100 m corridor as though it were 100 m wide. One pass, ~42k iterations, never
+   repeated. It degrades correctly: a scan that surrounds the sensor keeps the oblique view.
+
+4. **Mode came out of the header, but not off the HUD.** It read as a control rather than a
+   readout. FR-6 requires it displayed *at all times* (PRD:265, T-P6, and it is R-1's
+   mitigation), so it moved to the Pipeline latency module beside the perception stage whose
+   cost it explains. The freed space shows occupied cells. **The premise that there is only one
+   mode is an artefact of the fixture** — `fixtures.py:443` hard-codes `mode="geometric"`.
+
+5. **Typography split by what the reader is doing.** Inter for language, JetBrains Mono for
+   measurement only. Words set in mono are what made the console read as a log. Two fit bugs
+   the larger sizes caused were found by looking and fixed: `"Uniform 5 cm"` wrapped in the
+   154 px column beside the arc gauge, and the `AVR-25D` wordmark broke at its hyphen (measured
+   36.6 px across 2 client rects). A DOM audit afterwards found zero wrapped labels and zero
+   overflow.
+
+6. **I could finally see the work.** The Chrome extension has been unreachable all session, but
+   the in-app browser pane works. Everything above was verified visually rather than inferred.
+   One caveat: the pane runs hidden, which pauses `requestAnimationFrame` — so the 1–3 render
+   fps in those screenshots is an artefact, **not** a bloom regression, and T-V6 still needs a
+   check in a visible window.
+
+**Blocked / blocking.** Nothing on anyone. Vercel is still unprovisioned.
+
+**Next step.** Finish the KITTI cached run — it is set up but incomplete. `model/data/kitti` and
+`model/data/cache` did not exist; sequence 04 is **111 of 271 scans** and the cache was never
+built, so `--infer cached` would fall back to geometric and *say so* in the mode badge. Resume
+with, from the repo root and always via `backend/.venv/bin/python` (the four system Pythons all
+fail on `import yaml`):
+
+```
+backend/.venv/bin/python tools/fetch_kitti.py --sequences 04        # resumable
+backend/.venv/bin/python tools/build_cache.py --sequences 04 --mode network
+cd model && ../backend/.venv/bin/python -m avr25d.server.app --infer cached --seq 04 --port 8000
+```
+
+Then the six checks that never ran: socket connects, frames arrive, cells are real scan data,
+the scene shows genuine relief, all four views work, render fps healthy.
+
+---
+
 
 ### Day 11 · Monday 7 Sep 2026 (session 2) — Windows CI: the registry was not reproducible
 

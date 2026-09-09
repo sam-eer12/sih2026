@@ -67,13 +67,14 @@ function Card({ children }: { children: React.ReactNode }) {
 }
 
 const INPUT =
-  'mt-1.5 mb-4 w-full rounded-md border border-[var(--line)] bg-[var(--ink-800)] px-3 py-2.5 text-sm text-[var(--text-hi)] outline-none transition-colors duration-150 focus:border-[var(--accent)] placeholder:text-[var(--text-lo)]';
-const LABEL =
-  'block text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--text-lo)]';
+  'mt-2 mb-4 w-full rounded-md border border-[var(--line)] bg-[var(--ink-800)] px-3.5 py-3 text-[15px] text-[var(--text-hi)] outline-none transition-colors duration-150 focus:border-[var(--accent)] placeholder:text-[var(--text-lo)]';
+// Field labels are read, not scanned — sentence case at a size a person can
+// actually read beats 11px caps tracked out to 0.16em.
+const LABEL = 'block text-[13px] font-medium text-[var(--text)]';
 const PRIMARY =
-  'w-full rounded-md bg-[var(--accent)] px-4 py-2.5 text-sm font-semibold text-[#062713] transition-all duration-150 hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50';
+  'w-full rounded-md bg-[var(--accent)] px-4 py-3 text-[15px] font-semibold text-[#062713] transition-all duration-150 hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50';
 const SECONDARY =
-  'w-full rounded-md border border-[var(--line)] px-4 py-2.5 text-sm font-semibold text-[var(--text-hi)] transition-colors duration-150 hover:border-[var(--accent)] hover:text-[var(--accent)] disabled:cursor-not-allowed disabled:opacity-50';
+  'w-full rounded-md border border-[var(--line)] px-4 py-3 text-[15px] font-semibold text-[var(--text-hi)] transition-colors duration-150 hover:border-[var(--accent)] hover:text-[var(--accent)] disabled:cursor-not-allowed disabled:opacity-50';
 
 function LoginForm() {
   const router = useRouter();
@@ -115,10 +116,10 @@ function LoginForm() {
     return (
       <Shell>
         <Card>
-          <h1 className="text-xl font-semibold text-[var(--text-hi)]">
+          <h1 className="text-[22px] font-semibold tracking-[-0.02em] text-[var(--text-hi)]">
             Sign-in unavailable
           </h1>
-          <p className="mt-3 text-sm leading-relaxed text-[var(--text)]">
+          <p className="mt-3 text-[14.5px] leading-[1.6] text-[var(--text)]">
             No Firebase project is configured, so authentication is switched off and the
             dashboard is open. Copy <Code>.env.local.example</Code> to <Code>.env.local</Code>{' '}
             and fill in the <Code>NEXT_PUBLIC_FIREBASE_*</Code> values to turn it on.
@@ -134,13 +135,13 @@ function LoginForm() {
   return (
     <Shell>
       <Card>
-        <p className="tabular text-[10px] uppercase tracking-[0.34em] text-[var(--text-lo)]">
+        <p className="tabular text-[12px] tracking-[0.14em] text-[var(--text-lo)]">
           SIH26053 · DRDO / IDEX
         </p>
-        <h1 className="mt-2 text-3xl font-semibold tracking-tight text-[var(--text-hi)]">
+        <h1 className="mt-2.5 text-3xl font-semibold tracking-[-0.025em] text-[var(--text-hi)]">
           AVR-25D
         </h1>
-        <p className="mt-2 mb-7 text-sm text-[var(--text-lo)]">
+        <p className="mt-2.5 mb-7 text-[14.5px] leading-relaxed text-[var(--text-lo)]">
           Sign in to reach the dashboard and run history.
         </p>
 
@@ -175,7 +176,7 @@ function LoginForm() {
           {error ? (
             <p
               role="alert"
-              className="mb-4 rounded-md border border-[#5a1f28] bg-[#2a0f14] px-3 py-2 text-[13px] text-[#ff8a80]"
+              className="mb-4 rounded-md border border-[#5a1f28] bg-[#2a0f14] px-3.5 py-2.5 text-[13.5px] leading-relaxed text-[#ff8a80]"
             >
               {error}
             </p>
@@ -190,14 +191,14 @@ function LoginForm() {
           type="button"
           disabled={busy}
           onClick={() => void run(() => registerWithEmail(email, password))}
-          className="mt-3 w-full text-[13px] text-[var(--text-lo)] underline-offset-4 transition-colors duration-150 hover:text-[var(--accent)] hover:underline disabled:opacity-50"
+          className="mt-3.5 w-full text-[13.5px] text-[var(--text-lo)] underline-offset-4 transition-colors duration-150 hover:text-[var(--accent)] hover:underline disabled:opacity-50"
         >
           Create an account with this email
         </button>
 
         <div className="my-6 flex items-center gap-3">
           <span className="h-px flex-1 bg-[var(--line)]" />
-          <span className="text-[10px] uppercase tracking-[0.2em] text-[var(--text-lo)]">or</span>
+          <span className="text-[12px] text-[var(--text-lo)]">or</span>
           <span className="h-px flex-1 bg-[var(--line)]" />
         </div>
 
@@ -216,7 +217,7 @@ function LoginForm() {
 
 function Code({ children }: { children: React.ReactNode }) {
   return (
-    <code className="tabular rounded bg-[var(--ink-700)] px-1.5 py-0.5 text-[12px] text-[var(--text)]">
+    <code className="tabular rounded bg-[var(--ink-700)] px-1.5 py-0.5 text-[13px] text-[var(--text)]">
       {children}
     </code>
   );
