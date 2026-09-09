@@ -10,7 +10,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { apiGet } from '../../../lib/apiClient';
-import { Problem, formatDate, PAGE, HEADER, TITLE, SUB, LINK, CODE } from '../page';
+import { Problem, formatDate, PAGE, HEADER, TITLE, SUB, LINK, CODE, MONO } from '../page';
 
 interface RunDetail {
   _id: string;
@@ -107,8 +107,8 @@ export default function RunDetailPage() {
               <tbody>
                 {decisions.map((d) => (
                   <tr key={d._id}>
-                    <td style={TD}>{d.frameId}</td>
-                    <td style={TD}>{Number.isFinite(d.tSec) ? d.tSec.toFixed(1) : '—'}</td>
+                    <td style={TD_NUM}>{d.frameId}</td>
+                    <td style={TD_NUM}>{Number.isFinite(d.tSec) ? d.tSec.toFixed(1) : '—'}</td>
                     <td style={TD}>{d.selected || '—'}</td>
                     <td style={TD}>{d.risk || '—'}</td>
                     <td style={{ ...TD, color: d.changed ? '#FF6D00' : '#8b8b9e' }}>
@@ -156,36 +156,43 @@ const META: React.CSSProperties = {
   maxWidth: 900,
 };
 const DT: React.CSSProperties = {
-  font: '600 10px/1 inherit',
-  letterSpacing: '0.14em',
-  textTransform: 'uppercase',
+  font: '500 12.5px/1.3 var(--ui)',
   color: '#8b8b9e',
 };
-const DD: React.CSSProperties = { margin: '5px 0 0', wordBreak: 'break-all' };
-const H2: React.CSSProperties = { margin: '0 0 10px', font: '700 15px/1.2 inherit' };
+// Metadata values are timestamps, hashes and platform strings — identifiers,
+// so mono, which is also what separates them from their labels above.
+const DD: React.CSSProperties = { ...MONO, margin: '6px 0 0', wordBreak: 'break-all' };
+const H2: React.CSSProperties = {
+  margin: '0 0 12px',
+  font: '600 17px/1.25 var(--ui)',
+  letterSpacing: '-0.015em',
+};
 const PRE: React.CSSProperties = {
   margin: 0,
-  padding: 14,
+  padding: 16,
   borderRadius: 6,
   border: '1px solid rgba(255,255,255,0.12)',
   background: 'rgba(0,0,0,0.35)',
   maxWidth: 900,
   maxHeight: 340,
   overflow: 'auto',
-  font: '12px/1.5 inherit',
+  // Verbatim JSON — the one place on the page where mono is the whole point.
+  font: '12.5px/1.55 var(--tech)',
 };
 const TABLE: React.CSSProperties = { width: '100%', borderCollapse: 'collapse', maxWidth: 1100 };
 const TH: React.CSSProperties = {
   textAlign: 'left',
-  padding: '8px 12px 8px 0',
+  padding: '10px 14px 10px 0',
   borderBottom: '1px solid rgba(255,255,255,0.16)',
-  font: '600 10px/1 inherit',
-  letterSpacing: '0.14em',
+  font: '600 12px/1 var(--ui)',
+  letterSpacing: '0.04em',
   textTransform: 'uppercase',
   color: '#8b8b9e',
 };
 const TD: React.CSSProperties = {
-  padding: '8px 12px 8px 0',
+  padding: '10px 14px 10px 0',
   borderBottom: '1px solid rgba(255,255,255,0.07)',
   verticalAlign: 'top',
 };
+/** Frame ids and timings: numeric columns, so they line up. */
+const TD_NUM: React.CSSProperties = { ...TD, ...MONO };

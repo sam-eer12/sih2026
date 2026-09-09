@@ -34,9 +34,8 @@ export default function SessionChip() {
   return (
     <div style={CHIP}>
       <span style={{ color: '#8b8b9e' }}>Signed in</span>
-      <span style={{ color: '#e8e8ef', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-        {email}
-      </span>
+      {/* The only identifier in the chip, so the only thing set in mono. */}
+      <span style={EMAIL}>{email}</span>
       <Link href="/runs" style={LINK}>
         Runs
       </Link>
@@ -56,14 +55,21 @@ const CHIP: React.CSSProperties = {
   borderRadius: 6,
   border: '1px solid rgba(255,255,255,0.14)',
   background: 'rgba(10, 10, 20, 0.86)',
-  font: '12px/1 ui-monospace, SFMono-Regular, Menlo, monospace',
+  font: '450 12.5px/1.2 var(--ui)',
   whiteSpace: 'nowrap',
+};
+
+const EMAIL: React.CSSProperties = {
+  color: '#e8e8ef',
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  font: '450 12px/1.2 var(--tech)',
 };
 
 const LINK: React.CSSProperties = {
   color: '#2979FF',
   textDecoration: 'none',
-  font: '600 12px/1 inherit',
+  font: '600 12.5px/1.2 var(--ui)',
 };
 
 const BUTTON: React.CSSProperties = {
@@ -72,6 +78,6 @@ const BUTTON: React.CSSProperties = {
   border: '1px solid rgba(255,255,255,0.22)',
   background: 'transparent',
   color: '#e8e8ef',
-  font: '600 12px/1 inherit',
+  font: '600 12.5px/1.2 var(--ui)',
   cursor: 'pointer',
 };

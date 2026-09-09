@@ -25,13 +25,18 @@
 
   --background: var(--ink-900);
   --foreground: var(--text);
+
+  /* app/layout.tsx binds --font-ui and --font-tech. The stacks below are what
+     everything else should reference, so a fallback is never forgotten. */
+  --ui: var(--font-ui), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --tech: var(--font-tech), ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--ui);
+  --font-mono: var(--tech);
 }
 
 html {
@@ -41,15 +46,110 @@ html {
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  font-family: var(--ui);
+  font-optical-sizing: auto;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
 
-/* The product is a measuring instrument; numbers are set in mono everywhere
-   so a figure reads the same on the landing page as it does in the HUD. */
-.tabular {
-  font-family: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+/* ── Type system ───────────────────────────────────────────────────
+   Two voices, and the split is about what the reader is doing.
+
+   Sans is for language: headings, labels, prose, buttons, state words like
+   "Live" or "Alternative". Mono is for measurement only — a frame id, a rate,
+   a coordinate, a byte count — where tabular widths stop digits jittering as
+   the value resamples four times a second. A word set in mono reads as
+   terminal output, which is what made the console feel like a log rather than
+   an instrument.
+
+   Uppercase is reserved for module titles. Below ~11px, caps with wide
+   tracking stop being hierarchy and start being texture, so inline labels are
+   sentence case at a size that can actually be read across a room.
+
+   These classes sit outside Tailwind's layers, so they win over utilities.
+   Don't pair one with a `text-[...]` size utility — set the size here. */
+
+.t-title {
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: -0.012em;
+}
+
+.t-heading {
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: -0.008em;
+}
+
+/* Module titles. The only uppercase in the console. */
+.t-section {
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.t-label {
+  font-size: 12.5px;
+  font-weight: 450;
+  line-height: 1.3;
+  letter-spacing: 0;
+}
+
+.t-body {
+  font-size: 13.5px;
+  font-weight: 400;
+  line-height: 1.55;
+}
+
+.t-caption {
+  font-size: 11.5px;
+  font-weight: 400;
+  line-height: 1.45;
+}
+
+/* Measurements. `.tabular` is the base — the two sized variants exist so a
+   headline figure and a row value are unambiguously different ranks. */
+.tabular,
+.t-metric,
+.t-value-lg,
+.t-value,
+.t-value-sm {
+  font-family: var(--tech);
   font-variant-numeric: tabular-nums;
+  font-feature-settings: "zero" 1;
+}
+
+.t-metric {
+  font-size: 30px;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -0.03em;
+}
+
+.t-value-lg {
+  font-size: 18px;
+  font-weight: 550;
+  line-height: 1;
+  letter-spacing: -0.025em;
+}
+
+.t-value {
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.1;
+  letter-spacing: -0.015em;
+}
+
+.t-value-sm {
+  font-size: 12px;
+  font-weight: 450;
+  line-height: 1.15;
+  letter-spacing: -0.01em;
 }
 
 @keyframes rise {
@@ -63,4 +163,65 @@ body {
 
 @media (prefers-reduced-motion: reduce) {
   .rise { animation: none; }
+}
+
+/* ── Console atmosphere ────────────────────────────────────────────
+   Depth and motion around the LiDAR scene. All of it is CSS over the
+   canvas: nothing here touches the renderer, and none of it is derived
+   from frame data, so it can never be mistaken for a sensor return. */
+
+/* Focuses the eye on the middle of the scene and lets the chrome sit on
+   darker ground at the edges without dimming the cloud itself. */
+.stage-vignette {
+  background:
+    radial-gradient(ellipse 62% 58% at 50% 46%, transparent 0%, rgba(7, 10, 20, 0.55) 78%, var(--ink-900) 100%);
+}
+
+/* A slow sweep, like a sensor rotating. Deliberately near-invisible —
+   it should register as the scene breathing, not as a spinning graphic. */
+@keyframes sweep { to { transform: rotate(360deg); } }
+.stage-sweep {
+  background: conic-gradient(
+    from 0deg,
+    transparent 0deg,
+    transparent 300deg,
+    color-mix(in srgb, var(--accent) 12%, transparent) 348deg,
+    color-mix(in srgb, var(--accent) 22%, transparent) 358deg,
+    transparent 360deg
+  );
+  animation: sweep 14s linear infinite;
+  mix-blend-mode: screen;
+  opacity: 0.4;
+}
+
+/* A faint horizon glow beneath the cloud, so the scene sits in space
+   rather than floating on a flat fill. */
+.stage-horizon {
+  background: radial-gradient(
+    ellipse 54% 26% at 50% 62%,
+    color-mix(in srgb, var(--dynamic) 13%, transparent) 0%,
+    transparent 70%
+  );
+}
+
+/* Cinematic framing marks. Four hairline corners, nothing more. */
+.stage-reticle::before,
+.stage-reticle::after {
+  content: '';
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  border-color: var(--line);
+  border-style: solid;
+}
+.stage-reticle::before { top: 0; left: 0; border-width: 1px 0 0 1px; }
+.stage-reticle::after { bottom: 0; right: 0; border-width: 0 1px 1px 0; }
+
+/* Readouts fade up once, then hold. */
+@keyframes hud-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.hud-in { animation: hud-in 0.5s cubic-bezier(0.16, 1, 0.3, 1) both; }
+
+@media (prefers-reduced-motion: reduce) {
+  .stage-sweep { animation: none; opacity: 0.18; }
+  .hud-in { animation: none; }
 }

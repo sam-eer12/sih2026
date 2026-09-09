@@ -1,53 +1,53 @@
-// app/dashboard/page.tsx
-// The live viewer page — imports Shubham's Viewer component.
-// Navya will add the HUD and decision panel around this.
+// app/dashboard/page.tsx — the live perception console.
+//
+// The viewer is the page. Everything else floats over it on scrims and
+// hairlines rather than sitting in a grid of cards, so the scene stays the
+// thing you look at and the chrome stays readable on top of it.
+//
+// The data path below is unchanged from the working version: frames go into a
+// ref and straight to the GPU, the panels sample that ref on their own timers,
+// and React is never told a frame arrived (FR-42). Nothing in this file talks
+// to the protocol or the scene beyond the handle the viewer hands back.
 'use client';
+
 import dynamic from 'next/dynamic';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { connectFrames, DEFAULT_STREAM_URL } from '../../lib/ws';
+import { connectFrames, DEFAULT_STREAM_URL, type StreamStatus } from '../../lib/ws';
 import type { SceneHandle } from '../../components/viewer/useThreeScene';
-import StreamStatus, { type StatusSink } from '../../components/hud/StreamStatus';
 import SessionChip from '../../components/hud/SessionChip';
 import { startRunSession, type RunSession } from '../../lib/runSession';
-import Hud from '../../components/hud/Hud';
 import ViewControls from '../../components/hud/ViewControls';
-import DecisionPanel, {
-  type DecisionSnapshot,
-} from '../../components/decision/DecisionPanel';
+import type { DecisionSnapshot } from '../../components/decision/DecisionPanel';
 import type { HudSnapshot } from '../../components/hud/types';
 import type { FrameMessage } from '../../lib/protocol';
+import {
+  TopRail,
+  PerceptionRail,
+  DecisionRail,
+  StageAtmosphere,
+  StageMessage,
+} from '../../components/dashboard/ConsoleChrome';
+import NeuralField from '../../components/landing/NeuralField';
 
 // Dynamic import with SSR disabled — Three.js requires the browser's WebGL context
 const Viewer = dynamic(() => import('../../components/viewer/Viewer'), {
   ssr: false,
-  loading: () => (
-    <div style={{
-      width: '100%',
-      height: '100vh',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      background: '#1a1a2e',
-      color: '#888',
-      fontFamily: 'monospace',
-      fontSize: '14px',
-    }}>
-      Loading 3D viewer…
-    </div>
-  ),
+  loading: () => null,
 });
 
 export default function DashboardPage() {
   const disconnectRef = useRef<(() => void) | null>(null);
-  const statusSinkRef = useRef<StatusSink | null>(null);
   // The newest frame and the scene handle live in refs, never in state. This
-  // is the FR-42 line: frames reach the GPU and the HUD samples them, but
+  // is the FR-42 line: frames reach the GPU and the panels sample them, but
   // React is never told a frame arrived.
   const latestFrameRef = useRef<FrameMessage | null>(null);
   const sceneRef = useRef<SceneHandle | null>(null);
   // The audit trail (FR-38, FR-39). Inert until there is a signed-in user and
   // a reachable database, so the frame path below does not branch on config.
   const sessionRef = useRef<RunSession | null>(null);
+
+  // Connection state changes a handful of times a session, never per frame.
+  const [status, setStatus] = useState<StreamStatus>('connecting');
 
   // Wipe state lives here so ViewControls and Viewer stay in sync without
   // either component owning it. Changes only on user interaction — never on
@@ -59,8 +59,9 @@ export default function DashboardPage() {
   }, []);
 
   // Fires once, from inside the viewer's mount effect. It must not set React
-  // state — the frame path stays outside reconciliation entirely (FR-42), so
-  // the socket is held in a ref and the frames go straight to pushFrame.
+  // state per frame — the frame path stays outside reconciliation entirely
+  // (FR-42), so the socket is held in a ref and frames go straight to
+  // pushFrame.
   const handleReady = useCallback((handle: SceneHandle) => {
     disconnectRef.current?.();
     sceneRef.current = handle;
@@ -77,18 +78,18 @@ export default function DashboardPage() {
         sessionRef.current?.record(msg);
       },
       {
-        onStatus: (status, detail) => {
-          console.log(`[stream] ${status}${detail ? ` — ${detail}` : ''}`);
-          statusSinkRef.current?.(status, detail);
+        onStatus: (next, detail) => {
+          console.log(`[stream] ${next}${detail ? ` — ${detail}` : ''}`);
+          setStatus(next);
         },
         onDecodeError: (err) => console.error('[stream] decode failed:', err.message),
       }
     );
   }, []);
 
-  // Called by the HUD on its own timer, not per frame. Everything it returns
-  // is either straight off the wire or read from the viewer's own getters —
-  // nothing about the scene is recomputed here.
+  // Called by the panels on their own timers, not per frame. Everything
+  // returned is either straight off the wire or read from the viewer's own
+  // getters — nothing about the scene is recomputed here.
   const sampleHud = useCallback((): HudSnapshot | null => {
     const msg = latestFrameRef.current;
     const handle = sceneRef.current;
@@ -103,9 +104,8 @@ export default function DashboardPage() {
     };
   }, []);
 
-  // Same discipline as the HUD: read the newest frame from the ref on the
-  // panel's own timer. `tracks` is defaulted here because fixtures legitimately
-  // send an empty array when the crossing truck is out of frame.
+  // `tracks` is defaulted here because fixtures legitimately send an empty
+  // array when the crossing truck is out of frame.
   const sampleDecision = useCallback((): DecisionSnapshot | null => {
     const msg = latestFrameRef.current;
     if (!msg) return null;
@@ -114,19 +114,14 @@ export default function DashboardPage() {
 
   const getHandle = useCallback(() => sceneRef.current, []);
 
-  const handleStatusMount = useCallback((sink: StatusSink) => {
-    statusSinkRef.current = sink;
-  }, []);
-
   // The viewer element is built once and never rebuilt. Anything else on this
   // page can re-render without touching the canvas subtree, which is what
-  // keeps T-W7 (fewer than 10 React renders across 300 frames) safe as the
-  // HUD grows in Step 3.
+  // keeps T-W7 (fewer than 10 React renders across 300 frames) safe.
   //
   // wipeActive is the one exception that requires a re-render: the WipeOverlay
-  // React element is conditionally mounted inside Viewer based on this prop,
-  // so Viewer must re-render when it changes. That is exactly correct — a wipe
-  // toggle is a user action, not a frame event, so T-W7 is unaffected.
+  // React element is conditionally mounted inside Viewer based on this prop.
+  // That is exactly correct — a wipe toggle is a user action, not a frame
+  // event, so T-W7 is unaffected.
   const viewer = useMemo(
     () => (
       <Viewer
@@ -154,32 +149,37 @@ export default function DashboardPage() {
   }, []);
 
   return (
-    <main style={{ position: 'relative', width: '100vw', height: '100vh', overflow: 'hidden' }}>
-      {/* Live frames from the FastAPI server — browser to backend, no Next.js
-          in the path (FR-41). `devStream` is deliberately not passed; the
-          synthetic generator stays in the tree as Shubham's offline fallback. */}
-      {viewer}
-      {/* Top-left column: session first, then connection state. Stacked here
-          rather than each positioning itself, so neither can land on the
-          other when one of them is hidden. */}
+    <main className="relative h-screen w-screen overflow-hidden bg-[var(--ink-900)]">
+      {/* The scene fills the page — the chrome floats over it.
+          Live frames come from the FastAPI server, browser to backend, with no
+          Next.js in the path (FR-41). `devStream` is deliberately not passed;
+          the synthetic generator stays in the tree as an offline fallback. */}
+      <div className="absolute inset-0">{viewer}</div>
+
+      {/* Depth around the scene, and scrims so the readouts stay legible
+          without dimming the middle, which is where the grid is. */}
+      <NeuralField
+        className="pointer-events-none absolute inset-0 z-10 h-full w-full opacity-25"
+        density={40}
+        linkRadius={120}
+      />
+      <StageAtmosphere />
+      <div className="pointer-events-none absolute inset-x-0 top-0 z-10 h-28 bg-gradient-to-b from-[var(--ink-900)] via-[var(--ink-900)]/45 to-transparent" />
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-24 bg-gradient-to-t from-[var(--ink-900)]/90 to-transparent" />
+
+      <StageMessage status={status} />
+
+      <TopRail status={status} sample={sampleHud} session={<SessionChip />} />
+      <PerceptionRail sample={sampleHud} />
+      <DecisionRail sample={sampleDecision} />
+
+      {/* Controls sit centred at the bottom, clear of both side columns. */}
       <div
-        style={{
-          position: 'absolute',
-          top: 16,
-          left: 16,
-          zIndex: 10,
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'flex-start',
-          gap: 8,
-        }}
+        className="rise pointer-events-none absolute inset-x-0 bottom-6 z-30 flex justify-center px-6"
+        style={{ animationDelay: '160ms' }}
       >
-        <SessionChip />
-        <StreamStatus onMount={handleStatusMount} />
+        <ViewControls getHandle={getHandle} onWipeChange={handleWipeChange} />
       </div>
-      <Hud sample={sampleHud} />
-      <ViewControls getHandle={getHandle} onWipeChange={handleWipeChange} />
-      <DecisionPanel sample={sampleDecision} />
     </main>
   );
 }

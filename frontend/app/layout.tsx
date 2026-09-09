@@ -1,16 +1,27 @@
 import type { Metadata } from "next";
 import type React from "react";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+// Two typefaces, two jobs.
+//
+// Inter carries everything a person reads as language — headings, labels,
+// prose, buttons. It has the weight range and the tight optical tracking a
+// product UI needs, where a grotesque tuned for code does not.
+//
+// JetBrains Mono carries only what a person reads as a measurement: a frame
+// id, a rate, a coordinate. Its figures are unmistakably digits at 11px on a
+// projector, and tabular widths mean a number does not jitter between samples.
+const ui = Inter({
+  variable: "--font-ui",
   subsets: ["latin"],
+  display: "swap",
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+const tech = JetBrains_Mono({
+  variable: "--font-tech",
   subsets: ["latin"],
+  display: "swap",
 });
 
 export const metadata: Metadata = {
@@ -25,7 +36,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${ui.variable} ${tech.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">{children}</body>
     </html>

@@ -33,17 +33,19 @@ export default function Home() {
 
           <div className="pointer-events-none absolute inset-0 flex flex-col justify-center px-8 md:px-16">
             <div className="max-w-2xl">
-              <p className="rise tabular text-[11px] uppercase tracking-[0.34em] text-[var(--text-lo)]">
+              {/* Eyebrow: a programme reference, so mono — but at a size and
+                  tracking that reads as a line of type rather than a barcode. */}
+              <p className="rise tabular text-[12.5px] tracking-[0.14em] text-[var(--text-lo)]">
                 SIH26053 · DRDO / IDEX
               </p>
               <h1
-                className="rise mt-4 text-6xl font-semibold tracking-tight text-[var(--text-hi)] md:text-8xl"
+                className="rise mt-4 text-6xl font-semibold tracking-[-0.03em] text-[var(--text-hi)] md:text-8xl"
                 style={{ animationDelay: '80ms' }}
               >
                 AVR-25D
               </h1>
               <p
-                className="rise mt-5 max-w-xl text-base leading-relaxed text-[var(--text)] md:text-lg"
+                className="rise mt-6 max-w-xl text-[17px] leading-[1.6] text-[var(--text)] md:text-[19px] md:leading-[1.6]"
                 style={{ animationDelay: '160ms' }}
               >
                 Adaptive variable-resolution 2.5D LiDAR mapping for dynamic environment
@@ -52,7 +54,7 @@ export default function Home() {
                 sensor&rsquo;s own angular sampling.
               </p>
               <p
-                className="rise mt-6 text-[12px] tracking-wide text-[var(--text-lo)]"
+                className="rise mt-7 text-[13.5px] text-[var(--text-lo)]"
                 style={{ animationDelay: '240ms' }}
               >
                 Move across the terrain to scan it.
@@ -71,7 +73,7 @@ export default function Home() {
           <Figure value="0.878" label="mIoU, 971 scans" />
         </dl>
 
-        <p className="mt-10 max-w-2xl text-base leading-relaxed text-[var(--text)]">
+        <p className="mt-10 max-w-2xl text-[16px] leading-[1.65] text-[var(--text)]">
           Because each cell keeps ground height and obstacle height separately, the map
           represents the three hazards a 2D occupancy grid destroys: curbs, potholes and
           overhanging structures. A deterministic decision layer turns the map into a
@@ -81,19 +83,19 @@ export default function Home() {
         <div className="mt-9 flex flex-wrap gap-3">
           <Link
             href="/dashboard"
-            className="rounded-md bg-[var(--accent)] px-5 py-2.5 text-sm font-semibold text-[#062713] transition-transform duration-200 hover:-translate-y-0.5"
+            className="rounded-md bg-[var(--accent)] px-5 py-3 text-[15px] font-semibold text-[#062713] transition-transform duration-200 hover:-translate-y-0.5"
           >
             Live dashboard
           </Link>
           <Link
             href="/runs"
-            className="rounded-md border border-[var(--line)] px-5 py-2.5 text-sm font-semibold text-[var(--text-hi)] transition-colors duration-200 hover:border-[var(--accent)] hover:text-[var(--accent)]"
+            className="rounded-md border border-[var(--line)] px-5 py-3 text-[15px] font-semibold text-[var(--text-hi)] transition-colors duration-200 hover:border-[var(--accent)] hover:text-[var(--accent)]"
           >
             Run history
           </Link>
         </div>
 
-        <p className="mt-10 max-w-2xl text-[13px] leading-relaxed text-[var(--text-lo)]">
+        <p className="mt-10 max-w-2xl text-[14px] leading-[1.6] text-[var(--text-lo)]">
           The live frame stream runs from <Code>http://localhost:3000</Code> against a
           local pipeline server. A deployed page cannot open a <Code>ws://</Code> socket —
           browsers block mixed content — so the dashboard there reports that it cannot
@@ -108,21 +110,21 @@ function Figure({ value, label, accent }: { value: string; label: string; accent
   return (
     <div>
       <dt
-        className="tabular text-3xl font-semibold md:text-4xl"
+        className="tabular text-3xl font-semibold tracking-[-0.03em] md:text-4xl"
         style={{ color: accent ? 'var(--accent)' : 'var(--text-hi)' }}
       >
         {value}
       </dt>
-      <dd className="mt-2 text-[11px] uppercase tracking-[0.18em] text-[var(--text-lo)]">
-        {label}
-      </dd>
+      {/* Sentence case at a readable size. These caption a figure; they do not
+          need to compete with it. */}
+      <dd className="mt-2.5 text-[13px] text-[var(--text-lo)]">{label}</dd>
     </div>
   );
 }
 
 function Code({ children }: { children: React.ReactNode }) {
   return (
-    <code className="tabular rounded bg-[var(--ink-700)] px-1.5 py-0.5 text-[12px] text-[var(--text)]">
+    <code className="tabular rounded bg-[var(--ink-700)] px-1.5 py-0.5 text-[13px] text-[var(--text)]">
       {children}
     </code>
   );

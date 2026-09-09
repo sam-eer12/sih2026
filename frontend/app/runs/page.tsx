@@ -67,15 +67,15 @@ export default function RunsPage() {
           <tbody>
             {runs.map((r) => (
               <tr key={r._id}>
-                <Td>
+                <Td style={MONO}>
                   <Link href={`/runs/${r._id}`} style={{ color: '#2979FF' }}>
                     {formatDate(r.startedAt)}
                   </Link>
                 </Td>
                 <Td>{r.mode ?? '—'}</Td>
-                <Td style={{ fontFamily: 'inherit' }}>
-                  {r.gitCommit ? r.gitCommit.slice(0, 9) : '—'}
-                </Td>
+                {/* A commit hash is an identifier — the one column that has to
+                    stay mono for the characters to be distinguishable. */}
+                <Td style={MONO}>{r.gitCommit ? r.gitCommit.slice(0, 9) : '—'}</Td>
                 <Td>{r.platform ?? '—'}</Td>
               </tr>
             ))}
@@ -90,8 +90,10 @@ export function Problem({ error }: { error: Error }) {
   const unconfigured = error instanceof ApiError && error.isUnconfigured;
   return (
     <div style={NOTICE}>
-      <strong>{unconfigured ? 'Persistence is switched off' : 'Could not load runs'}</strong>
-      <p style={{ margin: '6px 0 0', color: '#b9b9c8' }}>
+      <strong style={{ font: '600 15px/1.3 var(--ui)' }}>
+        {unconfigured ? 'Persistence is switched off' : 'Could not load runs'}
+      </strong>
+      <p style={{ margin: '8px 0 0', color: '#b9b9c8', maxWidth: 640 }}>
         {unconfigured
           ? 'No MONGODB_URI is set, so run history is unavailable. The dashboard, the viewer and the HUD are entirely local and keep working without it.'
           : error.message}
@@ -113,12 +115,22 @@ function Td({ children, style }: { children: React.ReactNode; style?: React.CSSP
   return <td style={{ ...TD, ...style }}>{children}</td>;
 }
 
+// The page was set in mono end to end, which made a history table read like a
+// terminal dump. Sans is the page voice now; MONO is opted into per cell for
+// the things that are genuinely identifiers or measurements — commit hashes,
+// frame ids, timings, and the verbatim JSON payloads.
 export const PAGE: React.CSSProperties = {
   minHeight: '100vh',
   padding: '40px 32px',
   background: '#0b0b14',
   color: '#e8e8ef',
-  font: '14px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace',
+  font: '14.5px/1.6 var(--ui)',
+};
+export const MONO: React.CSSProperties = {
+  fontFamily: 'var(--tech)',
+  fontVariantNumeric: 'tabular-nums',
+  fontSize: 13.5,
+  letterSpacing: '-0.01em',
 };
 export const HEADER: React.CSSProperties = {
   display: 'flex',
@@ -128,12 +140,21 @@ export const HEADER: React.CSSProperties = {
   alignItems: 'flex-start',
   marginBottom: 28,
 };
-export const TITLE: React.CSSProperties = { margin: 0, font: '700 26px/1.2 inherit' };
-export const SUB: React.CSSProperties = { margin: '6px 0 0', color: '#b9b9c8' };
-export const LINK: React.CSSProperties = { color: '#2979FF', textDecoration: 'none' };
+export const TITLE: React.CSSProperties = {
+  margin: 0,
+  font: '600 28px/1.2 var(--ui)',
+  letterSpacing: '-0.022em',
+};
+export const SUB: React.CSSProperties = { margin: '8px 0 0', color: '#b9b9c8', maxWidth: 620 };
+export const LINK: React.CSSProperties = {
+  color: '#2979FF',
+  textDecoration: 'none',
+  fontWeight: 500,
+};
 export const CODE: React.CSSProperties = {
-  padding: '1px 4px',
-  borderRadius: 3,
+  ...MONO,
+  padding: '2px 6px',
+  borderRadius: 4,
   background: 'rgba(255,255,255,0.10)',
 };
 export const NOTICE: React.CSSProperties = {
@@ -150,14 +171,14 @@ const TABLE: React.CSSProperties = {
 };
 const TH: React.CSSProperties = {
   textAlign: 'left',
-  padding: '8px 12px 8px 0',
+  padding: '10px 14px 10px 0',
   borderBottom: '1px solid rgba(255,255,255,0.16)',
-  font: '600 10px/1 inherit',
-  letterSpacing: '0.14em',
+  font: '600 12px/1 var(--ui)',
+  letterSpacing: '0.04em',
   textTransform: 'uppercase',
   color: '#8b8b9e',
 };
 const TD: React.CSSProperties = {
-  padding: '9px 12px 9px 0',
+  padding: '11px 14px 11px 0',
   borderBottom: '1px solid rgba(255,255,255,0.07)',
 };

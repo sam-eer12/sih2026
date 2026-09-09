@@ -32,9 +32,17 @@ function allocate(scene: THREE.Scene, ref: PointsRef, capacity: number): THREE.P
   );
 
   const material = new THREE.PointsMaterial({
-    size: 0.25,
+    size: 0.34,
     sizeAttenuation: true,
     vertexColors: true,
+    // Additive so overlapping returns build up where the cloud is dense,
+    // which is what gives the raw view its structure instead of a flat
+    // stipple. depthWrite off stops near points punching holes in the ones
+    // behind them at this size.
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+    transparent: true,
+    opacity: 0.95,
   });
 
   const points = new THREE.Points(geometry, material);

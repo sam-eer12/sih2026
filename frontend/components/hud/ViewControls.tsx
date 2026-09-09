@@ -96,115 +96,74 @@ export default function ViewControls({
   if (!state) return null;
 
   return (
-    <div style={BAR}>
-      <div style={GROUP}>
-        {VIEWS.map(([mode, key, label]) => (
-          <Button
+    <div className="pointer-events-auto flex items-center gap-1.5 rounded-xl border border-[var(--line)] bg-[var(--ink-850)]/80 p-1.5 backdrop-blur-md">
+      {VIEWS.map(([mode, key, label]) => {
+        const active = state.view === mode;
+        return (
+          <button
             key={mode}
-            active={state.view === mode}
-            hint={key}
-            label={label}
+            type="button"
+            aria-pressed={active}
             onClick={() => setView(mode)}
-          />
-        ))}
-      </div>
+            title={`${label} view (${key})`}
+            className="group relative flex items-center gap-2 rounded-lg px-3.5 py-2 t-label font-medium transition-colors duration-150"
+            style={{
+              background: active ? 'color-mix(in srgb, var(--accent) 14%, transparent)' : 'transparent',
+              color: active ? 'var(--accent)' : 'var(--text-lo)',
+            }}
+          >
+            {label}
+            <kbd
+              className="tabular text-[11px] transition-opacity duration-150"
+              style={{ opacity: active ? 0.75 : 0.4 }}
+            >
+              {key}
+            </kbd>
+          </button>
+        );
+      })}
 
-      <span style={DIVIDER} />
+      <span className="mx-1 h-5 w-px bg-[var(--line)]" />
 
-      <div style={GROUP}>
-        <Button
-          active={state.elevation}
-          hint="E"
-          label="Elevation"
-          onClick={toggleElevation}
-          title="Shade by height instead of semantic class (FR-26)"
-        />
-        <Button
-          active={state.grid}
-          hint="G"
-          label="Grid"
-          onClick={toggleGrid}
-          title="Draw the cell boundaries themselves (FR-27)"
-        />
-        <Button
-          active={state.wipe}
-          hint="W"
-          label="A/B Wipe"
-          onClick={toggleWipe}
-          title="Uniform 5 cm against the adaptive grid, one scan (FR-29)"
-        />
-      </div>
+      <Toggle active={state.elevation} onClick={toggleElevation} hint="E"
+        title="Shade by height instead of semantic class (FR-26)">Elevation</Toggle>
+      <Toggle active={state.grid} onClick={toggleGrid} hint="G"
+        title="Draw the cell boundaries themselves (FR-27)">Grid</Toggle>
+      <Toggle active={state.wipe} onClick={toggleWipe} hint="W"
+        title="Uniform 5 cm against the adaptive grid, one scan (FR-29)">Wipe</Toggle>
     </div>
   );
 }
 
-function Button({
+function Toggle({
   active,
-  hint,
-  label,
   onClick,
+  hint,
   title,
+  children,
 }: {
   active: boolean;
-  hint: string;
-  label: string;
   onClick: () => void;
-  title?: string;
+  hint: string;
+  title: string;
+  children: React.ReactNode;
 }) {
   return (
-    <button type="button" onClick={onClick} title={title} style={btnStyle(active)}>
-      <kbd style={kbdStyle(active)}>{hint}</kbd>
-      {label}
+    <button
+      type="button"
+      aria-pressed={active}
+      onClick={onClick}
+      title={`${title} (${hint})`}
+      className="flex items-center gap-2 rounded-lg px-3.5 py-2 t-label font-medium transition-colors duration-150 hover:text-[var(--text-hi)]"
+      style={{
+        background: active ? 'color-mix(in srgb, var(--accent) 14%, transparent)' : 'transparent',
+        color: active ? 'var(--accent)' : 'var(--text-lo)',
+      }}
+    >
+      {children}
+      <kbd className="tabular text-[11px]" style={{ opacity: active ? 0.75 : 0.4 }}>
+        {hint}
+      </kbd>
     </button>
   );
 }
-
-function btnStyle(active: boolean): React.CSSProperties {
-  return {
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: 7,
-    padding: '8px 12px',
-    borderRadius: 5,
-    border: `1px solid ${active ? '#00C853' : 'rgba(255,255,255,0.18)'}`,
-    background: active ? 'rgba(0,200,83,0.16)' : 'rgba(255,255,255,0.04)',
-    color: active ? '#00C853' : '#d6d6e2',
-    font: '600 13px/1 ui-monospace, SFMono-Regular, Menlo, monospace',
-    cursor: 'pointer',
-  };
-}
-
-function kbdStyle(active: boolean): React.CSSProperties {
-  return {
-    display: 'inline-block',
-    minWidth: 15,
-    padding: '2px 4px',
-    borderRadius: 3,
-    background: active ? 'rgba(0,200,83,0.28)' : 'rgba(255,255,255,0.10)',
-    font: '600 10px/1 ui-monospace, SFMono-Regular, Menlo, monospace',
-    textAlign: 'center',
-  };
-}
-
-const BAR: React.CSSProperties = {
-  position: 'absolute',
-  bottom: 16,
-  left: 16,
-  zIndex: 10,
-  display: 'flex',
-  alignItems: 'center',
-  gap: 10,
-  padding: '10px 12px',
-  borderRadius: 8,
-  border: '1px solid rgba(255,255,255,0.14)',
-  background: 'rgba(10, 10, 20, 0.86)',
-  backdropFilter: 'blur(6px)',
-};
-
-const GROUP: React.CSSProperties = { display: 'flex', gap: 6 };
-
-const DIVIDER: React.CSSProperties = {
-  width: 1,
-  alignSelf: 'stretch',
-  background: 'rgba(255,255,255,0.14)',
-};
