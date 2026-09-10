@@ -21,6 +21,26 @@ export class UnauthorizedError extends Error {
 }
 
 /**
+ * The service account is missing or malformed. Becomes a 503, never a 401.
+ *
+ * This distinction is the whole point of the class. A 401 says "your token is
+ * no good"; this says "this server cannot check anyone's token". Returning the
+ * former for the latter sends whoever is debugging to look at the client, and
+ * the NEXT_PUBLIC_* half of the config can be filled in without this half — so
+ * it is exactly the state a half-configured deployment lands in.
+ *
+ * Matched by `instanceof` rather than by testing the message for the variable
+ * name, so renaming the message cannot silently turn a 503 into a 401.
+ */
+export class AdminConfigError extends Error {
+  readonly status = 503;
+  constructor(message: string) {
+    super(message);
+    this.name = 'AdminConfigError';
+  }
+}
+
+/**
  * The service account, as a single-line JSON string in FIREBASE_SERVICE_ACCOUNT.
  *
  * IMPLEMENTATION_PLAN §2.3: it is never committed. If it is ever pasted into
@@ -35,7 +55,7 @@ function serviceAccount(): Record<string, string> | null {
   } catch {
     // A malformed key is a deployment mistake, not a client error. Say so
     // loudly at the server rather than letting every request 401 mysteriously.
-    throw new Error(
+    throw new AdminConfigError(
       'FIREBASE_SERVICE_ACCOUNT is set but is not valid JSON — it must be the ' +
         'service-account file collapsed onto one line.'
     );
@@ -48,7 +68,7 @@ function adminApp(): App {
   if (getApps().length) return getApp();
   const creds = serviceAccount();
   if (!creds) {
-    throw new Error(
+    throw new AdminConfigError(
       'FIREBASE_SERVICE_ACCOUNT is not set — server-side token verification is ' +
         'unavailable. See .env.local.example.'
     );
@@ -86,9 +106,9 @@ export async function requireUser(req: Request): Promise<DecodedIdToken> {
     // immediately, not in up to an hour when the token would have expired.
     return await getAuth(adminApp()).verifyIdToken(token, true);
   } catch (cause) {
-    if (cause instanceof Error && /FIREBASE_SERVICE_ACCOUNT/.test(cause.message)) {
-      throw cause; // configuration problem — do not disguise it as a 401
-    }
+    // A configuration problem is not a credential problem. Let it through
+    // unchanged so handleRouteError can answer 503 and name the variable.
+    if (cause instanceof AdminConfigError) throw cause;
     throw new UnauthorizedError('Invalid or expired token');
   }
 }

@@ -24,6 +24,28 @@ export class MongoNotConfiguredError extends Error {
   }
 }
 
+/**
+ * The URI is set but the cluster will not talk to us. Becomes a 503.
+ *
+ * Overwhelmingly this is the Atlas IP allowlist, which presents as a TLS
+ * handshake the cluster tears down rather than as a refused connection — so
+ * the driver's own message is a line about `ssl3_read_bytes` that tells the
+ * reader nothing. The actionable sentence is ours; the driver's reason is
+ * logged server-side and never sent to a client, because it carries the shard
+ * hostnames.
+ */
+export class MongoUnreachableError extends Error {
+  readonly status = 503;
+  constructor(readonly cause: unknown) {
+    super(
+      'Cannot reach the MongoDB cluster. If this is Atlas, the usual cause is ' +
+        "that this machine's IP is not in Network Access — add it there, or " +
+        'allow access from anywhere for a demo machine.'
+    );
+    this.name = 'MongoUnreachableError';
+  }
+}
+
 const globalCache = globalThis as unknown as {
   _avr25dMongo?: Promise<MongoClient>;
 };
@@ -37,7 +59,18 @@ function client(): Promise<MongoClient> {
       // leaves headroom for the bench harness connecting at the same time.
       maxPoolSize: 10,
       serverSelectionTimeoutMS: 5000,
-    }).connect();
+    })
+      .connect()
+      .catch((cause: unknown) => {
+        // Drop the cache before rethrowing. A rejected promise left in place
+        // is permanent: every later request would await the same failure, so
+        // fixing the allowlist would appear to change nothing until somebody
+        // restarted the server. ensureIndexes() below already does this; the
+        // client did not.
+        globalCache._avr25dMongo = undefined;
+        console.error('[mongo] connection failed:', cause);
+        throw new MongoUnreachableError(cause);
+      });
   }
   return globalCache._avr25dMongo;
 }
@@ -141,7 +174,7 @@ export function ensureIndexes(): Promise<void> {
 
 /** Map a configuration failure to 503; anything else is the caller's problem. */
 export function serviceUnavailableResponse(err: unknown): Response {
-  if (err instanceof MongoNotConfiguredError) {
+  if (err instanceof MongoNotConfiguredError || err instanceof MongoUnreachableError) {
     return Response.json({ error: err.message }, { status: 503 });
   }
   throw err;

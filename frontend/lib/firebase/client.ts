@@ -95,6 +95,22 @@ function writeAuthCookie(signedIn: boolean): void {
 }
 
 /**
+ * Write the marker cookie from whatever the SDK currently believes.
+ *
+ * Call this before navigating to a gated route after a sign-in. `watchAuth`
+ * already keeps the cookie current, but that makes the redirect depend on the
+ * SDK's listeners having fired before the sign-in promise resolved — true
+ * today, nowhere documented, and a bounce straight back to /login if it ever
+ * stops being. This makes the ordering explicit instead of assumed.
+ *
+ * Idempotent, and inert when there is no project to ask.
+ */
+export function syncAuthCookie(): void {
+  if (!isAuthConfigured) return;
+  writeAuthCookie(Boolean(auth().currentUser));
+}
+
+/**
  * Keep the marker cookie in step with the real session, and hand the caller
  * the current user. Returns an unsubscribe function.
  *
@@ -118,8 +134,19 @@ export function watchAuth(onUser: (user: User | null) => void): () => void {
  *
  * Read from the SDK every time rather than cached anywhere: this is the value
  * route handlers verify, and a stale one fails closed.
+ *
+ * `authStateReady()` first, and that is not a nicety. Firebase restores a
+ * session from IndexedDB asynchronously, so for the first moment after a page
+ * load `currentUser` is null for a signed-in user just as it is for a signed-
+ * out one. Any fetch fired from a mount effect — which is how /runs and the
+ * run session both start — therefore went out with no Authorization header and
+ * came back 401, and the page reported "not signed in" to somebody who was.
+ * The promise resolves as soon as the initial state is settled, so this costs
+ * nothing once warm.
  */
 export async function getIdToken(): Promise<string | null> {
   if (!isAuthConfigured) return null;
-  return (await auth().currentUser?.getIdToken()) ?? null;
+  const a = auth();
+  await a.authStateReady();
+  return (await a.currentUser?.getIdToken()) ?? null;
 }

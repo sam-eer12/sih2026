@@ -11,10 +11,12 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { isAuthConfigured, signOut, watchAuth } from '../../lib/firebase/client';
 import { apiPost } from '../../lib/apiClient';
 
 export default function SessionChip() {
+  const router = useRouter();
   const [email, setEmail] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
 
@@ -29,6 +31,19 @@ export default function SessionChip() {
     });
   }, []);
 
+  /**
+   * Sign out, then leave.
+   *
+   * The proxy is a navigation-time check, so clearing the session without
+   * navigating left the signed-out user sitting on the dashboard watching live
+   * frames — the gate had nothing to gate. `replace` rather than `push` so Back
+   * cannot return to a page this user is no longer entitled to.
+   */
+  const leave = async () => {
+    await signOut();
+    router.replace('/login');
+  };
+
   if (!isAuthConfigured || !ready || !email) return null;
 
   return (
@@ -39,7 +54,7 @@ export default function SessionChip() {
       <Link href="/runs" style={LINK}>
         Runs
       </Link>
-      <button type="button" onClick={() => void signOut()} style={BUTTON}>
+      <button type="button" onClick={() => void leave()} style={BUTTON}>
         Sign out
       </button>
     </div>

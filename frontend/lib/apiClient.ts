@@ -17,7 +17,11 @@ export class ApiError extends Error {
     this.name = 'ApiError';
   }
 
-  /** Persistence is switched off server-side rather than broken. */
+  /**
+   * A credential the server needs is absent — MONGODB_URI or
+   * FIREBASE_SERVICE_ACCOUNT — rather than anything being broken. The response
+   * body names which one.
+   */
   get isUnconfigured(): boolean {
     return this.status === 503;
   }
