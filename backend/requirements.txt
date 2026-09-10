@@ -1,4 +1,4 @@
-# AVR-25D — backend Python dependencies
+# NEXA — backend Python dependencies
 #
 # Replaces a stray `pip freeze` of an unrelated global environment (168 of its
 # ~180 pins were not installed here and nothing in the project imported them —

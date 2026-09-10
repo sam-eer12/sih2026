@@ -1,7 +1,7 @@
 // wipe.ts — the A/B comparison wipe. THE MONEY SHOT.
 //
 // Same scan, same camera, same frame_id, split by a draggable divider:
-// uniform 5 cm on the left, AVR-25D adaptive on the right. The claim it has
+// uniform 5 cm on the left, NEXA adaptive on the right. The claim it has
 // to make visible is 16,000,000 vs 705,771 — grid CAPACITY, not occupied
 // returns (a scan lights up only ~6% of either grid, so coloured cells alone
 // cannot show the ratio; see gridShader.ts).
@@ -138,7 +138,7 @@ export function createWipe(
       showUniform(objects, grid);
       renderer.render(scene, camera);
 
-      // RIGHT — AVR-25D adaptive
+      // RIGHT — NEXA adaptive
       renderer.setScissor(splitPx, 0, w - splitPx, h);
       showAdaptive(objects, grid);
       renderer.render(scene, camera);

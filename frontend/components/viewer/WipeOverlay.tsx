@@ -103,7 +103,7 @@ export default function WipeOverlay({
       </div>
 
       <div ref={rightLabelRef} style={{ ...label, left: `calc(${pct} + 18px)` }}>
-        AVR-25D adaptive
+        NEXA adaptive
         <span style={{ ...count, color: '#69f0ae' }}>
           {GRID_CAPACITY.adaptive.toLocaleString()}
         </span>

@@ -36,7 +36,7 @@ export default function MemoryPanel({
         <span style={{ ...SUB, color: '#8b8b9e' }}>vs uniform 5 cm</span>
       </div>
 
-      <Row label="AVR-25D" value={megabytes(stats.mem_bytes)} />
+      <Row label="NEXA" value={megabytes(stats.mem_bytes)} />
       <Row label="Baseline" value={megabytes(stats.baseline_mem_bytes)} />
       <Row label="Cells occupied" value={count(stats.n_cells_occupied)} />
       <Row label="Grid capacity" value={count(capacity)} />

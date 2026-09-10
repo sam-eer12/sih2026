@@ -1,6 +1,6 @@
 @import "tailwindcss";
 
-/* ── AVR-25D palette ───────────────────────────────────────────────
+/* ── NEXA palette ───────────────────────────────────────────────
    Class colours are mirrored from lib/palette.ts, which stays the single
    source of truth for anything rendered into the scene. These exist so CSS
    can speak the same language as the canvas without hard-coding a hex in a

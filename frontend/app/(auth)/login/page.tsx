@@ -140,11 +140,8 @@ function LoginForm() {
   return (
     <Shell>
       <Card>
-        <p className="tabular text-[12px] tracking-[0.14em] text-[var(--text-lo)]">
-          SIH26053 · DRDO / IDEX
-        </p>
-        <h1 className="mt-2.5 text-3xl font-semibold tracking-[-0.025em] text-[var(--text-hi)]">
-          AVR-25D
+        <h1 className="text-3xl font-semibold tracking-[-0.025em] text-[var(--text-hi)]">
+          NEXA
         </h1>
         <p className="mt-2.5 mb-7 text-[14.5px] leading-relaxed text-[var(--text-lo)]">
           Sign in to reach the dashboard and run history.

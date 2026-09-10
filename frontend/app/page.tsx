@@ -3,8 +3,12 @@
 // The hero is the argument: a mountain that becomes a point cloud under the
 // cursor. It is the product's one-sentence pitch made literal — take a
 // surface, keep only what a sensor returns, and colour what remains by what
-// it is. Copy and figures are unchanged from the plain version; only the
-// staging is new, and every number still traces to results.json.
+// it is. Every number still traces to results.json.
+//
+// The copy is deliberately short. Two lines and four figures say what this is;
+// the terrain says the rest, and it says it better than a paragraph would. No
+// eyebrow, no caps, no instructions — a visitor finds the interaction on their
+// own, and telling them to look is what made the page read as a demo.
 
 import Link from 'next/link';
 import AuthLink from '../components/auth/AuthLink';
@@ -37,31 +41,20 @@ export default function Home() {
 
           <div className="pointer-events-none absolute inset-0 flex flex-col justify-center px-8 md:px-16">
             <div className="max-w-2xl">
-              {/* Eyebrow: a programme reference, so mono — but at a size and
-                  tracking that reads as a line of type rather than a barcode. */}
-              <p className="rise tabular text-[12.5px] tracking-[0.14em] text-[var(--text-lo)]">
-                SIH26053 · DRDO / IDEX
-              </p>
-              <h1
-                className="rise mt-4 text-6xl font-semibold tracking-[-0.03em] text-[var(--text-hi)] md:text-8xl"
-                style={{ animationDelay: '80ms' }}
-              >
-                AVR-25D
+              <h1 className="rise text-6xl font-semibold tracking-[-0.03em] text-[var(--text-hi)] md:text-8xl">
+                NEXA
               </h1>
               <p
-                className="rise mt-6 max-w-xl text-[17px] leading-[1.6] text-[var(--text)] md:text-[19px] md:leading-[1.6]"
-                style={{ animationDelay: '160ms' }}
+                className="rise mt-6 max-w-xl text-[20px] leading-[1.5] text-[var(--text-hi)] md:text-[23px] md:leading-[1.45]"
+                style={{ animationDelay: '80ms' }}
               >
-                Adaptive variable-resolution 2.5D LiDAR mapping for dynamic environment
-                perception. Resolution is allocated the way the eye allocates it — 5&nbsp;cm
-                inside 10&nbsp;m, coarsening to 50&nbsp;cm at 100&nbsp;m, matched to the
-                sensor&rsquo;s own angular sampling.
+                Adaptive LiDAR perception for dynamic environments.
               </p>
               <p
-                className="rise mt-7 text-[13.5px] text-[var(--text-lo)]"
-                style={{ animationDelay: '240ms' }}
+                className="rise mt-4 max-w-xl text-[17px] leading-[1.6] text-[var(--text)]"
+                style={{ animationDelay: '160ms' }}
               >
-                Move across the terrain to scan it.
+                Variable-resolution 2.5D mapping that preserves detail where it matters.
               </p>
             </div>
           </div>
@@ -70,21 +63,21 @@ export default function Home() {
 
       {/* ── Figures ──────────────────────────────────────────── */}
       <section className="relative z-10 px-8 pb-24 md:px-16">
+        {/* The qualifiers the labels used to carry — the 5 cm baseline, the
+            971-scan sample — moved to `title` rather than being dropped: the
+            claim stays checkable without putting fine print on the page. */}
         <dl className="flex flex-wrap gap-x-16 gap-y-8 border-t border-[var(--line)] pt-10">
-          <Figure value={CELLS_ADAPTIVE} label="cells, adaptive" />
-          <Figure value={CELLS_UNIFORM} label="cells, uniform 5 cm" />
-          <Figure value="22.67×" label="reduction" accent />
-          <Figure value="0.878" label="mIoU, 971 scans" />
+          <Figure value={CELLS_ADAPTIVE} label="Adaptive cells" />
+          <Figure
+            value={CELLS_UNIFORM}
+            label="Uniform cells"
+            hint="A uniform 5 cm grid over the same 100 m footprint"
+          />
+          <Figure value="22.67×" label="Reduction" accent />
+          <Figure value="0.878" label="mIoU" hint="Mean IoU over 971 SemanticKITTI scans" />
         </dl>
 
-        <p className="mt-10 max-w-2xl text-[16px] leading-[1.65] text-[var(--text)]">
-          Because each cell keeps ground height and obstacle height separately, the map
-          represents the three hazards a 2D occupancy grid destroys: curbs, potholes and
-          overhanging structures. A deterministic decision layer turns the map into a
-          route, a risk level and a stated reason.
-        </p>
-
-        <div className="mt-9 flex flex-wrap gap-3">
+        <div className="mt-10 flex flex-wrap gap-3">
           <Link
             href="/dashboard"
             className="rounded-md bg-[var(--accent)] px-5 py-3 text-[15px] font-semibold text-[#062713] transition-transform duration-200 hover:-translate-y-0.5"
@@ -98,21 +91,24 @@ export default function Home() {
             Run history
           </Link>
         </div>
-
-        <p className="mt-10 max-w-2xl text-[14px] leading-[1.6] text-[var(--text-lo)]">
-          The live frame stream runs from <Code>http://localhost:3000</Code> against a
-          local pipeline server. A deployed page cannot open a <Code>ws://</Code> socket —
-          browsers block mixed content — so the dashboard there reports that it cannot
-          connect rather than sitting blank.
-        </p>
       </section>
     </main>
   );
 }
 
-function Figure({ value, label, accent }: { value: string; label: string; accent?: boolean }) {
+function Figure({
+  value,
+  label,
+  accent,
+  hint,
+}: {
+  value: string;
+  label: string;
+  accent?: boolean;
+  hint?: string;
+}) {
   return (
-    <div>
+    <div title={hint}>
       <dt
         className="tabular text-3xl font-semibold tracking-[-0.03em] md:text-4xl"
         style={{ color: accent ? 'var(--accent)' : 'var(--text-hi)' }}
@@ -121,15 +117,7 @@ function Figure({ value, label, accent }: { value: string; label: string; accent
       </dt>
       {/* Sentence case at a readable size. These caption a figure; they do not
           need to compete with it. */}
-      <dd className="mt-2.5 text-[13px] text-[var(--text-lo)]">{label}</dd>
+      <dd className="mt-2.5 text-[14px] text-[var(--text-lo)]">{label}</dd>
     </div>
-  );
-}
-
-function Code({ children }: { children: React.ReactNode }) {
-  return (
-    <code className="tabular rounded bg-[var(--ink-700)] px-1.5 py-0.5 text-[13px] text-[var(--text)]">
-      {children}
-    </code>
   );
 }
