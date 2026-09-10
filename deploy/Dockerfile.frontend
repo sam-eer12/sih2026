@@ -1,0 +1,75 @@
+# AVR-25D web app — Next.js 16 (App Router), standalone output.
+#
+# Build context is frontend/:
+#     docker build -f deploy/Dockerfile.frontend -t avr25d-frontend ./frontend
+#
+# ── The one thing that is easy to get wrong ───────────────────────────────
+# NEXT_PUBLIC_* variables are INLINED INTO THE BUNDLE AT BUILD TIME, not read
+# at run time. proxy.ts says so in its own comment ("Read at module scope:
+# NEXT_PUBLIC_* values are inlined at build time"), and it decides there
+# whether the auth gate is live at all.
+#
+# So they must be passed as --build-arg. Passing them only as run-time
+# `environment:` produces an image that silently:
+#   - streams from ws://localhost:8000 regardless of what the VM is called, and
+#   - leaves the /dashboard route gate INERT, because AUTH_ENABLED evaluated
+#     false at build time (proxy.ts:36).
+# Both fail quietly in the browser rather than loudly in the build.
+#
+# The server-only secrets (FIREBASE_SERVICE_ACCOUNT, MONGODB_URI) are the
+# opposite: run-time environment only, never build args — a build arg is
+# readable in the image history with `docker history`.
+
+# ── deps ──────────────────────────────────────────────────────────────────
+FROM node:22-slim AS deps
+WORKDIR /app
+COPY package.json package-lock.json ./
+RUN npm ci
+
+# ── build ─────────────────────────────────────────────────────────────────
+FROM node:22-slim AS builder
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+
+ARG NEXT_PUBLIC_WS_URL
+ARG NEXT_PUBLIC_FIREBASE_API_KEY
+ARG NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
+ARG NEXT_PUBLIC_FIREBASE_PROJECT_ID
+ARG NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
+ARG NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID
+ARG NEXT_PUBLIC_FIREBASE_APP_ID
+
+ENV NEXT_PUBLIC_WS_URL=$NEXT_PUBLIC_WS_URL \
+    NEXT_PUBLIC_FIREBASE_API_KEY=$NEXT_PUBLIC_FIREBASE_API_KEY \
+    NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=$NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN \
+    NEXT_PUBLIC_FIREBASE_PROJECT_ID=$NEXT_PUBLIC_FIREBASE_PROJECT_ID \
+    NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=$NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET \
+    NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=$NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID \
+    NEXT_PUBLIC_FIREBASE_APP_ID=$NEXT_PUBLIC_FIREBASE_APP_ID \
+    NEXT_TELEMETRY_DISABLED=1
+
+# Requires `output: 'standalone'` in next.config.ts. Without it .next/standalone
+# is never emitted and the runner stage below fails on COPY.
+RUN npm run build
+
+# ── runner ────────────────────────────────────────────────────────────────
+FROM node:22-slim AS runner
+WORKDIR /app
+ENV NODE_ENV=production \
+    NEXT_TELEMETRY_DISABLED=1 \
+    PORT=3000 \
+    HOSTNAME=0.0.0.0
+
+RUN useradd --create-home --uid 1001 nextjs
+
+COPY --from=builder --chown=nextjs:nextjs /app/public ./public
+COPY --from=builder --chown=nextjs:nextjs /app/.next/standalone ./
+COPY --from=builder --chown=nextjs:nextjs /app/.next/static ./.next/static
+
+USER nextjs
+EXPOSE 3000
+
+# standalone emits its own minimal server; `next start` is not used and next
+# is not even installed in this stage.
+CMD ["node", "server.js"]

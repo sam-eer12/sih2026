@@ -9,63 +9,63 @@
     ],
     "bins": {
       "0-10m": {
-        "accuracy": 0.954997,
+        "accuracy": 0.542432,
         "iou": {
-          "DRIVABLE": 0.966259,
-          "DYNAMIC_OBJECT": 0.931578,
-          "NON_DRIVABLE_TERRAIN": 0.912675,
-          "STATIC_OBSTACLE": 0.841015,
-          "VOID": null
+          "DRIVABLE": 0.699723,
+          "DYNAMIC_OBJECT": 0.255847,
+          "NON_DRIVABLE_TERRAIN": 0.105989,
+          "STATIC_OBSTACLE": 0.098233,
+          "VOID": 0.0
         },
-        "miou": 0.912882,
-        "n_points": 72362280,
-        "n_points_scored": 71819304,
+        "miou": 0.289948,
+        "n_points": 17540281,
+        "n_points_scored": 17528774,
         "truth_share": {
-          "DRIVABLE": 0.283425,
-          "DYNAMIC_OBJECT": 0.05355,
-          "NON_DRIVABLE_TERRAIN": 0.466232,
-          "STATIC_OBSTACLE": 0.18929,
-          "VOID": 0.007504
+          "DRIVABLE": 0.464115,
+          "DYNAMIC_OBJECT": 0.005751,
+          "NON_DRIVABLE_TERRAIN": 0.492015,
+          "STATIC_OBSTACLE": 0.037462,
+          "VOID": 0.000656
         }
       },
       "10-30m": {
-        "accuracy": 0.913522,
+        "accuracy": 0.473072,
         "iou": {
-          "DRIVABLE": 0.922089,
-          "DYNAMIC_OBJECT": 0.798895,
-          "NON_DRIVABLE_TERRAIN": 0.834491,
-          "STATIC_OBSTACLE": 0.814475,
-          "VOID": null
+          "DRIVABLE": 0.491626,
+          "DYNAMIC_OBJECT": 0.114761,
+          "NON_DRIVABLE_TERRAIN": 0.15566,
+          "STATIC_OBSTACLE": 0.39422,
+          "VOID": 0.0
         },
-        "miou": 0.842487,
-        "n_points": 41435598,
-        "n_points_scored": 41357972,
+        "miou": 0.289067,
+        "n_points": 13827415,
+        "n_points_scored": 13825889,
         "truth_share": {
-          "DRIVABLE": 0.178747,
-          "DYNAMIC_OBJECT": 0.043107,
-          "NON_DRIVABLE_TERRAIN": 0.45153,
-          "STATIC_OBSTACLE": 0.324743,
-          "VOID": 0.001873
+          "DRIVABLE": 0.229243,
+          "DYNAMIC_OBJECT": 0.021033,
+          "NON_DRIVABLE_TERRAIN": 0.520778,
+          "STATIC_OBSTACLE": 0.228835,
+          "VOID": 0.00011
         }
       },
       "30-60m": {
-        "accuracy": 0.807483,
+        "accuracy": 0.35039,
         "iou": {
-          "DRIVABLE": 0.792101,
-          "DYNAMIC_OBJECT": 0.545307,
-          "NON_DRIVABLE_TERRAIN": 0.680436,
-          "STATIC_OBSTACLE": 0.658563,
-          "VOID": null
+          "DRIVABLE": 0.311879,
+          "DYNAMIC_OBJECT": 0.042876,
+          "NON_DRIVABLE_TERRAIN": 0.187181,
+          "STATIC_OBSTACLE": 0.311859,
+          "VOID": 0.0
         },
-        "miou": 0.669102,
-        "n_points": 5902287,
-        "n_points_scored": 5040013,
+        "miou": 0.213449,
+        "n_points": 2390366,
+        "n_points_scored": 2015022,
         "truth_share": {
-          "DRIVABLE": 0.096941,
-          "DYNAMIC_OBJECT": 0.0307,
-          "NON_DRIVABLE_TERRAIN": 0.434877,
-          "STATIC_OBSTACLE": 0.291391,
-          "VOID": 0.146092
+          "DRIVABLE": 0.102847,
+          "DYNAMIC_OBJECT": 0.019754,
+          "NON_DRIVABLE_TERRAIN": 0.523018,
+          "STATIC_OBSTACLE": 0.197358,
+          "VOID": 0.157024
         }
       },
       "60-100m": {
@@ -78,7 +78,7 @@
           "VOID": null
         },
         "miou": null,
-        "n_points": 721394,
+        "n_points": 311495,
         "n_points_scored": 0,
         "truth_share": {
           "DRIVABLE": 0.0,
@@ -94,23 +94,23 @@
     ],
     "n_points_outside_envelope": 0,
     "overall": {
-      "accuracy": 0.934198,
+      "accuracy": 0.502098,
       "iou": {
-        "DRIVABLE": 0.950955,
-        "DYNAMIC_OBJECT": 0.871347,
-        "NON_DRIVABLE_TERRAIN": 0.874344,
-        "STATIC_OBSTACLE": 0.815914,
-        "VOID": null
+        "DRIVABLE": 0.628415,
+        "DYNAMIC_OBJECT": 0.129823,
+        "NON_DRIVABLE_TERRAIN": 0.13412,
+        "STATIC_OBSTACLE": 0.272679,
+        "VOID": 0.0
       },
-      "miou": 0.87814,
-      "n_points": 120421559,
-      "n_points_scored": 118217289,
+      "miou": 0.291259,
+      "n_points": 34069557,
+      "n_points_scored": 33369685,
       "truth_share": {
-        "DRIVABLE": 0.236568,
-        "DYNAMIC_OBJECT": 0.048516,
-        "NON_DRIVABLE_TERRAIN": 0.456843,
-        "STATIC_OBSTACLE": 0.239768,
-        "VOID": 0.018305
+        "DRIVABLE": 0.3392,
+        "DYNAMIC_OBJECT": 0.012883,
+        "NON_DRIVABLE_TERRAIN": 0.501366,
+        "STATIC_OBSTACLE": 0.126009,
+        "VOID": 0.020542
       }
     }
   },
@@ -311,52 +311,52 @@
   },
   "latency": {
     "end_to_end": {
-      "max_ms": 22.4271,
-      "mean_ms": 9.5822,
-      "median_ms": 9.2371,
-      "min_ms": 7.2869,
-      "n": 956,
-      "p95_ms": 13.7235
+      "max_ms": 999.4416,
+      "mean_ms": 151.9649,
+      "median_ms": 142.2083,
+      "min_ms": 108.2536,
+      "n": 266,
+      "p95_ms": 178.2824
     },
     "meets_fr32": true,
     "min_scans_fr32": 200,
-    "n_frames": 956,
-    "n_warmup_discarded": 15,
-    "n_warmup_windows": 3,
+    "n_frames": 266,
+    "n_warmup_discarded": 5,
+    "n_warmup_windows": 1,
     "percentile_method": "linear",
     "stages": {
       "read": {
-        "max_ms": 3.1979,
-        "mean_ms": 2.0237,
-        "median_ms": 1.9379,
-        "min_ms": 1.714,
-        "n": 956,
-        "p95_ms": 2.8691
+        "max_ms": 8.2287,
+        "mean_ms": 4.6278,
+        "median_ms": 4.6527,
+        "min_ms": 3.764,
+        "n": 266,
+        "p95_ms": 5.2089
       },
       "score": {
-        "max_ms": 19.4951,
-        "mean_ms": 7.5486,
-        "median_ms": 7.1847,
-        "min_ms": 5.3303,
-        "n": 956,
-        "p95_ms": 11.5975
+        "max_ms": 39.4321,
+        "mean_ms": 14.4683,
+        "median_ms": 13.6818,
+        "min_ms": 12.5438,
+        "n": 266,
+        "p95_ms": 16.6269
       },
       "segment": {
-        "max_ms": 0.0662,
-        "mean_ms": 0.0061,
-        "median_ms": 0.0053,
-        "min_ms": 0.0025,
-        "n": 956,
-        "p95_ms": 0.0107
+        "max_ms": 951.7447,
+        "mean_ms": 132.8531,
+        "median_ms": 124.1765,
+        "min_ms": 86.4005,
+        "n": 266,
+        "p95_ms": 160.5259
       }
     },
     "unaccounted_ms": {
-      "max_ms": 0.0149,
-      "mean_ms": 0.0038,
-      "median_ms": 0.0035,
-      "min_ms": 0.0025,
-      "n": 956,
-      "p95_ms": 0.0057
+      "max_ms": 0.0663,
+      "mean_ms": 0.0158,
+      "median_ms": 0.0146,
+      "min_ms": 0.0119,
+      "n": 266,
+      "p95_ms": 0.0219
     }
   },
   "memory": {
@@ -366,11 +366,11 @@
     "envelope_r_max_m": 100.0,
     "models": [
       {
-        "bytes": 2108306,
+        "bytes": 2137206,
         "definition": "raw scan, float32 x/y/z/intensity + uint8 label",
-        "megabytes": 2.1083,
+        "megabytes": 2.1372,
         "n_cells": 0,
-        "n_points": 124018,
+        "n_points": 125718,
         "name": "B0"
       },
       {
@@ -382,10 +382,10 @@
         "name": "B1"
       },
       {
-        "bytes": 1700183,
+        "bytes": 2071151,
         "definition": "sparse uniform 2.5D @ 5 cm, hash map, 4-byte key",
-        "megabytes": 1.7002,
-        "n_cells": 58627,
+        "megabytes": 2.0712,
+        "n_cells": 71419,
         "n_points": 0,
         "name": "B2"
       },
@@ -398,10 +398,10 @@
         "name": "B3"
       },
       {
-        "bytes": 1005468,
+        "bytes": 1018080,
         "definition": "sparse 3D voxel hash @ 5 cm, 8-byte key + 4-byte payload",
-        "megabytes": 1.0055,
-        "n_cells": 83789,
+        "megabytes": 1.0181,
+        "n_cells": 84840,
         "n_points": 0,
         "name": "B4"
       },
@@ -414,10 +414,10 @@
         "name": "AVR-25D dense"
       },
       {
-        "bytes": 1400033,
+        "bytes": 1690990,
         "definition": "occupied adaptive cells only, 4-byte key",
-        "megabytes": 1.4,
-        "n_cells": 48277,
+        "megabytes": 1.691,
+        "n_cells": 58310,
         "n_points": 0,
         "name": "AVR-25D occupied"
       }
@@ -425,38 +425,36 @@
     "n_cells_adaptive_source": "core/grid.py (live measurement)",
     "n_occ_adaptive_below_n_occ_uniform": true,
     "n_occ_adaptive_measured": true,
-    "peak_rss_mb": 220.91,
+    "peak_rss_mb": 543.2,
     "peak_rss_scope": "whole benchmark process after all sequences, including the KITTI reader and the scoring accumulators \u2014 an upper bound on the pipeline",
     "resolution_m": 0.05
   },
   "meta": {
-    "dataset": "SemanticKITTI sequences 00, 04, 05, 971 scans",
-    "generated": "2026-09-07T14:13:23+00:00",
-    "git_commit": "1ccc876",
-    "mean_points_per_scan": 124018,
-    "perception_mode": "cached",
+    "dataset": "SemanticKITTI sequence 04, 271 scans",
+    "generated": "2026-09-09T18:03:05+00:00",
+    "git_commit": "16c9bed",
+    "mean_points_per_scan": 125718,
+    "perception_mode": "geometric",
     "sequences": [
-      "00",
-      "04",
-      "05"
+      "04"
     ]
   },
   "object_recall": {
     "bins": {
       "0-10m": {
-        "n_objects": 1709,
-        "n_recalled": 1708,
-        "recall": 0.999415
+        "n_objects": 46,
+        "n_recalled": 45,
+        "recall": 0.978261
       },
       "10-30m": {
-        "n_objects": 5289,
-        "n_recalled": 5035,
-        "recall": 0.951976
+        "n_objects": 780,
+        "n_recalled": 408,
+        "recall": 0.523077
       },
       "30-60m": {
-        "n_objects": 3475,
-        "n_recalled": 2992,
-        "recall": 0.861007
+        "n_objects": 378,
+        "n_recalled": 81,
+        "recall": 0.214286
       },
       "60-100m": {
         "n_objects": 0,
@@ -466,9 +464,9 @@
     },
     "classes": {
       "DYNAMIC_OBJECT": {
-        "n_objects": 10473,
-        "n_recalled": 9735,
-        "recall": 0.929533
+        "n_objects": 1204,
+        "n_recalled": 534,
+        "recall": 0.443522
       },
       "STATIC_OBSTACLE": {
         "n_objects": 0,
@@ -478,231 +476,14 @@
     },
     "hit_fraction": 0.5,
     "min_points": 5,
-    "n_objects_below_min_points": 932,
+    "n_objects_below_min_points": 55,
     "overall": {
-      "n_objects": 10473,
-      "n_recalled": 9735,
-      "recall": 0.929533
+      "n_objects": 1204,
+      "n_recalled": 534,
+      "recall": 0.443522
     }
   },
   "per_sequence": {
-    "00": {
-      "accuracy": {
-        "bin_edges_m": [
-          0.0,
-          10.0,
-          30.0,
-          60.0,
-          100.0
-        ],
-        "bins": {
-          "0-10m": {
-            "accuracy": 0.958932,
-            "iou": {
-              "DRIVABLE": 0.960684,
-              "DYNAMIC_OBJECT": 0.933427,
-              "NON_DRIVABLE_TERRAIN": 0.924074,
-              "STATIC_OBSTACLE": 0.867639,
-              "VOID": null
-            },
-            "miou": 0.921456,
-            "n_points": 31154102,
-            "n_points_scored": 30793358,
-            "truth_share": {
-              "DRIVABLE": 0.223091,
-              "DYNAMIC_OBJECT": 0.101071,
-              "NON_DRIVABLE_TERRAIN": 0.462721,
-              "STATIC_OBSTACLE": 0.201538,
-              "VOID": 0.011579
-            }
-          },
-          "10-30m": {
-            "accuracy": 0.9116,
-            "iou": {
-              "DRIVABLE": 0.908753,
-              "DYNAMIC_OBJECT": 0.800499,
-              "NON_DRIVABLE_TERRAIN": 0.81011,
-              "STATIC_OBSTACLE": 0.845087,
-              "VOID": null
-            },
-            "miou": 0.841112,
-            "n_points": 15456550,
-            "n_points_scored": 15424456,
-            "truth_share": {
-              "DRIVABLE": 0.149603,
-              "DYNAMIC_OBJECT": 0.070882,
-              "NON_DRIVABLE_TERRAIN": 0.377613,
-              "STATIC_OBSTACLE": 0.399825,
-              "VOID": 0.002076
-            }
-          },
-          "30-60m": {
-            "accuracy": 0.798865,
-            "iou": {
-              "DRIVABLE": 0.77625,
-              "DYNAMIC_OBJECT": 0.556618,
-              "NON_DRIVABLE_TERRAIN": 0.611212,
-              "STATIC_OBSTACLE": 0.704132,
-              "VOID": null
-            },
-            "miou": 0.662053,
-            "n_points": 1861410,
-            "n_points_scored": 1596588,
-            "truth_share": {
-              "DRIVABLE": 0.090022,
-              "DYNAMIC_OBJECT": 0.046301,
-              "NON_DRIVABLE_TERRAIN": 0.35941,
-              "STATIC_OBSTACLE": 0.361998,
-              "VOID": 0.14227
-            }
-          },
-          "60-100m": {
-            "accuracy": null,
-            "iou": {
-              "DRIVABLE": null,
-              "DYNAMIC_OBJECT": null,
-              "NON_DRIVABLE_TERRAIN": null,
-              "STATIC_OBSTACLE": null,
-              "VOID": null
-            },
-            "miou": null,
-            "n_points": 236473,
-            "n_points_scored": 0,
-            "truth_share": {
-              "DRIVABLE": 0.0,
-              "DYNAMIC_OBJECT": 0.0,
-              "NON_DRIVABLE_TERRAIN": 0.0,
-              "STATIC_OBSTACLE": 0.0,
-              "VOID": 1.0
-            }
-          }
-        },
-        "excluded_classes": [
-          "VOID"
-        ],
-        "n_points_outside_envelope": 0,
-        "overall": {
-          "accuracy": 0.938318,
-          "iou": {
-            "DRIVABLE": 0.944289,
-            "DYNAMIC_OBJECT": 0.886504,
-            "NON_DRIVABLE_TERRAIN": 0.880619,
-            "STATIC_OBSTACLE": 0.847343,
-            "VOID": null
-          },
-          "miou": 0.889689,
-          "n_points": 48708535,
-          "n_points_scored": 47814402,
-          "truth_share": {
-            "DRIVABLE": 0.193603,
-            "DYNAMIC_OBJECT": 0.088908,
-            "NON_DRIVABLE_TERRAIN": 0.429519,
-            "STATIC_OBSTACLE": 0.269613,
-            "VOID": 0.018357
-          }
-        }
-      },
-      "latency": {
-        "end_to_end": {
-          "max_ms": 22.4261,
-          "mean_ms": 10.8989,
-          "median_ms": 10.3249,
-          "min_ms": 7.3338,
-          "n": 395,
-          "p95_ms": 14.9242
-        },
-        "meets_fr32": true,
-        "min_scans_fr32": 200,
-        "n_frames": 395,
-        "n_warmup_discarded": 5,
-        "n_warmup_windows": 1,
-        "percentile_method": "linear",
-        "stages": {
-          "read": {
-            "max_ms": 3.078,
-            "mean_ms": 2.0142,
-            "median_ms": 1.9284,
-            "min_ms": 1.7128,
-            "n": 395,
-            "p95_ms": 2.8589
-          },
-          "score": {
-            "max_ms": 19.4921,
-            "mean_ms": 8.8722,
-            "median_ms": 8.3328,
-            "min_ms": 5.3294,
-            "n": 395,
-            "p95_ms": 12.7614
-          },
-          "segment": {
-            "max_ms": 0.039,
-            "mean_ms": 0.0059,
-            "median_ms": 0.0052,
-            "min_ms": 0.0022,
-            "n": 395,
-            "p95_ms": 0.0101
-          }
-        },
-        "unaccounted_ms": {
-          "max_ms": 0.0676,
-          "mean_ms": 0.0066,
-          "median_ms": 0.0059,
-          "min_ms": 0.0041,
-          "n": 395,
-          "p95_ms": 0.0101
-        }
-      },
-      "mean_occ_adaptive": 42074,
-      "mean_occ_uniform": 51028,
-      "mean_occ_voxel": 81220,
-      "mean_points_per_scan": 121771,
-      "n_scans": 400,
-      "object_recall": {
-        "bins": {
-          "0-10m": {
-            "n_objects": 1352,
-            "n_recalled": 1351,
-            "recall": 0.99926
-          },
-          "10-30m": {
-            "n_objects": 3466,
-            "n_recalled": 3303,
-            "recall": 0.952972
-          },
-          "30-60m": {
-            "n_objects": 2263,
-            "n_recalled": 1959,
-            "recall": 0.865665
-          },
-          "60-100m": {
-            "n_objects": 0,
-            "n_recalled": 0,
-            "recall": null
-          }
-        },
-        "classes": {
-          "DYNAMIC_OBJECT": {
-            "n_objects": 7081,
-            "n_recalled": 6613,
-            "recall": 0.933908
-          },
-          "STATIC_OBSTACLE": {
-            "n_objects": 0,
-            "n_recalled": 0,
-            "recall": null
-          }
-        },
-        "hit_fraction": 0.5,
-        "min_points": 5,
-        "n_objects_below_min_points": 692,
-        "overall": {
-          "n_objects": 7081,
-          "n_recalled": 6613,
-          "recall": 0.933908
-        }
-      },
-      "sequence": "00"
-    },
     "04": {
       "accuracy": {
         "bin_edges_m": [
@@ -714,15 +495,15 @@
         ],
         "bins": {
           "0-10m": {
-            "accuracy": 0.971712,
+            "accuracy": 0.542432,
             "iou": {
-              "DRIVABLE": 0.970746,
-              "DYNAMIC_OBJECT": 0.90834,
-              "NON_DRIVABLE_TERRAIN": 0.945371,
-              "STATIC_OBSTACLE": 0.684798,
-              "VOID": null
+              "DRIVABLE": 0.699723,
+              "DYNAMIC_OBJECT": 0.255847,
+              "NON_DRIVABLE_TERRAIN": 0.105989,
+              "STATIC_OBSTACLE": 0.098233,
+              "VOID": 0.0
             },
-            "miou": 0.877314,
+            "miou": 0.289948,
             "n_points": 17540281,
             "n_points_scored": 17528774,
             "truth_share": {
@@ -734,15 +515,15 @@
             }
           },
           "10-30m": {
-            "accuracy": 0.91971,
+            "accuracy": 0.473072,
             "iou": {
-              "DRIVABLE": 0.933874,
-              "DYNAMIC_OBJECT": 0.822925,
-              "NON_DRIVABLE_TERRAIN": 0.858476,
-              "STATIC_OBSTACLE": 0.770001,
-              "VOID": null
+              "DRIVABLE": 0.491626,
+              "DYNAMIC_OBJECT": 0.114761,
+              "NON_DRIVABLE_TERRAIN": 0.15566,
+              "STATIC_OBSTACLE": 0.39422,
+              "VOID": 0.0
             },
-            "miou": 0.846319,
+            "miou": 0.289067,
             "n_points": 13827415,
             "n_points_scored": 13825889,
             "truth_share": {
@@ -754,15 +535,15 @@
             }
           },
           "30-60m": {
-            "accuracy": 0.817979,
+            "accuracy": 0.35039,
             "iou": {
-              "DRIVABLE": 0.806459,
-              "DYNAMIC_OBJECT": 0.531301,
-              "NON_DRIVABLE_TERRAIN": 0.741538,
-              "STATIC_OBSTACLE": 0.572127,
-              "VOID": null
+              "DRIVABLE": 0.311879,
+              "DYNAMIC_OBJECT": 0.042876,
+              "NON_DRIVABLE_TERRAIN": 0.187181,
+              "STATIC_OBSTACLE": 0.311859,
+              "VOID": 0.0
             },
-            "miou": 0.662856,
+            "miou": 0.213449,
             "n_points": 2390366,
             "n_points_scored": 2015022,
             "truth_share": {
@@ -799,15 +580,15 @@
         ],
         "n_points_outside_envelope": 0,
         "overall": {
-          "accuracy": 0.940883,
+          "accuracy": 0.502098,
           "iou": {
-            "DRIVABLE": 0.956892,
-            "DYNAMIC_OBJECT": 0.800623,
-            "NON_DRIVABLE_TERRAIN": 0.893166,
-            "STATIC_OBSTACLE": 0.730954,
-            "VOID": null
+            "DRIVABLE": 0.628415,
+            "DYNAMIC_OBJECT": 0.129823,
+            "NON_DRIVABLE_TERRAIN": 0.13412,
+            "STATIC_OBSTACLE": 0.272679,
+            "VOID": 0.0
           },
-          "miou": 0.845409,
+          "miou": 0.291259,
           "n_points": 34069557,
           "n_points_scored": 33369685,
           "truth_share": {
@@ -821,12 +602,12 @@
       },
       "latency": {
         "end_to_end": {
-          "max_ms": 10.4491,
-          "mean_ms": 8.2495,
-          "median_ms": 8.0123,
-          "min_ms": 7.286,
+          "max_ms": 999.4364,
+          "mean_ms": 151.9622,
+          "median_ms": 142.206,
+          "min_ms": 108.2512,
           "n": 266,
-          "p95_ms": 9.5315
+          "p95_ms": 178.2729
         },
         "meets_fr32": true,
         "min_scans_fr32": 200,
@@ -836,37 +617,37 @@
         "percentile_method": "linear",
         "stages": {
           "read": {
-            "max_ms": 3.1958,
-            "mean_ms": 2.026,
-            "median_ms": 1.9389,
-            "min_ms": 1.829,
+            "max_ms": 8.2155,
+            "mean_ms": 4.6235,
+            "median_ms": 4.6488,
+            "min_ms": 3.7592,
             "n": 266,
-            "p95_ms": 2.8694
+            "p95_ms": 5.2041
           },
           "score": {
-            "max_ms": 7.8523,
-            "mean_ms": 6.2123,
-            "median_ms": 6.0142,
-            "min_ms": 5.3373,
+            "max_ms": 39.4199,
+            "mean_ms": 14.4637,
+            "median_ms": 13.6784,
+            "min_ms": 12.5408,
             "n": 266,
-            "p95_ms": 7.4005
+            "p95_ms": 16.622
           },
           "segment": {
-            "max_ms": 0.0151,
-            "mean_ms": 0.005,
-            "median_ms": 0.0043,
-            "min_ms": 0.002,
+            "max_ms": 951.7329,
+            "mean_ms": 132.8466,
+            "median_ms": 124.1706,
+            "min_ms": 86.395,
             "n": 266,
-            "p95_ms": 0.0094
+            "p95_ms": 160.5182
           }
         },
         "unaccounted_ms": {
-          "max_ms": 0.0192,
-          "mean_ms": 0.0062,
-          "median_ms": 0.0056,
-          "min_ms": 0.004,
+          "max_ms": 0.0817,
+          "mean_ms": 0.0283,
+          "median_ms": 0.0267,
+          "min_ms": 0.0209,
           "n": 266,
-          "p95_ms": 0.0099
+          "p95_ms": 0.0395
         }
       },
       "mean_occ_adaptive": 58310,
@@ -878,18 +659,18 @@
         "bins": {
           "0-10m": {
             "n_objects": 46,
-            "n_recalled": 46,
-            "recall": 1.0
+            "n_recalled": 45,
+            "recall": 0.978261
           },
           "10-30m": {
             "n_objects": 780,
-            "n_recalled": 770,
-            "recall": 0.987179
+            "n_recalled": 408,
+            "recall": 0.523077
           },
           "30-60m": {
             "n_objects": 378,
-            "n_recalled": 285,
-            "recall": 0.753968
+            "n_recalled": 81,
+            "recall": 0.214286
           },
           "60-100m": {
             "n_objects": 0,
@@ -900,8 +681,8 @@
         "classes": {
           "DYNAMIC_OBJECT": {
             "n_objects": 1204,
-            "n_recalled": 1101,
-            "recall": 0.914452
+            "n_recalled": 534,
+            "recall": 0.443522
           },
           "STATIC_OBSTACLE": {
             "n_objects": 0,
@@ -914,228 +695,11 @@
         "n_objects_below_min_points": 55,
         "overall": {
           "n_objects": 1204,
-          "n_recalled": 1101,
-          "recall": 0.914452
+          "n_recalled": 534,
+          "recall": 0.443522
         }
       },
       "sequence": "04"
-    },
-    "05": {
-      "accuracy": {
-        "bin_edges_m": [
-          0.0,
-          10.0,
-          30.0,
-          60.0,
-          100.0
-        ],
-        "bins": {
-          "0-10m": {
-            "accuracy": 0.93737,
-            "iou": {
-              "DRIVABLE": 0.966752,
-              "DYNAMIC_OBJECT": 0.926113,
-              "NON_DRIVABLE_TERRAIN": 0.871392,
-              "STATIC_OBSTACLE": 0.833811,
-              "VOID": null
-            },
-            "miou": 0.899517,
-            "n_points": 23667897,
-            "n_points_scored": 23497172,
-            "truth_share": {
-              "DRIVABLE": 0.228932,
-              "DYNAMIC_OBJECT": 0.026422,
-              "NON_DRIVABLE_TERRAIN": 0.451744,
-              "STATIC_OBSTACLE": 0.285689,
-              "VOID": 0.007213
-            }
-          },
-          "10-30m": {
-            "accuracy": 0.908905,
-            "iou": {
-              "DRIVABLE": 0.91891,
-              "DYNAMIC_OBJECT": 0.77794,
-              "NON_DRIVABLE_TERRAIN": 0.830038,
-              "STATIC_OBSTACLE": 0.806536,
-              "VOID": null
-            },
-            "miou": 0.833356,
-            "n_points": 12151633,
-            "n_points_scored": 12107627,
-            "truth_share": {
-              "DRIVABLE": 0.158356,
-              "DYNAMIC_OBJECT": 0.032897,
-              "NON_DRIVABLE_TERRAIN": 0.466752,
-              "STATIC_OBSTACLE": 0.338375,
-              "VOID": 0.003621
-            }
-          },
-          "30-60m": {
-            "accuracy": 0.802309,
-            "iou": {
-              "DRIVABLE": 0.787498,
-              "DYNAMIC_OBJECT": 0.53921,
-              "NON_DRIVABLE_TERRAIN": 0.63739,
-              "STATIC_OBSTACLE": 0.687955,
-              "VOID": null
-            },
-            "miou": 0.663013,
-            "n_points": 1650511,
-            "n_points_scored": 1428403,
-            "truth_share": {
-              "DRIVABLE": 0.096192,
-              "DYNAMIC_OBJECT": 0.028956,
-              "NON_DRIVABLE_TERRAIN": 0.392337,
-              "STATIC_OBSTACLE": 0.347946,
-              "VOID": 0.134569
-            }
-          },
-          "60-100m": {
-            "accuracy": null,
-            "iou": {
-              "DRIVABLE": null,
-              "DYNAMIC_OBJECT": null,
-              "NON_DRIVABLE_TERRAIN": null,
-              "STATIC_OBSTACLE": null,
-              "VOID": null
-            },
-            "miou": null,
-            "n_points": 173426,
-            "n_points_scored": 0,
-            "truth_share": {
-              "DRIVABLE": 0.0,
-              "DYNAMIC_OBJECT": 0.0,
-              "NON_DRIVABLE_TERRAIN": 0.0,
-              "STATIC_OBSTACLE": 0.0,
-              "VOID": 1.0
-            }
-          }
-        },
-        "excluded_classes": [
-          "VOID"
-        ],
-        "n_points_outside_envelope": 0,
-        "overall": {
-          "accuracy": 0.922854,
-          "iou": {
-            "DRIVABLE": 0.950291,
-            "DYNAMIC_OBJECT": 0.842356,
-            "NON_DRIVABLE_TERRAIN": 0.848021,
-            "STATIC_OBSTACLE": 0.815845,
-            "VOID": null
-          },
-          "miou": 0.864128,
-          "n_points": 37643467,
-          "n_points_scored": 37033202,
-          "truth_share": {
-            "DRIVABLE": 0.199274,
-            "DYNAMIC_OBJECT": 0.028501,
-            "NON_DRIVABLE_TERRAIN": 0.451903,
-            "STATIC_OBSTACLE": 0.30411,
-            "VOID": 0.016212
-          }
-        }
-      },
-      "latency": {
-        "end_to_end": {
-          "max_ms": 11.4543,
-          "mean_ms": 9.0176,
-          "median_ms": 9.0786,
-          "min_ms": 7.3338,
-          "n": 295,
-          "p95_ms": 10.4387
-        },
-        "meets_fr32": true,
-        "min_scans_fr32": 200,
-        "n_frames": 295,
-        "n_warmup_discarded": 5,
-        "n_warmup_windows": 1,
-        "percentile_method": "linear",
-        "stages": {
-          "read": {
-            "max_ms": 3.1313,
-            "mean_ms": 2.0298,
-            "median_ms": 1.943,
-            "min_ms": 1.8207,
-            "n": 295,
-            "p95_ms": 2.8735
-          },
-          "score": {
-            "max_ms": 8.7307,
-            "mean_ms": 6.9772,
-            "median_ms": 7.0658,
-            "min_ms": 5.3763,
-            "n": 295,
-            "p95_ms": 8.2835
-          },
-          "segment": {
-            "max_ms": 0.012,
-            "mean_ms": 0.0047,
-            "median_ms": 0.0042,
-            "min_ms": 0.0021,
-            "n": 295,
-            "p95_ms": 0.0087
-          }
-        },
-        "unaccounted_ms": {
-          "max_ms": 0.0131,
-          "mean_ms": 0.0058,
-          "median_ms": 0.0053,
-          "min_ms": 0.004,
-          "n": 295,
-          "p95_ms": 0.0093
-        }
-      },
-      "mean_occ_adaptive": 47486,
-      "mean_occ_uniform": 57202,
-      "mean_occ_voxel": 86265,
-      "mean_points_per_scan": 125478,
-      "n_scans": 300,
-      "object_recall": {
-        "bins": {
-          "0-10m": {
-            "n_objects": 311,
-            "n_recalled": 311,
-            "recall": 1.0
-          },
-          "10-30m": {
-            "n_objects": 1043,
-            "n_recalled": 962,
-            "recall": 0.922339
-          },
-          "30-60m": {
-            "n_objects": 834,
-            "n_recalled": 748,
-            "recall": 0.896882
-          },
-          "60-100m": {
-            "n_objects": 0,
-            "n_recalled": 0,
-            "recall": null
-          }
-        },
-        "classes": {
-          "DYNAMIC_OBJECT": {
-            "n_objects": 2188,
-            "n_recalled": 2021,
-            "recall": 0.923675
-          },
-          "STATIC_OBSTACLE": {
-            "n_objects": 0,
-            "n_recalled": 0,
-            "recall": null
-          }
-        },
-        "hit_fraction": 0.5,
-        "min_points": 5,
-        "n_objects_below_min_points": 185,
-        "overall": {
-          "n_objects": 2188,
-          "n_recalled": 2021,
-          "recall": 0.923675
-        }
-      },
-      "sequence": "05"
     }
   },
   "projection": {
@@ -1146,41 +710,39 @@
   },
   "variance": {
     "median_ms": {
-      "max": 10.3249,
-      "mean": 9.1386,
-      "min": 8.0123,
-      "n": 3,
-      "sd": 1.1575,
-      "spread_pct": 12.67
+      "max": 142.206,
+      "mean": 142.206,
+      "min": 142.206,
+      "n": 1,
+      "sd": null,
+      "spread_pct": null
     },
     "miou": {
-      "max": 0.8897,
-      "mean": 0.8664,
-      "min": 0.8454,
-      "n": 3,
-      "sd": 0.0222,
-      "spread_pct": 2.57
+      "max": 0.2913,
+      "mean": 0.2913,
+      "min": 0.2913,
+      "n": 1,
+      "sd": null,
+      "spread_pct": null
     },
     "object_recall": {
-      "max": 0.9339,
-      "mean": 0.924,
-      "min": 0.9145,
-      "n": 3,
-      "sd": 0.0097,
-      "spread_pct": 1.05
+      "max": 0.4435,
+      "mean": 0.4435,
+      "min": 0.4435,
+      "n": 1,
+      "sd": null,
+      "spread_pct": null
     },
     "point_accuracy": {
-      "max": 0.9409,
-      "mean": 0.934,
-      "min": 0.9229,
-      "n": 3,
-      "sd": 0.0098,
-      "spread_pct": 1.04
+      "max": 0.5021,
+      "mean": 0.5021,
+      "min": 0.5021,
+      "n": 1,
+      "sd": null,
+      "spread_pct": null
     },
     "sequences": [
-      "00",
-      "04",
-      "05"
+      "04"
     ]
   }
 }

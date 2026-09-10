@@ -1,0 +1,26 @@
+# Backend build context is the repository root, so everything heavy that is
+# not backend/requirements.txt or model/ must be excluded explicitly.
+
+.git
+.github
+**/__pycache__
+**/*.py[cod]
+**/.pytest_cache
+**/*.egg-info
+backend/.venv
+**/.venv
+venv
+
+frontend
+docs
+tools
+hardware
+*.pdf
+
+# The dataset, the label cache and recorded logs are bind-mounted at run time,
+# never baked in. model/data is ~2.2 GB with KITTI present.
+model/data
+model/results.json
+model/results_*.json
+
+.DS_Store

@@ -65,3 +65,4 @@ export default function AuthLink({ className = '' }: { className?: string }) {
 
 const LINK =
   'text-[13px] font-medium text-[var(--text-lo)] underline-offset-4 transition-colors duration-150 hover:text-[var(--accent)] hover:underline';
+  

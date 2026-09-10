@@ -8,3 +8,8 @@ __pycache__/
 # Python virtualenvs — created per-developer, never committed.
 .venv/
 venv/
+
+# Deployment secrets — see deploy/.env.example
+# Ignore every deploy env file, then re-include the (empty) committed template.
+deploy/.env*
+!deploy/.env.example

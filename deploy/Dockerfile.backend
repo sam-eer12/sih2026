@@ -1,0 +1,53 @@
+# AVR-25D pipeline server — FastAPI + the NumPy mapping engine.
+#
+# Build context is the REPOSITORY ROOT, not this directory:
+#     docker build -f deploy/Dockerfile.backend -t avr25d-backend .
+# because the image needs both backend/requirements.txt and model/.
+#
+# ── Why python:3.13-slim ──────────────────────────────────────────────────
+# CI pins 3.14 (.github/workflows/tests.yml) and the local venv is 3.13.1.
+# 3.13 is chosen here because every pinned wheel below publishes a manylinux
+# build for it on BOTH x86-64 and aarch64, so this stays a no-compile install
+# on an ARM VM. NFR-4 says macOS + Windows; Linux/ARM is a third platform the
+# test matrix does not cover — see docs/DEPLOYMENT.md §9.
+FROM python:3.13-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
+
+WORKDIR /app
+
+# ── Dependencies ──────────────────────────────────────────────────────────
+# backend/requirements.txt is the REAL dependency set: 12 pinned packages.
+# Do NOT use model/requirements.txt — that file is still a global pip freeze
+# (torch, ultralytics, catboost, opencv) and would add ~2 GB of wheels that
+# nothing in the runtime path imports.
+COPY backend/requirements.txt ./backend/requirements.txt
+RUN python -m pip install --upgrade pip \
+ && python -m pip install -r backend/requirements.txt
+
+# ── The package ───────────────────────────────────────────────────────────
+# Copied before install so config.yaml and synth/scenes/*.csv (declared as
+# package-data in pyproject.toml) travel with it. --no-deps because the pinned
+# set above is authoritative; pyproject's ranges must not be allowed to
+# re-resolve numpy or scipy underneath it.
+COPY model/ ./model/
+RUN python -m pip install --no-deps ./model
+
+# Relative paths in the CLI (--data data/kitti, --cache data/cache/network)
+# resolve against the working directory, and the Makefile runs every command
+# from model/. Match that so documented commands work unchanged inside the
+# container.
+WORKDIR /app/model
+
+# data/ is a bind mount at run time (replay logs, label cache, KITTI), never a
+# layer: model/.gitignore excludes data/* for the same reason — a 2.2 GB
+# dataset does not belong in an image that gets rebuilt on every commit.
+EXPOSE 8000
+
+# Overridden by docker-compose. Fixtures is the only mode that needs no data
+# at all, so it is the safe default for a container started by hand.
+CMD ["python", "-m", "avr25d.server.app", \
+     "--fixtures", "--host", "0.0.0.0", "--port", "8000"]
