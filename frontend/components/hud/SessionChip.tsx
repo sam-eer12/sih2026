@@ -11,12 +11,10 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { isAuthConfigured, signOut, watchAuth } from '../../lib/firebase/client';
 import { apiPost } from '../../lib/apiClient';
 
 export default function SessionChip() {
-  const router = useRouter();
   const [email, setEmail] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
 
@@ -41,7 +39,13 @@ export default function SessionChip() {
    */
   const leave = async () => {
     await signOut();
-    router.replace('/login');
+    // A full load, not router.replace(): Next's client Router Cache still
+    // holds this dashboard's payload, so a client-side navigation leaves it
+    // one Back button away from a user who has just signed out. It also tears
+    // down the WebSocket and the WebGL context, which is the honest meaning
+    // of leaving.
+    // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- router.push() is the bug, not the fix
+    window.location.assign('/login');
   };
 
   if (!isAuthConfigured || !ready || !email) return null;
