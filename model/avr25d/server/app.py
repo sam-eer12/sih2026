@@ -789,6 +789,19 @@ def main(argv=None) -> None:
         host      = args.host,
         port      = args.port,
         log_level = args.log_level,
+        # Cloud deployment (docs/DEPLOYMENT.md 12.1). Cell arrays are highly
+        # compressible: measured 34% of raw on real KITTI frames, taking the
+        # stream from 124 Mbit/s to ~42 Mbit/s through Caddy. Costs backend CPU
+        # to save egress, which is the right trade on a metered link -- the
+        # container measured 12.5% CPU of one core while streaming.
+        #
+        # A reverse proxy cannot do this for us: permessage-deflate is
+        # negotiated per WebSocket connection, and Caddy's `encode` directive
+        # does not apply to upgraded connections.
+        #
+        # Localhost demos (NFR-9) pay the CPU for no benefit, but the cost is
+        # small and one code path is worth more than a flag here.
+        ws_per_message_deflate = True,
     )
 
 

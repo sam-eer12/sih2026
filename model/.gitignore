@@ -40,10 +40,20 @@ data/splits/*
 # repo next to the CSV that specifies it.
 !data/scenes_registry.json
 
-# The demo fallback replay log (Path C safety net, FR-39). Recorded with
-# `python -m avr25d.server.app --infer cached --seq 04 --record data/logs/demo.log`.
-!data/logs/
-!data/logs/*
+# The demo fallback replay log (Path C safety net) stays OUT of git, and it is
+# not a preference — it cannot go in. A frame is ~1.85 MB whatever the
+# perception mode, so even a 55-frame log clears GitHub's hard 100 MB
+# per-file limit and the push is rejected outright; the 271-frame log this
+# was written for is 471 MB. Tracking it would also add half a gigabyte to
+# every clone forever, and `git pull` on the VM is the documented redeploy
+# path (docs/DEPLOYMENT.md §14).
+#
+# Ship it instead — the log is transferred by scp during deployment and
+# regenerated locally by one command. Both are documented in
+# docs/DEPLOYMENT.md §8:
+#     python -m avr25d.server.app --infer geometric --seq 04 \
+#         --data data/kitti --record data/logs/demo.log
+data/logs/
 
 __pycache__/
 *.py[cod]

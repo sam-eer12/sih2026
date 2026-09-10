@@ -1,0 +1,104 @@
+# AVR-25D — full stack on one VM.
+#
+#     cd deploy && docker compose up -d --build
+#
+# Three containers: Caddy terminates TLS and routes, Next.js serves the app
+# shell, FastAPI serves the frame stream. MongoDB and Firebase are managed
+# services (Atlas M0 / Spark) and are not containers here.
+#
+# ── FR-41 is preserved ────────────────────────────────────────────────────
+# "The browser shall connect directly to the FastAPI WebSocket. Next.js shall
+# not proxy, buffer or re-serialise frame data."
+#
+# Caddy is not Next.js. /stream is routed to the backend container at the edge
+# and never enters a Next.js route handler — no serialisation hop, no Node
+# process in the frame path. T-W6's assertion ("no Next.js route handler
+# appears in the network trace for /stream") still holds, and killing the
+# frontend container mid-stream does not interrupt rendering. Verify it after
+# deploying: docs/DEPLOYMENT.md §8.
+
+services:
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"     # required for the ACME HTTP-01 challenge, and for the
+      - "443:443"   # redirect to https that Caddy installs automatically
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data      # certificates — MUST persist or every restart
+      - caddy_config:/config  # re-requests from Let's Encrypt and hits the
+    environment:              # 5-per-week duplicate-certificate rate limit
+      DOMAIN: ${DOMAIN:?set DOMAIN in deploy/.env}
+    depends_on:
+      - frontend
+      - backend
+
+  backend:
+    # Named explicitly so a host that already has the image (loaded from
+    # `docker save`, as on the EC2 box) uses it instead of trying to build.
+    # `docker compose up` only builds when the tag is absent or --build is
+    # passed, so this one line is what lets the same file serve both the
+    # build machine and the deployment target.
+    image: avr25d-backend:prod-arm64
+    build:
+      context: ..                        # repo root — needs backend/ and model/
+      dockerfile: deploy/Dockerfile.backend
+    restart: unless-stopped
+    expose:
+      - "8000"                           # internal only; Caddy is the front door
+    volumes:
+      # Replay logs, label cache, KITTI. Bind-mounted so the image stays small
+      # and the data survives a rebuild. See §6 for what to put here.
+      - ../model/data:/app/model/data
+    command:
+      # The cloud profile. --replay needs no dataset, is deterministic, and
+      # cannot fail differently than it did when you recorded it — which is
+      # exactly the property a submission link wants. Swap to
+      #   --infer cached --seq 04 --cache data/cache/network
+      # only if you have shipped the label cache to the VM.
+      - python
+      - -m
+      - avr25d.server.app
+      - --replay
+      - data/logs/demo.log
+      - --host
+      - "0.0.0.0"
+      - --port
+      - "8000"
+    healthcheck:
+      test: ["CMD", "python", "-c",
+             "import urllib.request;urllib.request.urlopen('http://127.0.0.1:8000/health').read()"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  frontend:
+    image: avr25d-frontend:prod-arm64    # see the note on backend.image
+    build:
+      context: ../frontend
+      dockerfile: ../deploy/Dockerfile.frontend
+      args:
+        # Build-time — inlined into the bundle. Getting these wrong produces a
+        # working build that points at localhost. See Dockerfile.frontend.
+        NEXT_PUBLIC_WS_URL: wss://${DOMAIN:?set DOMAIN in deploy/.env}/stream
+        NEXT_PUBLIC_FIREBASE_API_KEY: ${NEXT_PUBLIC_FIREBASE_API_KEY}
+        NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: ${NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN}
+        NEXT_PUBLIC_FIREBASE_PROJECT_ID: ${NEXT_PUBLIC_FIREBASE_PROJECT_ID}
+        NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: ${NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET}
+        NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: ${NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID}
+        NEXT_PUBLIC_FIREBASE_APP_ID: ${NEXT_PUBLIC_FIREBASE_APP_ID}
+    restart: unless-stopped
+    expose:
+      - "3000"
+    environment:
+      # Run-time only. These are credentials: a build arg would be readable
+      # forever in `docker history`.
+      FIREBASE_SERVICE_ACCOUNT: ${FIREBASE_SERVICE_ACCOUNT}
+      MONGODB_URI: ${MONGODB_URI}
+      MONGODB_DB: ${MONGODB_DB:-avr25d}
+
+volumes:
+  caddy_data:
+  caddy_config:
