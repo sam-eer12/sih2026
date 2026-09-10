@@ -8,7 +8,9 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { apiGet, ApiError } from '../../lib/apiClient';
+import { isAuthConfigured } from '../../lib/firebase/client';
 
 interface RunSummary {
   _id: string;
@@ -87,16 +89,56 @@ export default function RunsPage() {
 }
 
 export function Problem({ error }: { error: Error }) {
-  const unconfigured = error instanceof ApiError && error.isUnconfigured;
+  // Come back to whichever runs page the reader was actually on, rather than
+  // the hardcoded /runs the detail page would otherwise inherit.
+  const here = usePathname();
+  const status = error instanceof ApiError ? error.status : 0;
+  // 503 now has two causes — no MONGODB_URI and no FIREBASE_SERVICE_ACCOUNT —
+  // so the copy can no longer name one of them. The server's message already
+  // names whichever it is; print that and keep only the reassurance.
+  const unconfigured = status === 503;
+  // A 401 with no Firebase project is not "you need to sign in" — there is
+  // nothing to sign in to, and offering the link sends the reader to a page
+  // that only says sign-in is switched off. Say the true thing instead.
+  const signedOut = status === 401 && isAuthConfigured;
+  const authOff = status === 401 && !isAuthConfigured;
+
   return (
     <div style={NOTICE}>
       <strong style={{ font: '600 15px/1.3 var(--ui)' }}>
-        {unconfigured ? 'Persistence is switched off' : 'Could not load runs'}
+        {unconfigured
+          ? 'Run history is unavailable'
+          : signedOut
+            ? 'Not signed in'
+            : authOff
+              ? 'Authentication is switched off'
+              : 'Could not load runs'}
       </strong>
       <p style={{ margin: '8px 0 0', color: '#b9b9c8', maxWidth: 640 }}>
-        {unconfigured
-          ? 'No MONGODB_URI is set, so run history is unavailable. The dashboard, the viewer and the HUD are entirely local and keep working without it.'
-          : error.message}
+        {unconfigured ? (
+          <>
+            {error.message} The dashboard, the viewer and the HUD are entirely local and
+            keep working without it.
+          </>
+        ) : signedOut ? (
+          <>
+            This session is not signed in, so run history cannot be read.{' '}
+            <Link href={`/login?next=${encodeURIComponent(here)}`} style={LINK}>
+              Sign in
+            </Link>
+            .
+          </>
+        ) : authOff ? (
+          <>
+            No Firebase project is configured, so requests carry no identity and the
+            server has nobody to attribute a run to. Fill in the{' '}
+            <code style={CODE}>NEXT_PUBLIC_FIREBASE_*</code> values in{' '}
+            <code style={CODE}>.env.local</code> to turn it on. The dashboard, the viewer
+            and the HUD are entirely local and keep working without it.
+          </>
+        ) : (
+          error.message
+        )}
       </p>
     </div>
   );

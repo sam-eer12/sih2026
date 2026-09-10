@@ -5,8 +5,8 @@
 // T-W2 asserts the guard per route and a wrapper is exactly how one handler
 // ends up quietly unwrapped.
 
-import { UnauthorizedError } from './firebase/admin';
-import { MongoNotConfiguredError } from './mongo';
+import { AdminConfigError, UnauthorizedError } from './firebase/admin';
+import { MongoNotConfiguredError, MongoUnreachableError } from './mongo';
 
 /** 400 for a request this server will never accept as written. */
 export class BadRequestError extends Error {
@@ -31,7 +31,16 @@ export function handleRouteError(err: unknown): Response {
   if (err instanceof BadRequestError) {
     return Response.json({ error: err.message }, { status: 400 });
   }
-  if (err instanceof MongoNotConfiguredError) {
+  // 503, not 500: the server is working, a credential it needs is absent.
+  // The message names the variable, because the caller is the team.
+  if (
+    err instanceof AdminConfigError ||
+    err instanceof MongoNotConfiguredError ||
+    err instanceof MongoUnreachableError
+  ) {
+    // Still logged. A half-filled .env.local is silent from the client's side,
+    // and "why is nothing being recorded" is the question this line answers.
+    console.warn('[api] not configured:', err.message);
     return Response.json({ error: err.message }, { status: 503 });
   }
   console.error('[api] unhandled error:', err);

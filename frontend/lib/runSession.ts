@@ -34,6 +34,9 @@ export interface RunSessionOptions {
   onError?: (err: Error) => void;
 }
 
+/** Statuses that mean "not set up yet" rather than "something is wrong". */
+const EXPECTED_WHEN_UNCONFIGURED = new Set([401, 503]);
+
 export function startRunSession(options: RunSessionOptions = {}): RunSession {
   const { onError } = options;
 
@@ -44,9 +47,16 @@ export function startRunSession(options: RunSessionOptions = {}): RunSession {
 
   const disable = (reason?: Error) => {
     status = 'disabled';
-    // A 401 or 503 is the expected state before the accounts exist, not an
-    // error worth shouting about. Anything else is worth reporting.
-    if (reason && !(reason instanceof ApiError)) onError?.(reason);
+    if (!reason) return;
+    // A 401 (signed out) or a 503 (a credential is absent) is the expected
+    // state before the accounts exist, not an error worth shouting about.
+    //
+    // Every OTHER status is. This used to swallow the whole ApiError class,
+    // which meant a 500 from a half-configured server looked identical to
+    // "persistence isn't set up yet" — the dashboard ran, recorded nothing,
+    // and said nothing about it.
+    if (reason instanceof ApiError && EXPECTED_WHEN_UNCONFIGURED.has(reason.status)) return;
+    onError?.(reason);
   };
 
   void (async () => {
