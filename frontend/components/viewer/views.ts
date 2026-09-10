@@ -2,7 +2,7 @@
 //
 //   View 1  raw       — point cloud, one point per cell
 //   View 2  uniform   — the 5 cm uniform grid (Day 4, not built yet)
-//   View 3  adaptive  — the AVR-25D instanced grid          ← default
+//   View 3  adaptive  — the NEXA instanced grid          ← default
 //   View 4  decision  — tracks, routes, risk shading (Days 7-8)
 //
 // Switching a view only flips `visible` and re-renders the last frame into

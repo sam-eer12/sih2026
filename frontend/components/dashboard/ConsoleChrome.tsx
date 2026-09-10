@@ -159,9 +159,8 @@ export function TopRail({
         href="/"
         className="pointer-events-auto flex items-baseline gap-2 transition-opacity hover:opacity-75"
       >
-        {/* nowrap: the hyphen in "AVR-25D" is a legal break opportunity, and
-            this link is a flex item that the rail will happily squeeze. */}
-        <span className="t-heading whitespace-nowrap text-white">AVR-25D</span>
+        {/* nowrap: this link is a flex item that the rail will happily squeeze. */}
+        <span className="t-heading whitespace-nowrap text-white">NEXA</span>
         <span className="t-label whitespace-nowrap text-white/45">Perception</span>
       </Link>
 
