@@ -32,8 +32,29 @@ export async function POST(req: Request): Promise<Response> {
     const user = await requireUser(req);          // FR-37 — before any Mongo call
     const body = await readJson<RunBody>(req);
 
-    if (body.results === undefined && body.config === undefined) {
-      throw new BadRequestError('A run needs at least one of `config` or `results`');
+    // A `runs` document has two producers and two legitimate shapes:
+    //
+    //   tools/publish_run.py — a benchmark publication. Carries `config` and
+    //     `results`: the provenance behind a number in the deck (FR-38, T-W3).
+    //   lib/runSession.ts — a live dashboard session. Carries `startedAt` and
+    //     `platform`, and has neither `config` nor `results` because it is the
+    //     anchor that /api/decisions records hang off (FR-39), not a
+    //     measurement.
+    //
+    // Requiring config-or-results recognised only the first, so every session
+    // run 400'd. The client left `runId` null, never reached
+    // `createDecisionLog`, and `record()` returned on every frame — FR-39
+    // recorded nothing at all, with one console line as the only symptom.
+    // The guard still rejects a contentless body; it knows both shapes now.
+    const isBenchRun = body.config !== undefined || body.results !== undefined;
+    const isSessionRun =
+      body.startedAt !== undefined || body.platform !== undefined;
+
+    if (!isBenchRun && !isSessionRun) {
+      throw new BadRequestError(
+        'A run needs `config`/`results` (a benchmark publication) or ' +
+          '`startedAt` (a live session)'
+      );
     }
 
     const doc: RunDoc = {
