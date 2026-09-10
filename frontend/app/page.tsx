@@ -7,6 +7,7 @@
 // staging is new, and every number still traces to results.json.
 
 import Link from 'next/link';
+import AuthLink from '../components/auth/AuthLink';
 import LidarMountain from '../components/landing/LidarMountain';
 import NeuralField from '../components/landing/NeuralField';
 
@@ -18,6 +19,9 @@ export default function Home() {
     <main className="relative min-h-screen overflow-hidden bg-[var(--ink-900)]">
       {/* Motif sits behind everything and is inert to the pointer. */}
       <NeuralField className="pointer-events-none absolute inset-0 z-0 h-full w-full opacity-60" />
+
+      {/* z-20: the hero's scrims sit at z-10 and would otherwise swallow it. */}
+      <AuthLink className="absolute top-6 right-8 z-20 md:right-16" />
 
       {/* ── Hero ─────────────────────────────────────────────── */}
       <section className="relative z-10">

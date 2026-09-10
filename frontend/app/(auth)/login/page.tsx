@@ -18,6 +18,7 @@ import {
   registerWithEmail,
   signInWithEmail,
   signInWithGoogle,
+  syncAuthCookie,
   watchAuth,
 } from '../../../lib/firebase/client';
 
@@ -102,6 +103,10 @@ function LoginForm() {
       setError(null);
       try {
         await action();
+        // The proxy decides on the cookie, so set it here rather than trusting
+        // that the SDK's listener has already run. Without this the navigation
+        // below can race the gate and land back on this page.
+        syncAuthCookie();
         router.replace(safeNext(next));
       } catch (err) {
         setError(humanise(err));
@@ -252,6 +257,24 @@ function humanise(err: unknown): string {
       return 'The Google sign-in window was closed.';
     case 'auth/operation-not-allowed':
       return 'That sign-in method is not enabled on the Firebase project.';
+    case 'auth/user-disabled':
+      return 'That account has been disabled.';
+    case 'auth/too-many-requests':
+      return 'Too many attempts. Wait a minute and try again.';
+    case 'auth/network-request-failed':
+      return 'Could not reach Firebase. Check the network and try again.';
+    // ── Configuration, not user error ──────────────────────────────────────
+    // These four mean the project is set up wrong, and the raw SDK message for
+    // them is a sentence about an HTTP request. Whoever hits one is on our
+    // team, so name the thing to go and fix.
+    case 'auth/invalid-api-key':
+    case 'auth/api-key-not-valid':
+    case 'auth/api-key-not-valid.-please-pass-a-valid-api-key.':
+      return 'NEXT_PUBLIC_FIREBASE_API_KEY is not valid for this project — check .env.local.';
+    case 'auth/unauthorized-domain':
+      return 'This domain is not in the Firebase project\u2019s authorised list (Authentication \u2192 Settings \u2192 Authorised domains).';
+    case 'auth/popup-blocked':
+      return 'The browser blocked the Google sign-in window. Allow pop-ups for this site.';
     default:
       return err instanceof Error ? err.message : 'Sign-in failed.';
   }
